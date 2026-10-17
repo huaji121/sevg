@@ -5,7 +5,6 @@ package ui
 import (
 	"fmt"
 	"image"
-	"math"
 	"os"
 	"sort"
 
@@ -30,12 +29,18 @@ type Glyph struct {
 	Advance          float32
 }
 
+type IconSide struct {
+	AX, AY, BX, BY float32
+	U, V           float32
+}
+
 type FontAtlas struct {
 	Pixels     []byte
 	W, H       int
 	WhiteUV    [2]float32
 	Glyphs     map[rune]Glyph
 	Icons      map[core.ItemID]Glyph
+	IconSides  map[core.ItemID][]IconSide
 	LineHeight float32
 	Ascent     float32
 	Source     string
@@ -154,6 +159,7 @@ func BuildFontAtlas(runes []rune, blockAtlas []byte) FontAtlas {
 	}
 	glyphs := make(map[rune]Glyph, len(placements))
 	icons := make(map[core.ItemID]Glyph)
+	iconSides := make(map[core.ItemID][]IconSide)
 	for i := range placements {
 		p := &placements[i]
 		px, py := int(p.g.OffsetX), int(p.g.OffsetY)
@@ -194,13 +200,14 @@ func BuildFontAtlas(runes []rune, blockAtlas []byte) FontAtlas {
 				}
 			}
 			icons[p.item] = p.g
+			iconSides[p.item] = buildIconSides(p.rgba, p.g)
 		}
 	}
 
 	whiteUV := [2]float32{1.0 / atlasWidth, 1.0 / float32(height)}
 	return FontAtlas{
 		Pixels: pixels, W: atlasWidth, H: height,
-		WhiteUV: whiteUV, Glyphs: glyphs, Icons: icons,
+		WhiteUV: whiteUV, Glyphs: glyphs, Icons: icons, IconSides: iconSides,
 		LineHeight: lineHeight, Ascent: ascent, Source: source,
 	}
 }
@@ -299,11 +306,12 @@ type Canvas struct {
 	White      [2]float32
 	Glyphs     map[rune]Glyph
 	Icons      map[core.ItemID]Glyph
+	IconSides  map[core.ItemID][]IconSide
 	LineHeight float32
 }
 
 func NewCanvas(w, h int, atlas FontAtlas) *Canvas {
-	return &Canvas{W: w, H: h, White: atlas.WhiteUV, Glyphs: atlas.Glyphs, Icons: atlas.Icons, LineHeight: atlas.LineHeight}
+	return &Canvas{W: w, H: h, White: atlas.WhiteUV, Glyphs: atlas.Glyphs, Icons: atlas.Icons, IconSides: atlas.IconSides, LineHeight: atlas.LineHeight}
 }
 
 func (c *Canvas) Resize(w, h int) { c.W, c.H = w, h }
@@ -335,35 +343,6 @@ func (c *Canvas) Icon(item core.ItemID, x, y, w, h float32, alpha float32) {
 		return
 	}
 	c.quad(x, y, w, h, g.U0, g.V0, g.U1, g.V1, [4]float32{1, 1, 1, alpha})
-}
-
-// IconRotated draws a centered, rotated item icon.
-func (c *Canvas) IconRotated(item core.ItemID, cx, cy, w, h, angle, alpha float32) {
-	c.IconRotatedColored(item, cx, cy, w, h, angle, [4]float32{1, 1, 1, alpha})
-}
-
-// IconRotatedColored is IconRotated with a tint/shadow colour.
-func (c *Canvas) IconRotatedColored(item core.ItemID, cx, cy, w, h, angle float32, col [4]float32) {
-	g, ok := c.Icons[item]
-	if !ok || w <= 0 || h <= 0 || col[3] <= 0 {
-		return
-	}
-	cosA, sinA := float32(math.Cos(float64(angle))), float32(math.Sin(float64(angle)))
-	hw, hh := w/2, h/2
-	local := [4][2]float32{{-hw, -hh}, {hw, -hh}, {hw, hh}, {-hw, hh}}
-	uv := [4][2]float32{{g.U0, g.V0}, {g.U1, g.V0}, {g.U1, g.V1}, {g.U0, g.V1}}
-	var p [4][2]float32
-	for i, q := range local {
-		p[i][0] = cx + q[0]*cosA - q[1]*sinA
-		p[i][1] = cy + q[0]*sinA + q[1]*cosA
-	}
-	for _, idx := range [...]int{0, 1, 2, 0, 2, 3} {
-		c.Verts = append(c.Verts, Vertex{
-			X: p[idx][0], Y: p[idx][1],
-			U: uv[idx][0], V: uv[idx][1],
-			R: col[0], G: col[1], B: col[2], A: col[3],
-		})
-	}
 }
 
 func (c *Canvas) Border(x, y, w, h, t float32, col [4]float32) {

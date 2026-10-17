@@ -73,7 +73,6 @@ const (
 	TileBrown
 	TilePink
 	TileGreen
-	TileWood
 	TileTileCount
 )
 

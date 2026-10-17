@@ -45,7 +45,9 @@ type Frame struct {
 	World             WorldUniforms
 	Entity            world.MeshData
 	EntityTransparent world.MeshData
+	EntityIcon        world.MeshData
 	Held              world.MeshData
+	HeldIcon          world.MeshData
 	UI                *ui.Canvas
 }
 
@@ -105,11 +107,15 @@ type Renderer struct {
 
 	uiVB, entVB, entIB         *sdl.GPUBuffer
 	entTransVB, entTransIB     *sdl.GPUBuffer
+	entIconVB, entIconIB       *sdl.GPUBuffer
 	heldVB, heldIB             *sdl.GPUBuffer
+	heldIconVB, heldIconIB     *sdl.GPUBuffer
 	uiCap, entCap, entTransCap uint32
-	heldCap                    uint32
+	entIconCap, heldCap        uint32
+	heldIconCap                uint32
 	entICount, entTransICount  uint32
-	heldICount                 uint32
+	entIconICount              uint32
+	heldICount, heldIconICount uint32
 	staging                    *sdl.GPUTransferBuffer
 	stagingCap                 uint32
 }
@@ -215,11 +221,13 @@ func (r *Renderer) createResources() error {
 		return err
 	}
 	r.blockView, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, true, true, true)
-	r.Dev.ReleaseShader(blockVS)
-	r.Dev.ReleaseShader(blockFS)
 	if err != nil {
+		r.Dev.ReleaseShader(blockVS)
+		r.Dev.ReleaseShader(blockFS)
 		return err
 	}
+	r.Dev.ReleaseShader(blockVS)
+	r.Dev.ReleaseShader(blockFS)
 
 	uiVS, err := r.loadShader("ui.vert", sdl.GPU_SHADERSTAGE_VERTEX, 0, 1)
 	if err != nil {
@@ -273,6 +281,24 @@ func (r *Renderer) createResources() error {
 		return err
 	}
 	r.heldIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.heldCap})
+	if err != nil {
+		return err
+	}
+	r.entIconCap = r.entCap
+	r.entIconVB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: r.entIconCap})
+	if err != nil {
+		return err
+	}
+	r.entIconIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.entIconCap})
+	if err != nil {
+		return err
+	}
+	r.heldIconCap = r.entCap
+	r.heldIconVB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: r.heldIconCap})
+	if err != nil {
+		return err
+	}
+	r.heldIconIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.heldIconCap})
 	if err != nil {
 		return err
 	}
@@ -613,6 +639,12 @@ func (r *Renderer) Render(f *Frame) error {
 		rp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.entIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
 		rp.DrawIndexedPrimitives(r.entICount, 1, 0, 0, 0)
 	}
+	if r.entIconICount > 0 && r.entIconVB != nil && r.entIconIB != nil {
+		rp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.uiTex, Sampler: r.sampler}})
+		rp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.entIconVB, Offset: 0}})
+		rp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.entIconIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
+		rp.DrawIndexedPrimitives(r.entIconICount, 1, 0, 0, 0)
+	}
 
 	// Transparent chunk pass, back to front.
 	rp.BindGraphicsPipeline(r.blockTrans)
@@ -641,7 +673,7 @@ func (r *Renderer) Render(f *Frame) error {
 	// First-person held item: a dedicated pass with a fresh depth buffer so
 	// its own front faces occlude its back faces without clipping into the
 	// nearby world geometry.
-	if r.heldICount > 0 && r.heldVB != nil && r.heldIB != nil {
+	if r.heldICount > 0 || r.heldIconICount > 0 {
 		heldColor := sdl.GPUColorTargetInfo{
 			Texture: sw.Texture,
 			LoadOp:  sdl.GPU_LOADOP_LOAD,
@@ -662,9 +694,21 @@ func (r *Renderer) Render(f *Frame) error {
 		cb.PushVertexUniformData(0, bytesOf(&wu))
 		cb.PushFragmentUniformData(0, bytesOf(&wu))
 		hvp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}})
-		hvp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.heldVB, Offset: 0}})
-		hvp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.heldIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
-		hvp.DrawIndexedPrimitives(r.heldICount, 1, 0, 0, 0)
+		if r.heldICount > 0 && r.heldVB != nil && r.heldIB != nil {
+			hvp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.heldVB, Offset: 0}})
+			hvp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.heldIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
+			hvp.DrawIndexedPrimitives(r.heldICount, 1, 0, 0, 0)
+		}
+		if r.heldIconICount > 0 && r.heldIconVB != nil && r.heldIconIB != nil {
+			// Match dropped items: alpha test only, no blending. The icon
+			// texture has anti-aliased edge pixels; blending them against
+			// the world produced a translucent pixel fringe.
+			hvp.BindGraphicsPipeline(r.blockOpaque)
+			hvp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.uiTex, Sampler: r.sampler}})
+			hvp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.heldIconVB, Offset: 0}})
+			hvp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.heldIconIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
+			hvp.DrawIndexedPrimitives(r.heldIconICount, 1, 0, 0, 0)
+		}
 		hvp.End()
 	}
 
@@ -691,12 +735,18 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 	entI := meshIndexBytes(f.Entity)
 	entTV := meshVertBytes(f.EntityTransparent)
 	entTI := meshIndexBytes(f.EntityTransparent)
+	entIV := meshVertBytes(f.EntityIcon)
+	entII := meshIndexBytes(f.EntityIcon)
 	heldV := meshVertBytes(f.Held)
 	heldI := meshIndexBytes(f.Held)
+	heldIV := meshVertBytes(f.HeldIcon)
+	heldII := meshIndexBytes(f.HeldIcon)
 	r.entICount = uint32(len(f.Entity.Indices))
 	r.entTransICount = uint32(len(f.EntityTransparent.Indices))
+	r.entIconICount = uint32(len(f.EntityIcon.Indices))
 	r.heldICount = uint32(len(f.Held.Indices))
-	total := len(uiBytes) + len(entV) + len(entI) + len(entTV) + len(entTI) + len(heldV) + len(heldI)
+	r.heldIconICount = uint32(len(f.HeldIcon.Indices))
+	total := len(uiBytes) + len(entV) + len(entI) + len(entTV) + len(entTI) + len(entIV) + len(entII) + len(heldV) + len(heldI) + len(heldIV) + len(heldII)
 	if total == 0 {
 		return nil
 	}
@@ -748,6 +798,21 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 			return err
 		}
 	}
+	needEntIcon := maxInt(len(entIV), len(entII))
+	if uint32(needEntIcon) > r.entIconCap {
+		r.Dev.ReleaseBuffer(r.entIconVB)
+		r.Dev.ReleaseBuffer(r.entIconIB)
+		r.entIconCap = uint32(needEntIcon * 2)
+		var err error
+		r.entIconVB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: r.entIconCap})
+		if err != nil {
+			return err
+		}
+		r.entIconIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.entIconCap})
+		if err != nil {
+			return err
+		}
+	}
 	needHeld := maxInt(len(heldV), len(heldI))
 	if uint32(needHeld) > r.heldCap {
 		r.Dev.ReleaseBuffer(r.heldVB)
@@ -763,6 +828,21 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 			return err
 		}
 	}
+	needHeldIcon := maxInt(len(heldIV), len(heldII))
+	if uint32(needHeldIcon) > r.heldIconCap {
+		r.Dev.ReleaseBuffer(r.heldIconVB)
+		r.Dev.ReleaseBuffer(r.heldIconIB)
+		r.heldIconCap = uint32(needHeldIcon * 2)
+		var err error
+		r.heldIconVB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: r.heldIconCap})
+		if err != nil {
+			return err
+		}
+		r.heldIconIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.heldIconCap})
+		if err != nil {
+			return err
+		}
+	}
 	ptr, err := r.Dev.MapTransferBuffer(r.staging, true)
 	if err != nil {
 		return err
@@ -773,15 +853,23 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 	offEntI := offEntV + len(entV)
 	offEntTV := offEntI + len(entI)
 	offEntTI := offEntTV + len(entTV)
-	offHeldV := offEntTI + len(entTI)
+	offEntIV := offEntTI + len(entTI)
+	offEntII := offEntIV + len(entIV)
+	offHeldV := offEntII + len(entII)
 	offHeldI := offHeldV + len(heldV)
+	offHeldIV := offHeldI + len(heldI)
+	offHeldII := offHeldIV + len(heldIV)
 	copy(mem[offUI:], uiBytes)
 	copy(mem[offEntV:], entV)
 	copy(mem[offEntI:], entI)
 	copy(mem[offEntTV:], entTV)
 	copy(mem[offEntTI:], entTI)
+	copy(mem[offEntIV:], entIV)
+	copy(mem[offEntII:], entII)
 	copy(mem[offHeldV:], heldV)
 	copy(mem[offHeldI:], heldI)
+	copy(mem[offHeldIV:], heldIV)
+	copy(mem[offHeldII:], heldII)
 	r.Dev.UnmapTransferBuffer(r.staging)
 	cb, err := r.Dev.AcquireCommandBuffer()
 	if err != nil {
@@ -823,6 +911,20 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 			true,
 		)
 	}
+	if len(entIV) > 0 {
+		cp.UploadToGPUBuffer(
+			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offEntIV)},
+			&sdl.GPUBufferRegion{Buffer: r.entIconVB, Offset: 0, Size: uint32(len(entIV))},
+			true,
+		)
+	}
+	if len(entII) > 0 {
+		cp.UploadToGPUBuffer(
+			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offEntII)},
+			&sdl.GPUBufferRegion{Buffer: r.entIconIB, Offset: 0, Size: uint32(len(entII))},
+			true,
+		)
+	}
 	if len(heldV) > 0 {
 		cp.UploadToGPUBuffer(
 			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offHeldV)},
@@ -834,6 +936,20 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 		cp.UploadToGPUBuffer(
 			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offHeldI)},
 			&sdl.GPUBufferRegion{Buffer: r.heldIB, Offset: 0, Size: uint32(len(heldI))},
+			true,
+		)
+	}
+	if len(heldIV) > 0 {
+		cp.UploadToGPUBuffer(
+			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offHeldIV)},
+			&sdl.GPUBufferRegion{Buffer: r.heldIconVB, Offset: 0, Size: uint32(len(heldIV))},
+			true,
+		)
+	}
+	if len(heldII) > 0 {
+		cp.UploadToGPUBuffer(
+			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offHeldII)},
+			&sdl.GPUBufferRegion{Buffer: r.heldIconIB, Offset: 0, Size: uint32(len(heldII))},
 			true,
 		)
 	}
@@ -891,7 +1007,7 @@ func (r *Renderer) Close() {
 		gc.transparent.release(r.Dev)
 	}
 	r.chunks = map[[2]int]*gpuChunk{}
-	for _, b := range []*sdl.GPUBuffer{r.uiVB, r.entVB, r.entIB, r.entTransVB, r.entTransIB, r.heldVB, r.heldIB} {
+	for _, b := range []*sdl.GPUBuffer{r.uiVB, r.entVB, r.entIB, r.entTransVB, r.entTransIB, r.entIconVB, r.entIconIB, r.heldVB, r.heldIB, r.heldIconVB, r.heldIconIB} {
 		if b != nil {
 			r.Dev.ReleaseBuffer(b)
 		}

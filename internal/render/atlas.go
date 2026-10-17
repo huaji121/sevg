@@ -401,8 +401,6 @@ func drawTile(tile int, put func(tile, x, y int, c rgba)) {
 		fill(rgba{232, 74, 108, 255}, 3)
 	case core.TileGreen:
 		fill(rgba{63, 140, 61, 255}, 3)
-	case core.TileWood:
-		fill(rgba{174, 123, 63, 255}, 3)
 	}
 }
 

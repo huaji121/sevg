@@ -5,6 +5,7 @@ import (
 
 	"sevg/internal/core"
 	"sevg/internal/mathx"
+	"sevg/internal/ui"
 	"sevg/internal/world"
 )
 
@@ -40,23 +41,10 @@ func TestPlantDropGeometry(t *testing.T) {
 	}
 }
 
-func TestToolDropGeometry(t *testing.T) {
-	var sword world.MeshData
-	appendSword(&sword, mathx.Vec3{X: 0.5, Y: 64.2, Z: 0.5}, core.TileWood)
-	if len(sword.Vertices) == 0 || len(sword.Indices) == 0 {
-		t.Fatal("sword has no geometry")
-	}
-	var pick world.MeshData
-	appendPickaxe(&pick, mathx.Vec3{X: 0.5, Y: 64.2, Z: 0.5}, core.TileGray)
-	if len(pick.Vertices) == 0 || len(pick.Indices) == 0 {
-		t.Fatal("pickaxe has no geometry")
-	}
-}
-
 func TestGlassDropUsesTransparentMesh(t *testing.T) {
 	g := newTestGame(t)
 	g.mobs.Drop(core.ItemGlass, 1, mathx.Vec3{X: 0.5, Y: 64.2, Z: 0.5}, mathx.Vec3{})
-	opaque, transparent := g.buildEntityMeshes()
+	opaque, transparent, _ := g.buildEntityMeshes()
 	if len(transparent.Vertices) != 24 || len(transparent.Indices) != 36 {
 		t.Fatalf("glass drop transparent mesh: %d/%d", len(transparent.Vertices), len(transparent.Indices))
 	}
@@ -80,5 +68,16 @@ func TestHeldItemMesh(t *testing.T) {
 	g.inv.Slots[0] = core.Stack{Item: core.ItemStonePickaxe, Count: 1}
 	if m = g.buildHeldMesh(); len(m.Vertices) != 0 {
 		t.Fatal("tool should use the inventory icon, not the 3D held mesh")
+	}
+}
+func TestIconCardGeometry(t *testing.T) {
+	var m world.MeshData
+	icon := ui.Glyph{U0: 0.1, V0: 0.2, U1: 0.3, V1: 0.4}
+	appendIconCard(&m, mathx.Vec3{X: 0.5, Y: 64, Z: 0.5}, mathx.V3(1, 0, 0), mathx.V3(0, 1, 0), mathx.V3(0, 0, 1), 0.3, 0.3, 0.012, icon, []ui.IconSide{{AX: -0.5, AY: -0.5, BX: -0.5, BY: 0.5, U: 0.2, V: 0.3}})
+	if len(m.Vertices) != 8 || len(m.Indices) != 12 {
+		t.Fatalf("icon card vertices=%d indices=%d", len(m.Vertices), len(m.Indices))
+	}
+	if m.Vertices[0].U != icon.U0 || m.Vertices[0].V != icon.V1 {
+		t.Fatalf("icon card front UV = %v,%v", m.Vertices[0].U, m.Vertices[0].V)
 	}
 }

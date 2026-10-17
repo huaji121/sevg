@@ -20,9 +20,6 @@ func (g *Game) drawUI() {
 	case StateMenu:
 		g.drawMenu(w, h)
 	default:
-		if g.state == StatePlaying {
-			g.drawHeldIcon(w, h)
-		}
 		g.drawHUD(w, h)
 		switch g.state {
 		case StateInventory:
@@ -513,8 +510,8 @@ func worldChunkZ(z float32) int { return int(math.Floor(float64(z))) / 16 }
 
 // Entity and block-highlight geometry, rendered through the block atlas
 // pipeline so it shares fog, depth and lighting with terrain.
-func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData) {
-	var opaque, transparent world.MeshData
+func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshData) {
+	var opaque, transparent, icons world.MeshData
 	if g.mobs != nil {
 		for _, mob := range g.mobs.Mobs {
 			if mob.Dead {
@@ -547,21 +544,16 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData) {
 				appendBlockBox(&transparent, c.Sub(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), c.Add(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), def.Block)
 			case entity.DropVisualPlant:
 				appendPlant(&opaque, c, 0.34, 0.42, def.Block)
-			case entity.DropVisualSword:
-				blade := uint8(core.TileWood)
-				if d.Item == core.ItemIronSword {
-					blade = uint8(core.TileWhite)
-				}
-				appendSword(&opaque, c, blade)
-			case entity.DropVisualPickaxe:
-				head := uint8(core.TileGray)
-				if d.Item == core.ItemIronPickaxe {
-					head = uint8(core.TileWhite)
-				}
-				appendPickaxe(&opaque, c, head)
 			default:
-				col := [4]float32{def.Color[0], def.Color[1], def.Color[2], 1}
-				appendEntityBox(&opaque, c.Sub(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), c.Add(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), col)
+				if g.canv != nil {
+					if gph, ok := g.canv.Icons[d.Item]; ok {
+						yaw := d.Age*1.6 + float32(d.ID)*0.7
+						right := mathx.Vec3{X: float32(math.Cos(float64(yaw))), Z: float32(math.Sin(float64(yaw)))}
+						up := mathx.V3(0, 1, 0)
+						normal := right.Cross(up)
+						appendIconCard(&icons, c, right, up, normal, 0.32, 0.32, 0.012, gph, g.canv.IconSides[d.Item])
+					}
+				}
 			}
 		}
 	}
@@ -571,36 +563,7 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData) {
 		max := mathx.V3(float32(x)+1.003, float32(y)+1.003, float32(z)+1.003)
 		appendOutline(&opaque, min, max, [4]float32{1, 0.88, 0.35, 1})
 	}
-	return opaque, transparent
-}
-
-// drawHeldIcon uses the same generated icon as the inventory for tools,
-// food and materials. It is drawn in the UI pass, before the HUD.
-func (g *Game) drawHeldIcon(w, h float32) {
-	if g.player == nil {
-		return
-	}
-	st := g.inv.SelectedStack()
-	if st.Empty() {
-		return
-	}
-	switch entity.VisualForItem(st.Item) {
-	case entity.DropVisualBlock, entity.DropVisualGlass, entity.DropVisualPlant:
-		return
-	}
-	size := w
-	if h < size {
-		size = h
-	}
-	size *= 0.22
-	cx := w - size*0.68
-	cy := h - size*0.72 + float32(math.Sin(float64(g.frame)*0.08))*2 + g.player.Bob*8
-	angle := float32(-0.14)
-	if g.breakActive {
-		angle += float32(math.Sin(float64(g.frame)*0.9)) * 0.16
-	}
-	g.canv.IconRotatedColored(st.Item, cx+4, cy+6, size, size, angle, [4]float32{0, 0, 0, 0.28})
-	g.canv.IconRotated(st.Item, cx, cy, size, size, angle, 1)
+	return opaque, transparent, icons
 }
 
 // buildHeldMesh creates a small first-person view model for the selected
@@ -659,6 +622,80 @@ func (g *Game) buildHeldMesh() world.MeshData {
 	return out
 }
 
+// buildHeldIconMesh builds the thick sprite used for tools, food and
+// materials. It is drawn with the UI atlas so its artwork exactly matches
+// the inventory icon.
+func (g *Game) buildHeldIconMesh() world.MeshData {
+	if g.state != StatePlaying || g.player == nil || g.canv == nil {
+		return world.MeshData{}
+	}
+	st := g.inv.SelectedStack()
+	if st.Empty() {
+		return world.MeshData{}
+	}
+	switch entity.VisualForItem(st.Item) {
+	case entity.DropVisualBlock, entity.DropVisualGlass, entity.DropVisualPlant:
+		return world.MeshData{}
+	}
+	icon, ok := g.canv.Icons[st.Item]
+	if !ok {
+		return world.MeshData{}
+	}
+	fwd := g.player.LookDir()
+	right := fwd.Cross(mathx.V3(0, 1, 0)).Normalize()
+	up := right.Cross(fwd)
+	normal := fwd.Mul(-1)
+	yaw := float32(0.34)
+	cy, sy := float32(math.Cos(float64(yaw))), float32(math.Sin(float64(yaw)))
+	rotRight := right.Mul(cy).Add(normal.Mul(sy))
+	rotNormal := normal.Mul(cy).Sub(right.Mul(sy))
+	roll := float32(-0.10)
+	cr, sr := float32(math.Cos(float64(roll))), float32(math.Sin(float64(roll)))
+	cardRight := rotRight.Mul(cr).Add(up.Mul(sr))
+	cardUp := up.Mul(cr).Sub(rotRight.Mul(sr))
+	eye := g.player.Eye()
+	c := eye.Add(right.Mul(0.28)).Add(up.Mul(-0.19 + g.player.Bob*1.5)).Add(fwd.Mul(0.50))
+	var held world.MeshData
+	appendIconCard(&held, c, cardRight, cardUp, rotNormal, 0.30, 0.30, 0.012, icon, g.canv.IconSides[st.Item])
+	return held
+}
+
+// appendIconCard builds a single textured sheet plus silhouette side walls.
+// Keeping one sheet aligned avoids a mirrored second copy showing through
+// transparent pixels; the walls give the item its thickness.
+func appendIconCard(m *world.MeshData, center, right, up, normal mathx.Vec3, w, h, t float32, icon ui.Glyph, sides []ui.IconSide) {
+	hw, hh, ht := w/2, h/2, t/2
+	n := normal.Mul(ht)
+	bl := center.Sub(right.Mul(hw)).Sub(up.Mul(hh))
+	br := center.Add(right.Mul(hw)).Sub(up.Mul(hh))
+	tr := center.Add(right.Mul(hw)).Add(up.Mul(hh))
+	tl := center.Sub(right.Mul(hw)).Add(up.Mul(hh))
+	fbl, fbr, ftr, ftl := bl.Add(n), br.Add(n), tr.Add(n), tl.Add(n)
+
+	frontUV := [4][2]float32{{icon.U0, icon.V1}, {icon.U1, icon.V1}, {icon.U1, icon.V0}, {icon.U0, icon.V0}}
+	addIconQuad(m, fbl, fbr, ftr, ftl, frontUV, 1.0)
+
+	for _, s := range sides {
+		fa := center.Add(right.Mul(s.AX * w)).Add(up.Mul(s.AY * h)).Add(n)
+		fb := center.Add(right.Mul(s.BX * w)).Add(up.Mul(s.BY * h)).Add(n)
+		ba := center.Add(right.Mul(s.AX * w)).Add(up.Mul(s.AY * h)).Sub(n)
+		bb := center.Add(right.Mul(s.BX * w)).Add(up.Mul(s.BY * h)).Sub(n)
+		uv := [4][2]float32{{s.U, s.V}, {s.U, s.V}, {s.U, s.V}, {s.U, s.V}}
+		addIconQuad(m, fa, fb, bb, ba, uv, 0.78)
+	}
+}
+
+func addIconQuad(m *world.MeshData, a, b, c, d mathx.Vec3, uv [4][2]float32, light float32) {
+	base := uint32(len(m.Vertices))
+	for i, p := range [4]mathx.Vec3{a, b, c, d} {
+		m.Vertices = append(m.Vertices, world.Vertex{
+			X: p.X, Y: p.Y, Z: p.Z,
+			U: uv[i][0], V: uv[i][1], Light: light,
+		})
+	}
+	m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)
+}
+
 func appendPlant(m *world.MeshData, c mathx.Vec3, width, height float32, block core.BlockID) {
 	u0, v0, u1, v1 := world.TileUV(block.Tile(2))
 	hx, hz := width/2, width/2
@@ -689,25 +726,6 @@ func appendPlant(m *world.MeshData, c mathx.Vec3, width, height float32, block c
 		}
 		m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)
 	}
-}
-
-func appendTileBox(m *world.MeshData, center, size mathx.Vec3, tile uint8) {
-	appendBoxFaces(m, center.Sub(size.Mul(0.5)), center.Add(size.Mul(0.5)), func(int) uint8 { return tile })
-}
-
-func appendSword(m *world.MeshData, c mathx.Vec3, bladeTile uint8) {
-	appendTileBox(m, c.Add(mathx.Vec3{Y: -0.09}), mathx.Vec3{X: 0.04, Y: 0.15, Z: 0.04}, core.TileBrown)
-	appendTileBox(m, c.Add(mathx.Vec3{Y: -0.18}), mathx.Vec3{X: 0.08, Y: 0.04, Z: 0.05}, core.TileDark)
-	appendTileBox(m, c.Add(mathx.Vec3{Y: -0.02}), mathx.Vec3{X: 0.17, Y: 0.035, Z: 0.05}, core.TileDark)
-	appendTileBox(m, c.Add(mathx.Vec3{Y: 0.10}), mathx.Vec3{X: 0.07, Y: 0.22, Z: 0.025}, bladeTile)
-	appendTileBox(m, c.Add(mathx.Vec3{Y: 0.225}), mathx.Vec3{X: 0.04, Y: 0.045, Z: 0.02}, core.TileWhite)
-}
-
-func appendPickaxe(m *world.MeshData, c mathx.Vec3, headTile uint8) {
-	appendTileBox(m, c, mathx.Vec3{X: 0.04, Y: 0.34, Z: 0.04}, core.TileBrown)
-	appendTileBox(m, c.Add(mathx.Vec3{Y: 0.15}), mathx.Vec3{X: 0.28, Y: 0.06, Z: 0.06}, headTile)
-	appendTileBox(m, c.Add(mathx.Vec3{X: -0.15, Y: 0.14}), mathx.Vec3{X: 0.05, Y: 0.09, Z: 0.055}, core.TileWhite)
-	appendTileBox(m, c.Add(mathx.Vec3{X: 0.15, Y: 0.14}), mathx.Vec3{X: 0.05, Y: 0.09, Z: 0.055}, core.TileWhite)
 }
 
 type entityPaletteEntry struct {

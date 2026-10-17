@@ -39,6 +39,12 @@ func buildItemIcons(atlas []byte) map[core.ItemID]*image.RGBA {
 			img = materialIcon(def.Color)
 		}
 		if img != nil {
+			// Tools, food and materials are rendered as hard-edged pixel
+			// sprites in the world. Keeping anti-aliased alpha here would
+			// produce a translucent fringe around the held/dropped item.
+			if def.Kind != core.KindBlock {
+				hardenIconAlpha(img)
+			}
 			out[item] = img
 		}
 	}
@@ -208,6 +214,57 @@ func materialIcon(col [3]float32) *image.RGBA {
 	fillCircle(img, 19, 20, 9, c)
 	fillCircle(img, 16, 17, 3, [4]uint8{255, 255, 255, 70})
 	return img
+}
+
+func buildIconSides(img *image.RGBA, g Glyph) []IconSide {
+	w, h := img.Rect.Dx(), img.Rect.Dy()
+	const threshold = 40
+	opaque := func(x, y int) bool {
+		if x < 0 || y < 0 || x >= w || y >= h {
+			return false
+		}
+		return img.Pix[y*img.Stride+x*4+3] > threshold
+	}
+	var sides []IconSide
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			if !opaque(x, y) {
+				continue
+			}
+			u := g.U0 + (float32(x)+0.5)/float32(w)*(g.U1-g.U0)
+			v := g.V0 + (float32(y)+0.5)/float32(h)*(g.V1-g.V0)
+			xL := float32(x)/float32(w) - 0.5
+			xR := float32(x+1)/float32(w) - 0.5
+			yT := 0.5 - float32(y)/float32(h)
+			yB := 0.5 - float32(y+1)/float32(h)
+			if !opaque(x-1, y) {
+				sides = append(sides, IconSide{AX: xL, AY: yB, BX: xL, BY: yT, U: u, V: v})
+			}
+			if !opaque(x+1, y) {
+				sides = append(sides, IconSide{AX: xR, AY: yB, BX: xR, BY: yT, U: u, V: v})
+			}
+			if !opaque(x, y-1) {
+				sides = append(sides, IconSide{AX: xL, AY: yT, BX: xR, BY: yT, U: u, V: v})
+			}
+			if !opaque(x, y+1) {
+				sides = append(sides, IconSide{AX: xR, AY: yB, BX: xL, BY: yB, U: u, V: v})
+			}
+		}
+	}
+	return sides
+}
+
+func hardenIconAlpha(img *image.RGBA) {
+	for y := 0; y < img.Rect.Dy(); y++ {
+		for x := 0; x < img.Rect.Dx(); x++ {
+			i := y*img.Stride + x*4
+			if img.Pix[i+3] < 128 {
+				img.Pix[i], img.Pix[i+1], img.Pix[i+2], img.Pix[i+3] = 0, 0, 0, 0
+			} else {
+				img.Pix[i+3] = 255
+			}
+		}
+	}
 }
 
 func setPixel(img *image.RGBA, x, y int, r, g, b, a uint8) {

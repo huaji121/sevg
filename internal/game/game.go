@@ -465,13 +465,15 @@ func (g *Game) renderFrame() {
 		sky.FogStart = 1
 		sky.FogEnd = 22
 	}
-	opaque, transparent := g.buildEntityMeshes()
+	opaque, transparent, entityIcons := g.buildEntityMeshes()
 	f := &render.Frame{
 		Camera:            cam,
 		World:             sky,
 		Entity:            opaque,
 		EntityTransparent: transparent,
+		EntityIcon:        entityIcons,
 		Held:              g.buildHeldMesh(),
+		HeldIcon:          g.buildHeldIconMesh(),
 		UI:                g.canv,
 	}
 	if err := g.gfx.Render(f); err != nil {

@@ -47,6 +47,9 @@ func TestFontAtlasPacksIconsAndSpaces(t *testing.T) {
 	if _, ok := fa.Icons[core.ItemPlanks]; !ok {
 		t.Fatal("plank icon was not packed into the font atlas")
 	}
+	if len(fa.IconSides[core.ItemPlanks]) == 0 {
+		t.Fatal("plank silhouette sides were not recorded")
+	}
 	if _, ok := fa.Glyphs[' ']; !ok {
 		t.Fatal("space glyph missing from atlas")
 	}
