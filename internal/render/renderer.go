@@ -211,7 +211,7 @@ func (r *Renderer) createResources() error {
 		r.Dev.ReleaseShader(blockFS)
 		return err
 	}
-	r.blockView, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, true, false, false)
+	r.blockView, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, true, true, true)
 	r.Dev.ReleaseShader(blockVS)
 	r.Dev.ReleaseShader(blockFS)
 	if err != nil {
@@ -633,18 +633,37 @@ func (r *Renderer) Render(f *Frame) error {
 		rp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.entTransIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
 		rp.DrawIndexedPrimitives(r.entTransICount, 1, 0, 0, 0)
 	}
-	// First-person held item: drawn last with depth testing disabled so it
-	// stays in front of nearby terrain.
+	rp.End()
+
+	// First-person held item: a dedicated pass with a fresh depth buffer so
+	// its own front faces occlude its back faces without clipping into the
+	// nearby world geometry.
 	if r.heldICount > 0 && r.heldVB != nil && r.heldIB != nil {
-		rp.BindGraphicsPipeline(r.blockView)
+		heldColor := sdl.GPUColorTargetInfo{
+			Texture: sw.Texture,
+			LoadOp:  sdl.GPU_LOADOP_LOAD,
+			StoreOp: sdl.GPU_STOREOP_STORE,
+		}
+		heldDepth := sdl.GPUDepthStencilTargetInfo{
+			Texture:        r.depth,
+			Cycle:          true,
+			ClearDepth:     1,
+			ClearStencil:   0,
+			LoadOp:         sdl.GPU_LOADOP_CLEAR,
+			StoreOp:        sdl.GPU_STOREOP_DONT_CARE,
+			StencilLoadOp:  sdl.GPU_LOADOP_DONT_CARE,
+			StencilStoreOp: sdl.GPU_STOREOP_DONT_CARE,
+		}
+		hvp := cb.BeginRenderPass([]sdl.GPUColorTargetInfo{heldColor}, &heldDepth)
+		hvp.BindGraphicsPipeline(r.blockView)
 		cb.PushVertexUniformData(0, bytesOf(&wu))
 		cb.PushFragmentUniformData(0, bytesOf(&wu))
-		rp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}})
-		rp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.heldVB, Offset: 0}})
-		rp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.heldIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
-		rp.DrawIndexedPrimitives(r.heldICount, 1, 0, 0, 0)
+		hvp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}})
+		hvp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.heldVB, Offset: 0}})
+		hvp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.heldIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
+		hvp.DrawIndexedPrimitives(r.heldICount, 1, 0, 0, 0)
+		hvp.End()
 	}
-	rp.End()
 
 	if f.UI != nil && len(f.UI.Verts) > 0 && r.uiVB != nil {
 		uiColor := sdl.GPUColorTargetInfo{
