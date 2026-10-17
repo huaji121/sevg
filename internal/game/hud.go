@@ -204,8 +204,9 @@ func (g *Game) drawHUD(w, h float32) {
 	if !st.Empty() {
 		label := i18n.ItemName(st.Item)
 		lw := c.TextWidth(label, 1.2) + 24
-		c.Panel(w/2-lw/2, y0-34, lw, 26, ui.RGBA(12, 16, 20, 200), ui.RGBA(70, 90, 100, 150))
-		c.TextCentered(w/2, y0-29, label, 1.2, ui.TextColor)
+		r := ui.Rect{X: w/2 - lw/2, Y: y0 - 34, W: lw, H: 26}
+		c.Panel(r.X, r.Y, r.W, r.H, ui.RGBA(12, 16, 20, 200), ui.RGBA(70, 90, 100, 150))
+		g.drawCenteredLabel(r, label, 1.2, ui.TextColor)
 	}
 
 	if g.helpTime > 0 && g.state == StatePlaying && !g.chatOpen {
@@ -342,10 +343,7 @@ func (g *Game) drawSurvivalInventory(w, h float32) {
 		if g.invSlotRect(vis).Contains(g.mouseX, g.mouseY) {
 			st := g.inv.Slots[visualToSlot(vis)]
 			if !st.Empty() {
-				name := i18n.ItemName(st.Item)
-				tw := c.TextWidth(name, 1.1) + 16
-				c.Panel(g.mouseX+14, g.mouseY+12, tw, 24, ui.RGBA(8, 12, 16, 240), ui.RGBA(90, 105, 115, 220))
-				c.Text(g.mouseX+22, g.mouseY+17, name, 1.1, ui.TextColor)
+				g.drawItemTooltip(i18n.ItemName(st.Item))
 			}
 		}
 	}
@@ -952,4 +950,20 @@ func (g *Game) appendFallingBlocks(m *world.MeshData) {
 			m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)
 		}
 	}
+}
+func (g *Game) drawCenteredLabel(r ui.Rect, text string, scale float32, col [4]float32) {
+	y := r.Y + (r.H-g.canv.LineHeight*scale)/2
+	if y < r.Y+2 {
+		y = r.Y + 2
+	}
+	g.canv.TextCentered(r.X+r.W/2, y, text, scale, col)
+}
+
+func (g *Game) drawItemTooltip(name string) {
+	c := g.canv
+	const h = float32(24)
+	tw := c.TextWidth(name, 1.1) + 16
+	r := ui.Rect{X: g.mouseX + 14, Y: g.mouseY + 12, W: tw, H: h}
+	c.Panel(r.X, r.Y, r.W, r.H, ui.RGBA(8, 12, 16, 240), ui.RGBA(90, 105, 115, 220))
+	g.drawCenteredLabel(r, name, 1.1, ui.TextColor)
 }

@@ -97,10 +97,7 @@ func (g *Game) drawCreativeInventory(w, h float32) {
 		g.drawInventorySlot(r, st, bg, bd, 0)
 	}
 	if item := g.creativeItemAt(g.mouseX, g.mouseY); item != core.ItemNone {
-		name := i18n.ItemName(item)
-		tw := c.TextWidth(name, 1.1) + 16
-		c.Panel(g.mouseX+14, g.mouseY+12, tw, 24, ui.RGBA(8, 12, 16, 240), ui.RGBA(90, 105, 115, 220))
-		c.Text(g.mouseX+22, g.mouseY+17, name, 1.1, ui.TextColor)
+		g.drawItemTooltip(i18n.ItemName(item))
 	}
 
 	const slot = float32(42)
