@@ -1,0 +1,545 @@
+package game
+
+import (
+	"fmt"
+	"math"
+	"sync"
+	"time"
+
+	"github.com/Zyko0/go-sdl3/bin/binsdl"
+	"github.com/Zyko0/go-sdl3/sdl"
+
+	"sevg/internal/core"
+	"sevg/internal/entity"
+	"sevg/internal/mathx"
+	"sevg/internal/player"
+	"sevg/internal/render"
+	"sevg/internal/ui"
+	"sevg/internal/world"
+)
+
+type Options struct {
+	Width, Height int
+	Seed          int64
+	RenderDist    int
+	SavePath      string
+	SmokeFrames   int
+	Continue      bool
+}
+
+type State int
+
+const (
+	StateMenu State = iota
+	StatePlaying
+	StateInventory
+	StatePaused
+	StateDead
+)
+
+type genResult struct {
+	pos world.ChunkPos
+	ok  bool
+}
+
+type Game struct {
+	opts Options
+	Win  *sdl.Window
+	gfx  *render.Renderer
+	canv *ui.Canvas
+
+	state  State
+	seed   int64
+	world  *world.World
+	player *player.Player
+	mobs   *entity.Manager
+	inv    core.Inventory
+	time   float64
+	saveAt string
+
+	mouseX, mouseY float32
+	mouseLeft      bool
+	mouseRight     bool
+	heldStack      core.Stack
+
+	breakPos      [3]int
+	breakProgress float32
+	breakActive   bool
+	targetValid   bool
+	attackCool    float32
+	placeCool     float32
+	pickCool      float32
+
+	toast      string
+	toastTime  float32
+	helpTime   float32
+	debug      bool
+	fullscreen bool
+
+	fps   float64
+	frame int
+	quit  bool
+
+	saveTimer float32
+	unloadT   float32
+	streamT   float32
+	lastTime  time.Time
+
+	// Async chunk generation.
+	genJobs   chan world.ChunkPos
+	genResult chan genResult
+	genDone   chan struct{}
+	genWG     sync.WaitGroup
+	pending   map[[2]int]bool
+	meshed    map[[2]int]bool
+}
+
+func Run(opts Options) error {
+	if opts.Width <= 0 {
+		opts.Width = 1280
+	}
+	if opts.Height <= 0 {
+		opts.Height = 720
+	}
+	if opts.RenderDist < 3 {
+		opts.RenderDist = 6
+	}
+	if opts.SavePath == "" {
+		opts.SavePath = "savegame.gob"
+	}
+
+	var unload func()
+	if err := sdl.LoadLibrary(sdl.Path()); err != nil {
+		lib := binsdl.Load()
+		unload = lib.Unload
+	}
+	defer func() {
+		sdl.Quit()
+		if unload != nil {
+			unload()
+		}
+	}()
+
+	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS); err != nil {
+		return fmt.Errorf("SDL init: %w", err)
+	}
+	fmt.Println("SEVG - Simple and Extendable Voxel Game")
+	fmt.Println("SDL", sdl.GetVersion().String())
+	win, err := sdl.CreateWindow("SEVG - Simple and Extendable Voxel Game", opts.Width, opts.Height, sdl.WINDOW_RESIZABLE)
+	if err != nil {
+		return fmt.Errorf("create window: %w", err)
+	}
+	defer win.Destroy()
+
+	gfx, err := render.New(win, opts.Width, opts.Height)
+	if err != nil {
+		return err
+	}
+	g := &Game{
+		opts:     opts,
+		Win:      win,
+		gfx:      gfx,
+		canv:     ui.NewCanvas(opts.Width, opts.Height, ui.BuildFontAtlas()),
+		state:    StateMenu,
+		saveAt:   opts.SavePath,
+		pending:  make(map[[2]int]bool),
+		meshed:   make(map[[2]int]bool),
+		lastTime: time.Now(),
+	}
+	g.seed = opts.Seed
+	if g.seed == 0 {
+		g.seed = time.Now().UnixNano()
+	}
+	if opts.SmokeFrames > 0 {
+		if err := g.startWorld(opts.Continue); err != nil {
+			gfx.Close()
+			return err
+		}
+		g.setState(StatePlaying)
+	} else if opts.Continue {
+		if err := g.startWorld(true); err != nil {
+			g.notify("COULD NOT LOAD SAVE: "+err.Error(), 4)
+			g.setState(StateMenu)
+		}
+	}
+	g.run()
+	g.shutdown()
+	gfx.Close()
+	return nil
+}
+
+func (g *Game) setState(s State) {
+	g.state = s
+	captured := s == StatePlaying
+	if g.Win != nil {
+		_ = g.Win.SetRelativeMouseMode(captured)
+	}
+	if captured {
+		_ = sdl.HideCursor()
+	} else {
+		_ = sdl.ShowCursor()
+		g.mouseLeft = false
+		g.mouseRight = false
+	}
+}
+
+func (g *Game) run() {
+	for !g.quit {
+		now := time.Now()
+		dt := now.Sub(g.lastTime).Seconds()
+		g.lastTime = now
+		if dt > 0.1 {
+			dt = 0.1
+		}
+		if dt <= 0 {
+			dt = 1.0 / 1000
+		}
+		g.fps = g.fps*0.92 + (1/dt)*0.08
+		g.frame++
+
+		g.poll()
+		if g.quit {
+			break
+		}
+		g.refreshMouse()
+		if g.toastTime > 0 {
+			g.toastTime -= float32(dt)
+		}
+		if g.helpTime > 0 {
+			g.helpTime -= float32(dt)
+		}
+		switch g.state {
+		case StatePlaying:
+			g.updatePlaying(float32(dt))
+		case StateMenu:
+			// idle title animation
+		}
+		g.updateStreaming(float32(dt))
+		g.drawUI()
+		g.renderFrame()
+		if g.opts.SmokeFrames > 0 && g.frame >= g.opts.SmokeFrames {
+			g.quit = true
+		}
+	}
+}
+
+func (g *Game) poll() {
+	var e sdl.Event
+	for sdl.PollEvent(&e) {
+		switch e.Type {
+		case sdl.EVENT_QUIT:
+			g.quit = true
+		case sdl.EVENT_WINDOW_RESIZED, sdl.EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+			w, h, err := g.Win.SizeInPixels()
+			if err == nil {
+				g.gfx.Resize(int(w), int(h))
+				g.canv.Resize(int(w), int(h))
+			}
+		case sdl.EVENT_KEY_DOWN:
+			ke := e.KeyboardEvent()
+			if ke.Repeat {
+				continue
+			}
+			g.onKey(ke.Key)
+		case sdl.EVENT_MOUSE_MOTION:
+			me := e.MouseMotionEvent()
+			g.mouseX, g.mouseY = g.toUI(me.X, me.Y)
+			if g.state == StatePlaying {
+				g.player.Rotate(me.Xrel, me.Yrel, 0.0022)
+			}
+		case sdl.EVENT_MOUSE_BUTTON_DOWN:
+			be := e.MouseButtonEvent()
+			g.mouseX, g.mouseY = g.toUI(be.X, be.Y)
+			g.onMouseDown(be.Button)
+		case sdl.EVENT_MOUSE_BUTTON_UP:
+			be := e.MouseButtonEvent()
+			g.mouseX, g.mouseY = g.toUI(be.X, be.Y)
+			g.onMouseUp(be.Button)
+		case sdl.EVENT_MOUSE_WHEEL:
+			we := e.MouseWheelEvent()
+			if g.state == StatePlaying {
+				if we.Y < 0 {
+					g.inv.Scroll(1)
+				} else if we.Y > 0 {
+					g.inv.Scroll(-1)
+				}
+			}
+		}
+	}
+}
+
+func (g *Game) onKey(k sdl.Keycode) {
+	switch g.state {
+	case StateMenu:
+		if k == sdl.K_RETURN || k == sdl.K_KP_ENTER {
+			if err := g.startWorld(false); err == nil {
+				g.setState(StatePlaying)
+			}
+		} else if k == sdl.K_ESCAPE {
+			g.quit = true
+		}
+	case StatePlaying:
+		switch k {
+		case sdl.K_ESCAPE:
+			g.setState(StatePaused)
+		case sdl.K_E:
+			g.setState(StateInventory)
+		case sdl.K_F:
+			g.player.Flying = !g.player.Flying
+			g.player.Body.Vel.Y = 0
+			g.notify("FLYING "+onOff(g.player.Flying), 1.6)
+		case sdl.K_F3:
+			g.debug = !g.debug
+		case sdl.K_H:
+			if g.helpTime > 0 {
+				g.helpTime = 0
+			} else {
+				g.helpTime = 10
+			}
+		case sdl.K_F5:
+			if err := g.saveGame(); err != nil {
+				g.notify("SAVE FAILED: "+err.Error(), 3)
+			} else {
+				g.notify("WORLD SAVED", 1.8)
+			}
+		case sdl.K_F11:
+			g.fullscreen = !g.fullscreen
+			_ = g.Win.SetFullscreen(g.fullscreen)
+		case sdl.K_Q:
+			g.dropSelected()
+		case sdl.K_1, sdl.K_2, sdl.K_3, sdl.K_4, sdl.K_5, sdl.K_6, sdl.K_7, sdl.K_8, sdl.K_9:
+			g.inv.Select(int(k - sdl.K_1))
+		}
+	case StateInventory:
+		if k == sdl.K_E || k == sdl.K_ESCAPE {
+			if !g.heldStack.Empty() {
+				left := g.inv.Add(g.heldStack.Item, g.heldStack.Count)
+				if left > 0 && g.mobs != nil {
+					g.mobs.Drop(g.heldStack.Item, left, g.player.Body.Pos, mathx.Vec3{Y: 3})
+				}
+				g.heldStack = core.Stack{}
+			}
+			g.setState(StatePlaying)
+		}
+	case StatePaused:
+		if k == sdl.K_ESCAPE {
+			g.setState(StatePlaying)
+		}
+	case StateDead:
+		if k == sdl.K_R || k == sdl.K_RETURN {
+			g.respawn()
+		}
+	}
+}
+
+func (g *Game) onMouseDown(button uint8) {
+	if g.state != StatePlaying {
+		if button == uint8(sdl.BUTTON_LEFT) {
+			g.handleUIClick(false)
+		} else if button == uint8(sdl.BUTTON_RIGHT) {
+			g.handleUIClick(true)
+		}
+		return
+	}
+	g.mouseLeft = false
+	g.mouseRight = false
+	if int(button) == int(sdl.BUTTON_LEFT) {
+		g.mouseLeft = true
+	} else if int(button) == int(sdl.BUTTON_RIGHT) {
+		g.mouseRight = true
+	} else if int(button) == int(sdl.BUTTON_MIDDLE) {
+		g.pickBlock()
+	}
+}
+
+func (g *Game) onMouseUp(button uint8) {
+	if int(button) == int(sdl.BUTTON_LEFT) {
+		g.mouseLeft = false
+		g.breakActive = false
+		g.breakProgress = 0
+	} else if int(button) == int(sdl.BUTTON_RIGHT) {
+		g.mouseRight = false
+	}
+}
+
+func (g *Game) refreshMouse() {
+	_, x, y := sdl.GetMouseState()
+	g.mouseX, g.mouseY = g.toUI(x, y)
+}
+
+func (g *Game) toUI(x, y float32) (float32, float32) {
+	ww, wh, err := g.Win.Size()
+	if err != nil || ww <= 0 || wh <= 0 {
+		return x, y
+	}
+	return x * float32(g.gfx.W) / float32(ww), y * float32(g.gfx.H) / float32(wh)
+}
+
+func (g *Game) updatePlaying(dt float32) {
+	if g.player == nil {
+		return
+	}
+	ks := sdl.GetKeyboardState()
+	down := func(code sdl.Scancode) bool { return int(code) < len(ks) && ks[code] }
+	in := player.Input{
+		Forward: float32(boolToInt(down(sdl.SCANCODE_W))) - float32(boolToInt(down(sdl.SCANCODE_S))),
+		Strafe:  float32(boolToInt(down(sdl.SCANCODE_D))) - float32(boolToInt(down(sdl.SCANCODE_A))),
+		Jump:    down(sdl.SCANCODE_SPACE),
+		Descend: down(sdl.SCANCODE_LCTRL) || down(sdl.SCANCODE_RCTRL),
+		Sprint:  down(sdl.SCANCODE_LSHIFT) || down(sdl.SCANCODE_RSHIFT),
+	}
+	g.player.Update(dt, g.world, in)
+	g.mobs.Update(dt, g.world, g.player.Body.Pos, &g.inv)
+	g.time += float64(dt) / 600.0
+	if g.time >= 1 {
+		g.time -= 1
+	}
+	if g.attackCool > 0 {
+		g.attackCool -= dt
+	}
+	if g.placeCool > 0 {
+		g.placeCool -= dt
+	}
+	if g.pickCool > 0 {
+		g.pickCool -= dt
+	}
+	g.handleActions(dt)
+	g.saveTimer += dt
+	if g.saveTimer > 30 && g.opts.SmokeFrames == 0 {
+		g.saveTimer = 0
+		if err := g.saveGame(); err == nil {
+			g.notify("AUTO-SAVED", 1.2)
+		}
+	}
+	if g.player.Health <= 0 {
+		g.setState(StateDead)
+	}
+}
+
+func (g *Game) renderFrame() {
+	if g.player == nil {
+		g.gfx.Render(&render.Frame{
+			Camera: render.Camera{Pos: mathx.V3(0, 70, 8), Dir: mathx.V3(0, -0.2, -1).Normalize(), Up: mathx.V3(0, 1, 0), Fov: mathx.Radians(70), Near: 0.08, Far: 400, Aspect: float32(g.gfx.W) / float32(g.gfx.H)},
+			World:  g.sky(),
+			UI:     g.canv,
+		})
+		return
+	}
+	dir := g.player.LookDir()
+	cam := render.Camera{
+		Pos: g.player.Eye(), Dir: dir, Up: mathx.V3(0, 1, 0),
+		Fov: mathx.Radians(72), Near: 0.06, Far: 500,
+		Aspect: float32(g.gfx.W) / float32(g.gfx.H),
+	}
+	sky := g.sky()
+	eye := g.player.Eye()
+	eyeBlock := g.world.GetBlock(int(math.Floor(float64(eye.X))), int(math.Floor(float64(eye.Y))), int(math.Floor(float64(eye.Z))))
+	if eyeBlock == core.Water {
+		sky.FogColor = [3]float32{0.04, 0.20, 0.33}
+		sky.Clear = [4]float32{0.04, 0.20, 0.33, 1}
+		sky.FogStart = 1
+		sky.FogEnd = 22
+	}
+	f := &render.Frame{
+		Camera: cam,
+		World:  sky,
+		Entity: g.buildEntityMesh(),
+		UI:     g.canv,
+	}
+	if err := g.gfx.Render(f); err != nil {
+		fmt.Println("render error:", err)
+		g.quit = true
+	}
+}
+
+func (g *Game) sky() render.WorldUniforms {
+	t := g.time
+	sunH := float32(math.Sin((t - 0.25) * 6.2831853))
+	day := clampF(sunH*1.9+0.30, 0, 1)
+	nightSky := [3]float32{0.012, 0.022, 0.055}
+	daySky := [3]float32{0.42, 0.64, 0.93}
+	sky := lerp3(nightSky, daySky, day)
+	// Warm sunrise and sunset band.
+	warm := clampF(1-absF(sunH)*3.5, 0, 1)
+	sunset := [3]float32{0.92, 0.42, 0.20}
+	sky = lerp3(sky, sunset, warm*0.45)
+	sunTint := lerp3([3]float32{0.32, 0.38, 0.58}, [3]float32{1.0, 0.97, 0.90}, day)
+	sunTint = lerp3(sunTint, [3]float32{1.0, 0.72, 0.50}, warm*0.35)
+	fogEnd := float32(g.opts.RenderDist*16) - 8
+	if fogEnd < 48 {
+		fogEnd = 48
+	}
+	return render.WorldUniforms{
+		FogColor: sky,
+		FogStart: fogEnd * 0.55,
+		FogEnd:   fogEnd,
+		SunTint:  sunTint,
+		Clear:    [4]float32{sky[0], sky[1], sky[2], 1},
+	}
+}
+
+func (g *Game) notify(s string, secs float32) {
+	g.toast = s
+	g.toastTime = secs
+}
+
+func (g *Game) shutdown() {
+	if g.world != nil && g.opts.SmokeFrames == 0 {
+		_ = g.saveGame()
+	}
+	g.stopWorkers()
+}
+
+func (g *Game) dropSelected() {
+	s := g.inv.SelectedStack()
+	if s.Empty() {
+		return
+	}
+	item := s.Item
+	g.inv.TakeSelected(1)
+	dir := g.player.LookDir()
+	pos := g.player.Eye().Add(dir.Mul(0.8))
+	g.mobs.Drop(item, 1, pos, dir.Mul(3).Add(mathx.Vec3{Y: 1.5}))
+}
+
+func (g *Game) respawn() {
+	g.player.Respawn()
+	g.player.Body.Pos = g.world.SafeSpawn(g.player.Body.Pos, 24)
+	g.player.Spawning = g.player.Body.Pos
+	g.player.FallingReset()
+	g.setState(StatePlaying)
+	g.notify("RESPAWNED", 1.5)
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func onOff(b bool) string {
+	if b {
+		return "ON"
+	}
+	return "OFF"
+}
+
+func absF(v float32) float32 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+func clampF(v, lo, hi float32) float32 {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+func lerp3(a, b [3]float32, t float32) [3]float32 {
+	return [3]float32{a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, a[2] + (b[2]-a[2])*t}
+}

@@ -1,0 +1,10 @@
+github.com/Zyko0/go-sdl3 v0.1.1 h1:tXlnEcEJa9eqyzaBpCktOGteJGbUfnvG6ocURdsspHw=
+github.com/Zyko0/go-sdl3 v0.1.1/go.mod h1:LOqUd6DUUkCO/8quWPfovV1Ep/nr/aw0uBT5vdlAIQY=
+github.com/Zyko0/purego-gen v0.0.0-20250727121216-3bcd331a1e0c h1:3z1BdpfvUbaP7oXjPabl7STN7zz88S432hZJ8M095kI=
+github.com/Zyko0/purego-gen v0.0.0-20250727121216-3bcd331a1e0c/go.mod h1:xpUxPkAb7v0Ffn/NGp1XpD+tZly4dpSPI7DTAFT37es=
+github.com/ebitengine/purego v0.10.0 h1:QIw4xfpWT6GWTzaW5XEKy3HXoqrJGx1ijYHzTF0/ISU=
+github.com/ebitengine/purego v0.10.0/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
+golang.org/x/image v0.47.0 h1:za/8gVz++PPZqmZJBNSISICN5Rrj5zixP/8K++fgmqo=
+golang.org/x/image v0.47.0/go.mod h1:IkN5o4A7vq55vXN8FWjjnhg9Rs2GOtffqsSi9mWAKYE=
+golang.org/x/sys v0.49.0 h1:XbzkgYJHdqh/8m2Uu0W/dQv8nktxx4BFHp1M0gROTXA=
+golang.org/x/sys v0.49.0/go.mod h1:hNLxWAXmnKAxqDtdwIYC4bM9oQPEecfsnNMuSxOs3og=

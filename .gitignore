@@ -1,0 +1,27 @@
+# Build output
+sevg.exe
+*.test
+*.out
+
+# Saves and dumps
+*.gob
+atlas.png
+atlas4x.png
+screenshot.png
+screenshot_*.png
+shot_*.png
+mobtest*.png
+flatbox*.png
+inventory*.png
+menu.png
+pause*.png
+interact*.png
+
+# Local shader toolchain (optional)
+.tools/
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
