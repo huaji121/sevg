@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"sevg/internal/core"
+	"sevg/internal/entity"
 	"sevg/internal/i18n"
 	"sevg/internal/mathx"
 	"sevg/internal/ui"
@@ -510,8 +511,8 @@ func worldChunkZ(z float32) int { return int(math.Floor(float64(z))) / 16 }
 
 // Entity and block-highlight geometry, rendered through the block atlas
 // pipeline so it shares fog, depth and lighting with terrain.
-func (g *Game) buildEntityMesh() world.MeshData {
-	var m world.MeshData
+func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData) {
+	var opaque, transparent world.MeshData
 	if g.mobs != nil {
 		for _, mob := range g.mobs.Mobs {
 			if mob.Dead {
@@ -525,7 +526,7 @@ func (g *Game) buildEntityMesh() world.MeshData {
 					col[1] = col[1] * (1 - flash*0.3)
 					col[2] = col[2] * (1 - flash*0.3)
 				}
-				appendEntityBox(&m, box.Center.Sub(box.Size.Mul(0.5)), box.Center.Add(box.Size.Mul(0.5)), col)
+				appendEntityBox(&opaque, box.Center.Sub(box.Size.Mul(0.5)), box.Center.Add(box.Size.Mul(0.5)), col)
 			}
 		}
 		for _, d := range g.mobs.Items {
@@ -533,15 +534,32 @@ func (g *Game) buildEntityMesh() world.MeshData {
 				continue
 			}
 			bob := float32(math.Sin(float64(d.Age*4))) * 0.06
-			for _, box := range d.Boxes() {
-				c := box.Center
-				c.Y += bob
-				min, max := c.Sub(box.Size.Mul(0.5)), c.Add(box.Size.Mul(0.5))
-				if box.Block != core.Air {
-					appendBlockBox(&m, min, max, box.Block)
-				} else {
-					appendEntityBox(&m, min, max, box.Color)
+			c := d.Body.Pos.Add(mathx.Vec3{Y: 0.18})
+			c.Y += bob
+			def := d.Item.Def()
+			switch d.Visual() {
+			case entity.DropVisualBlock:
+				half := def.Block
+				appendBlockBox(&opaque, c.Sub(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), c.Add(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), half)
+			case entity.DropVisualGlass:
+				appendBlockBox(&transparent, c.Sub(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), c.Add(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), def.Block)
+			case entity.DropVisualPlant:
+				appendPlant(&opaque, c, 0.34, 0.42, def.Block)
+			case entity.DropVisualSword:
+				blade := uint8(core.TileWood)
+				if d.Item == core.ItemIronSword {
+					blade = uint8(core.TileWhite)
 				}
+				appendSword(&opaque, c, blade)
+			case entity.DropVisualPickaxe:
+				head := uint8(core.TileGray)
+				if d.Item == core.ItemIronPickaxe {
+					head = uint8(core.TileWhite)
+				}
+				appendPickaxe(&opaque, c, head)
+			default:
+				col := [4]float32{def.Color[0], def.Color[1], def.Color[2], 1}
+				appendEntityBox(&opaque, c.Sub(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), c.Add(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), col)
 			}
 		}
 	}
@@ -549,9 +567,60 @@ func (g *Game) buildEntityMesh() world.MeshData {
 		x, y, z := g.breakPos[0], g.breakPos[1], g.breakPos[2]
 		min := mathx.V3(float32(x)-0.003, float32(y)-0.003, float32(z)-0.003)
 		max := mathx.V3(float32(x)+1.003, float32(y)+1.003, float32(z)+1.003)
-		appendOutline(&m, min, max, [4]float32{1, 0.88, 0.35, 1})
+		appendOutline(&opaque, min, max, [4]float32{1, 0.88, 0.35, 1})
 	}
-	return m
+	return opaque, transparent
+}
+
+func appendPlant(m *world.MeshData, c mathx.Vec3, width, height float32, block core.BlockID) {
+	u0, v0, u1, v1 := world.TileUV(block.Tile(2))
+	hx, hz := width/2, width/2
+	top, bottom := c.Y+height/2, c.Y-height/2
+	quads := [2][4]mathx.Vec3{
+		{
+			{X: c.X - hx, Y: bottom, Z: c.Z - hz},
+			{X: c.X + hx, Y: bottom, Z: c.Z + hz},
+			{X: c.X + hx, Y: top, Z: c.Z + hz},
+			{X: c.X - hx, Y: top, Z: c.Z - hz},
+		},
+		{
+			{X: c.X - hx, Y: bottom, Z: c.Z + hz},
+			{X: c.X + hx, Y: bottom, Z: c.Z - hz},
+			{X: c.X + hx, Y: top, Z: c.Z - hz},
+			{X: c.X - hx, Y: top, Z: c.Z + hz},
+		},
+	}
+	uvs := [4][2]float32{{0, 1}, {1, 1}, {1, 0}, {0, 0}}
+	for _, q := range quads {
+		base := uint32(len(m.Vertices))
+		for i := 0; i < 4; i++ {
+			m.Vertices = append(m.Vertices, world.Vertex{
+				X: q[i].X, Y: q[i].Y, Z: q[i].Z,
+				U: u0 + (u1-u0)*uvs[i][0], V: v0 + (v1-v0)*uvs[i][1],
+				Light: 0.92,
+			})
+		}
+		m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)
+	}
+}
+
+func appendTileBox(m *world.MeshData, center, size mathx.Vec3, tile uint8) {
+	appendBoxFaces(m, center.Sub(size.Mul(0.5)), center.Add(size.Mul(0.5)), func(int) uint8 { return tile })
+}
+
+func appendSword(m *world.MeshData, c mathx.Vec3, bladeTile uint8) {
+	appendTileBox(m, c.Add(mathx.Vec3{Y: -0.09}), mathx.Vec3{X: 0.04, Y: 0.15, Z: 0.04}, core.TileBrown)
+	appendTileBox(m, c.Add(mathx.Vec3{Y: -0.18}), mathx.Vec3{X: 0.08, Y: 0.04, Z: 0.05}, core.TileDark)
+	appendTileBox(m, c.Add(mathx.Vec3{Y: -0.02}), mathx.Vec3{X: 0.17, Y: 0.035, Z: 0.05}, core.TileDark)
+	appendTileBox(m, c.Add(mathx.Vec3{Y: 0.10}), mathx.Vec3{X: 0.07, Y: 0.22, Z: 0.025}, bladeTile)
+	appendTileBox(m, c.Add(mathx.Vec3{Y: 0.225}), mathx.Vec3{X: 0.04, Y: 0.045, Z: 0.02}, core.TileWhite)
+}
+
+func appendPickaxe(m *world.MeshData, c mathx.Vec3, headTile uint8) {
+	appendTileBox(m, c, mathx.Vec3{X: 0.04, Y: 0.34, Z: 0.04}, core.TileBrown)
+	appendTileBox(m, c.Add(mathx.Vec3{Y: 0.15}), mathx.Vec3{X: 0.28, Y: 0.06, Z: 0.06}, headTile)
+	appendTileBox(m, c.Add(mathx.Vec3{X: -0.15, Y: 0.14}), mathx.Vec3{X: 0.05, Y: 0.09, Z: 0.055}, core.TileWhite)
+	appendTileBox(m, c.Add(mathx.Vec3{X: 0.15, Y: 0.14}), mathx.Vec3{X: 0.05, Y: 0.09, Z: 0.055}, core.TileWhite)
 }
 
 type entityPaletteEntry struct {

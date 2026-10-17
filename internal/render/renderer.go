@@ -41,10 +41,11 @@ type WorldUniforms struct {
 }
 
 type Frame struct {
-	Camera Camera
-	World  WorldUniforms
-	Entity world.MeshData
-	UI     *ui.Canvas
+	Camera            Camera
+	World             WorldUniforms
+	Entity            world.MeshData
+	EntityTransparent world.MeshData
+	UI                *ui.Canvas
 }
 
 type worldUBO struct {
@@ -100,11 +101,12 @@ type Renderer struct {
 
 	chunks map[[2]int]*gpuChunk
 
-	uiVB, entVB, entIB *sdl.GPUBuffer
-	uiCap, entCap      uint32
-	entICount          uint32
-	staging            *sdl.GPUTransferBuffer
-	stagingCap         uint32
+	uiVB, entVB, entIB         *sdl.GPUBuffer
+	entTransVB, entTransIB     *sdl.GPUBuffer
+	uiCap, entCap, entTransCap uint32
+	entICount, entTransICount  uint32
+	staging                    *sdl.GPUTransferBuffer
+	stagingCap                 uint32
 }
 
 func New(win *sdl.Window, w, h int, fontAtlas ui.FontAtlas) (*Renderer, error) {
@@ -239,6 +241,15 @@ func (r *Renderer) createResources() error {
 		return err
 	}
 	r.entIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.entCap})
+	if err != nil {
+		return err
+	}
+	r.entTransCap = r.entCap
+	r.entTransVB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: r.entTransCap})
+	if err != nil {
+		return err
+	}
+	r.entTransIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.entTransCap})
 	if err != nil {
 		return err
 	}
@@ -597,6 +608,11 @@ func (r *Renderer) Render(f *Frame) error {
 	for _, gc := range trans {
 		r.drawMesh(rp, &gc.transparent)
 	}
+	if r.entTransICount > 0 && r.entTransVB != nil && r.entTransIB != nil {
+		rp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.entTransVB, Offset: 0}})
+		rp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.entTransIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
+		rp.DrawIndexedPrimitives(r.entTransICount, 1, 0, 0, 0)
+	}
 	rp.End()
 
 	if f.UI != nil && len(f.UI.Verts) > 0 && r.uiVB != nil {
@@ -620,8 +636,11 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 	uiBytes := uiVertBytes(f.UI)
 	entV := meshVertBytes(f.Entity)
 	entI := meshIndexBytes(f.Entity)
+	entTV := meshVertBytes(f.EntityTransparent)
+	entTI := meshIndexBytes(f.EntityTransparent)
 	r.entICount = uint32(len(f.Entity.Indices))
-	total := len(uiBytes) + len(entV) + len(entI)
+	r.entTransICount = uint32(len(f.EntityTransparent.Indices))
+	total := len(uiBytes) + len(entV) + len(entI) + len(entTV) + len(entTI)
 	if total == 0 {
 		return nil
 	}
@@ -643,10 +662,7 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 			return err
 		}
 	}
-	needEnt := len(entV)
-	if len(entI) > needEnt {
-		needEnt = len(entI)
-	}
+	needEnt := maxInt(len(entV), len(entI))
 	if uint32(needEnt) > r.entCap {
 		r.Dev.ReleaseBuffer(r.entVB)
 		r.Dev.ReleaseBuffer(r.entIB)
@@ -661,6 +677,21 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 			return err
 		}
 	}
+	needTrans := maxInt(len(entTV), len(entTI))
+	if uint32(needTrans) > r.entTransCap {
+		r.Dev.ReleaseBuffer(r.entTransVB)
+		r.Dev.ReleaseBuffer(r.entTransIB)
+		r.entTransCap = uint32(needTrans * 2)
+		var err error
+		r.entTransVB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: r.entTransCap})
+		if err != nil {
+			return err
+		}
+		r.entTransIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.entTransCap})
+		if err != nil {
+			return err
+		}
+	}
 	ptr, err := r.Dev.MapTransferBuffer(r.staging, true)
 	if err != nil {
 		return err
@@ -669,9 +700,13 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 	offUI := 0
 	offEntV := offUI + len(uiBytes)
 	offEntI := offEntV + len(entV)
+	offEntTV := offEntI + len(entI)
+	offEntTI := offEntTV + len(entTV)
 	copy(mem[offUI:], uiBytes)
 	copy(mem[offEntV:], entV)
 	copy(mem[offEntI:], entI)
+	copy(mem[offEntTV:], entTV)
+	copy(mem[offEntTI:], entTI)
 	r.Dev.UnmapTransferBuffer(r.staging)
 	cb, err := r.Dev.AcquireCommandBuffer()
 	if err != nil {
@@ -699,8 +734,29 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 			true,
 		)
 	}
+	if len(entTV) > 0 {
+		cp.UploadToGPUBuffer(
+			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offEntTV)},
+			&sdl.GPUBufferRegion{Buffer: r.entTransVB, Offset: 0, Size: uint32(len(entTV))},
+			true,
+		)
+	}
+	if len(entTI) > 0 {
+		cp.UploadToGPUBuffer(
+			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offEntTI)},
+			&sdl.GPUBufferRegion{Buffer: r.entTransIB, Offset: 0, Size: uint32(len(entTI))},
+			true,
+		)
+	}
 	cp.End()
 	return cb.Submit()
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func meshVertBytes(m world.MeshData) []byte {
@@ -746,7 +802,7 @@ func (r *Renderer) Close() {
 		gc.transparent.release(r.Dev)
 	}
 	r.chunks = map[[2]int]*gpuChunk{}
-	for _, b := range []*sdl.GPUBuffer{r.uiVB, r.entVB, r.entIB} {
+	for _, b := range []*sdl.GPUBuffer{r.uiVB, r.entVB, r.entIB, r.entTransVB, r.entTransIB} {
 		if b != nil {
 			r.Dev.ReleaseBuffer(b)
 		}

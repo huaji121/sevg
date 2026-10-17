@@ -95,6 +95,17 @@ func (m *Mob) Boxes() []Box {
 	return boxes
 }
 
+type DropVisual uint8
+
+const (
+	DropVisualCube DropVisual = iota
+	DropVisualBlock
+	DropVisualGlass
+	DropVisualPlant
+	DropVisualSword
+	DropVisualPickaxe
+)
+
 type ItemDrop struct {
 	ID    int
 	Item  core.ItemID
@@ -117,6 +128,37 @@ func (d *ItemDrop) Boxes() []Box {
 		}
 	}
 	return []Box{{Center: c, Size: mathx.Vec3{X: 0.28, Y: 0.28, Z: 0.28}, Color: col, Block: block}}
+}
+
+func (d *ItemDrop) Visual() DropVisual {
+	if !d.Item.Valid() {
+		return DropVisualCube
+	}
+	def := d.Item.Def()
+	if def.Kind == core.KindBlock {
+		switch {
+		case def.Block == core.Air:
+			return DropVisualCube
+		case def.Block.Cross():
+			return DropVisualPlant
+		case def.Block == core.Glass || def.Block == core.Ice:
+			return DropVisualGlass
+		default:
+			return DropVisualBlock
+		}
+	}
+	switch d.Item {
+	case core.ItemWoodSword, core.ItemIronSword:
+		return DropVisualSword
+	case core.ItemStonePickaxe, core.ItemIronPickaxe:
+		return DropVisualPickaxe
+	default:
+		return DropVisualCube
+	}
+}
+
+func (d *ItemDrop) Transparent() bool {
+	return d.Visual() == DropVisualGlass
 }
 
 type Manager struct {

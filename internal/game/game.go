@@ -455,11 +455,13 @@ func (g *Game) renderFrame() {
 		sky.FogStart = 1
 		sky.FogEnd = 22
 	}
+	opaque, transparent := g.buildEntityMeshes()
 	f := &render.Frame{
-		Camera: cam,
-		World:  sky,
-		Entity: g.buildEntityMesh(),
-		UI:     g.canv,
+		Camera:            cam,
+		World:             sky,
+		Entity:            opaque,
+		EntityTransparent: transparent,
+		UI:                g.canv,
 	}
 	if err := g.gfx.Render(f); err != nil {
 		fmt.Println("render error:", err)

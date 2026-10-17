@@ -28,3 +28,39 @@ func TestDroppedBlockUsesPlacedBlockTiles(t *testing.T) {
 		t.Fatalf("bottom face UV does not match dirt")
 	}
 }
+func TestPlantDropGeometry(t *testing.T) {
+	var m world.MeshData
+	appendPlant(&m, mathx.Vec3{X: 0.5, Y: 64.2, Z: 0.5}, 0.34, 0.42, core.TallGrass)
+	if len(m.Vertices) != 8 || len(m.Indices) != 12 {
+		t.Fatalf("plant vertices=%d indices=%d", len(m.Vertices), len(m.Indices))
+	}
+	u0, _, _, v1 := world.TileUV(core.TallGrass.Tile(2))
+	if m.Vertices[0].U != u0 || m.Vertices[0].V != v1 {
+		t.Fatalf("plant does not use the tall grass tile: %+v", m.Vertices[0])
+	}
+}
+
+func TestToolDropGeometry(t *testing.T) {
+	var sword world.MeshData
+	appendSword(&sword, mathx.Vec3{X: 0.5, Y: 64.2, Z: 0.5}, core.TileWood)
+	if len(sword.Vertices) == 0 || len(sword.Indices) == 0 {
+		t.Fatal("sword has no geometry")
+	}
+	var pick world.MeshData
+	appendPickaxe(&pick, mathx.Vec3{X: 0.5, Y: 64.2, Z: 0.5}, core.TileGray)
+	if len(pick.Vertices) == 0 || len(pick.Indices) == 0 {
+		t.Fatal("pickaxe has no geometry")
+	}
+}
+
+func TestGlassDropUsesTransparentMesh(t *testing.T) {
+	g := newTestGame(t)
+	g.mobs.Drop(core.ItemGlass, 1, mathx.Vec3{X: 0.5, Y: 64.2, Z: 0.5}, mathx.Vec3{})
+	opaque, transparent := g.buildEntityMeshes()
+	if len(transparent.Vertices) != 24 || len(transparent.Indices) != 36 {
+		t.Fatalf("glass drop transparent mesh: %d/%d", len(transparent.Vertices), len(transparent.Indices))
+	}
+	if len(opaque.Vertices) != 0 {
+		t.Fatalf("glass drop leaked into opaque mesh: %d vertices", len(opaque.Vertices))
+	}
+}

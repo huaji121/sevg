@@ -41,3 +41,27 @@ func TestBlockDropsUseBlockTextures(t *testing.T) {
 		t.Fatalf("apple drop should stay a palette cube: %v", boxes)
 	}
 }
+func TestDropVisuals(t *testing.T) {
+	cases := []struct {
+		item core.ItemID
+		want DropVisual
+	}{
+		{core.ItemGlass, DropVisualGlass},
+		{core.ItemIce, DropVisualGlass},
+		{core.ItemTallGrass, DropVisualPlant},
+		{core.ItemFlower, DropVisualPlant},
+		{core.ItemStonePickaxe, DropVisualPickaxe},
+		{core.ItemIronPickaxe, DropVisualPickaxe},
+		{core.ItemWoodSword, DropVisualSword},
+		{core.ItemIronSword, DropVisualSword},
+		{core.ItemPlanks, DropVisualBlock},
+		{core.ItemApple, DropVisualCube},
+		{core.ItemCoal, DropVisualCube},
+	}
+	for _, tc := range cases {
+		d := &ItemDrop{Item: tc.item}
+		if got := d.Visual(); got != tc.want {
+			t.Fatalf("%v visual = %v, want %v", tc.item, got, tc.want)
+		}
+	}
+}
