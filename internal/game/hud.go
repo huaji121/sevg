@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"sevg/internal/core"
+	"sevg/internal/i18n"
 	"sevg/internal/mathx"
 	"sevg/internal/ui"
 	"sevg/internal/world"
@@ -29,10 +30,14 @@ func (g *Game) drawUI() {
 		}
 	}
 	if g.toastTime > 0 && g.toast != "" {
+		toastY := float32(58)
+		if g.state != StatePlaying {
+			toastY = 18
+		}
 		tw := g.canv.TextWidth(g.toast, 1.5) + 32
 		x := w/2 - tw/2
-		g.canv.Panel(x, 58, tw, 34, ui.RGBA(20, 25, 30, 230), ui.RGBA(255, 196, 82, 220))
-		g.canv.TextCentered(w/2, 67, g.toast, 1.5, ui.TextColor)
+		g.canv.Panel(x, toastY, tw, 34, ui.RGBA(20, 25, 30, 230), ui.RGBA(255, 196, 82, 220))
+		g.canv.TextCentered(w/2, toastY+9, g.toast, 1.5, ui.TextColor)
 	}
 }
 
@@ -63,34 +68,40 @@ func (g *Game) drawMenu(w, h float32) {
 	}
 	g.canv.Rect(0, base+52, w, h, ui.RGBA(28, 22, 18, 255))
 
-	g.canv.TextShadowCentered(w/2, h*0.17, "SEVG", 9, ui.TextColor)
-	g.canv.TextShadowCentered(w/2, h*0.34, "SIMPLE AND EXTENDABLE VOXEL GAME", 2, ui.Accent)
-	g.canv.TextCentered(w/2, h*0.40, "GO + SDL3 GPU - PROCEDURAL WORLD - CHUNKS - ENTITIES - ITEMS - GUI", 1, ui.MutedColor)
+	g.canv.TextShadowCentered(w/2, h*0.12, "SEVG", 7.5, ui.TextColor)
+	g.canv.TextShadowCentered(w/2, h*0.33, i18n.T("menu.subtitle"), 2, ui.Accent)
+	g.canv.TextCentered(w/2, h*0.39, i18n.T("menu.tagline"), 1, ui.MutedColor)
 
 	rects := g.menuRects()
-	labels := []string{"NEW WORLD", "CONTINUE", "QUIT"}
+	labels := []string{i18n.T("menu.new"), i18n.T("menu.continue"), i18n.T("menu.quit")}
 	for i, r := range rects {
 		enabled := i != 1 || g.saveExists()
 		g.drawButton(r, labels[i], enabled)
 	}
-	g.canv.TextCentered(w/2, rects[2].Y+rects[2].H+34, "ENTER: NEW WORLD    ESC: QUIT", 1.2, ui.MutedColor)
+	g.canv.TextCentered(w/2, rects[0].Y-32, i18n.T("menu.enter_hint"), 1.2, ui.MutedColor)
+
+	// Language selector.
+	lr := g.menuLangRect()
+	g.drawButtonScale(lr, i18n.T("menu.language", i18n.LocaleName(i18n.Current())), true, 1.4)
+	g.canv.TextCentered(lr.X+lr.W/2, lr.Y+lr.H+10, i18n.T("menu.language_hint"), 0.9, ui.MutedColor)
 
 	// Controls card.
-	px, py := float32(26), h-230
-	g.canv.Panel(px, py, 430, 200, ui.RGBA(12, 16, 20, 220), ui.RGBA(80, 100, 110, 180))
-	g.canv.Text(px+18, py+14, "CONTROLS", 1.6, ui.Accent)
+	px, py := float32(26), h-238
+	g.canv.Panel(px, py, 430, 208, ui.RGBA(12, 16, 20, 220), ui.RGBA(80, 100, 110, 180))
+	g.canv.Text(px+18, py+14, i18n.T("menu.controls"), 1.6, ui.Accent)
 	lines := []string{
-		"WASD ........ MOVE        SPACE ... JUMP",
-		"SHIFT ....... SPRINT      F ....... FLY",
-		"LMB ......... MINE/ATTACK RMB ..... PLACE",
-		"MMB ......... PICK BLOCK  1-9 ..... HOTBAR",
-		"E ........... INVENTORY   F3 ...... DEBUG",
-		"ESC ......... PAUSE       F5 ...... SAVE",
+		i18n.T("menu.ctrl_move"),
+		i18n.T("menu.ctrl_sprint"),
+		i18n.T("menu.ctrl_mine"),
+		i18n.T("menu.ctrl_pick"),
+		i18n.T("menu.ctrl_inv"),
+		i18n.T("menu.ctrl_pause"),
 	}
 	for i, line := range lines {
 		g.canv.Text(px+18, py+46+float32(i)*22, line, 1.0, ui.TextColor)
 	}
-	g.canv.Text(w-26-g.canv.TextWidth("RENDER DISTANCE "+fmt.Sprint(g.opts.RenderDist), 1), h-28, "RENDER DISTANCE "+fmt.Sprint(g.opts.RenderDist), 1, ui.RGBA(120, 140, 150, 255))
+	rd := i18n.T("menu.render_distance", g.opts.RenderDist)
+	g.canv.Text(w-26-g.canv.TextWidth(rd, 1), h-28, rd, 1, ui.RGBA(120, 140, 150, 255))
 }
 
 func (g *Game) drawHUD(w, h float32) {
@@ -125,7 +136,7 @@ func (g *Game) drawHUD(w, h float32) {
 	// Health.
 	hx, hy := float32(24), float32(22)
 	c.Panel(hx, hy, 214, 48, ui.RGBA(12, 16, 20, 190), ui.RGBA(70, 90, 100, 180))
-	c.Text(hx+12, hy+7, "HEALTH", 1.1, ui.MutedColor)
+	c.Text(hx+12, hy+6, i18n.T("hud.health"), 1.1, ui.MutedColor)
 	c.Rect(hx+12, hy+27, 180, 10, ui.RGBA(60, 20, 20, 255))
 	c.Rect(hx+12, hy+27, 180*clampF(g.player.Health/g.player.MaxHP, 0, 1), 10, ui.RGBA(220, 55, 60, 255))
 	c.Text(hx+196-c.TextWidth(fmt.Sprintf("%.0f", g.player.Health), 1), hy+6, fmt.Sprintf("%.0f", g.player.Health), 1, ui.TextColor)
@@ -133,13 +144,14 @@ func (g *Game) drawHUD(w, h float32) {
 	// Time and chunk progress.
 	clock := g.timeString()
 	c.TextShadow(w-28-c.TextWidth(clock, 1.6), 22, clock, 1.6, ui.TextColor)
-	chunkText := fmt.Sprintf("CHUNKS %d/%d", len(g.meshed), g.loadedTarget())
+	chunkText := i18n.T("hud.chunks", len(g.meshed), g.loadedTarget())
 	c.Text(w-28-c.TextWidth(chunkText, 1), 48, chunkText, 1, ui.MutedColor)
 	if len(g.meshed) < g.loadedTarget()/3 {
 		prog := float32(len(g.meshed)) / float32(g.loadedTarget())
 		c.Rect(w-228, 66, 200, 8, ui.RGBA(0, 0, 0, 150))
 		c.Rect(w-228, 66, 200*prog, 8, ui.Accent)
-		c.Text(w-28-c.TextWidth("GENERATING TERRAIN", 1), 78, "GENERATING TERRAIN", 1, ui.MutedColor)
+		gen := i18n.T("hud.generating")
+		c.Text(w-28-c.TextWidth(gen, 1), 78, gen, 1, ui.MutedColor)
 	}
 
 	if g.state != StatePlaying {
@@ -171,22 +183,23 @@ func (g *Game) drawHUD(w, h float32) {
 	// Selected item name.
 	st := g.inv.SelectedStack()
 	if !st.Empty() {
-		label := st.Item.Name()
+		label := i18n.ItemName(st.Item)
 		lw := c.TextWidth(label, 1.2) + 24
 		c.Panel(w/2-lw/2, y0-34, lw, 26, ui.RGBA(12, 16, 20, 200), ui.RGBA(70, 90, 100, 150))
 		c.TextCentered(w/2, y0-29, label, 1.2, ui.TextColor)
 	}
 
 	if g.helpTime > 0 && g.state == StatePlaying {
-		px, py := float32(24), h-260
-		c.Panel(px, py, 390, 158, ui.RGBA(12, 16, 20, 195), ui.RGBA(80, 100, 110, 160))
-		c.Text(px+14, py+12, "SEVG QUICK START", 1.5, ui.Accent)
+		px, py := float32(24), h-300
+		c.Panel(px, py, 500, 192, ui.RGBA(12, 16, 20, 195), ui.RGBA(80, 100, 110, 160))
+		c.Text(px+14, py+10, i18n.T("hud.quick_start"), 1.5, ui.Accent)
 		lines := []string{
-			"WASD MOVE - SPACE JUMP - SHIFT SPRINT",
-			"LMB MINE / ATTACK - RMB PLACE / EAT",
-			"MMB PICK BLOCK - WHEEL SELECT - 1-9 HOTBAR",
-			"E INVENTORY + CRAFTING - F FLY - F3 DEBUG",
-			"BREAK BLOCKS TO COLLECT ITEMS AND BUILD!",
+			i18n.T("hud.help1"),
+			i18n.T("hud.help2"),
+			i18n.T("hud.help3"),
+			i18n.T("hud.help4"),
+			i18n.T("hud.help5"),
+			i18n.T("hud.help6"),
 		}
 		for i, line := range lines {
 			c.Text(px+14, py+38+float32(i)*22, line, 1.0, ui.TextColor)
@@ -200,35 +213,35 @@ func (g *Game) drawHUD(w, h float32) {
 func (g *Game) drawDebug(w float32) {
 	c := g.canv
 	px, py := float32(24), float32(86)
-	c.Panel(px, py, 340, 250, ui.RGBA(8, 12, 16, 220), ui.RGBA(80, 100, 110, 180))
-	biome := "?"
-	target := "-"
+	c.Panel(px, py, 380, 276, ui.RGBA(8, 12, 16, 220), ui.RGBA(80, 100, 110, 180))
+	biome := i18n.T("common.unknown")
+	target := i18n.T("hud.target_none")
 	if g.player != nil && g.world != nil {
 		_, b := g.world.Gen.HeightAt(int(g.player.Body.Pos.X), int(g.player.Body.Pos.Z))
-		biome = b.Name()
+		biome = i18n.BiomeName(b)
 	}
 	if g.breakActive {
-		target = fmt.Sprintf("%d %d %d", g.breakPos[0], g.breakPos[1], g.breakPos[2])
+		target = i18n.T("hud.target_pos", g.breakPos[0], g.breakPos[1], g.breakPos[2])
 	}
 	lines := []string{
-		"SEVG DEBUG (F3)",
-		fmt.Sprintf("FPS %.0f", g.fps),
-		fmt.Sprintf("POS %.1f %.1f %.1f", g.player.Body.Pos.X, g.player.Body.Pos.Y, g.player.Body.Pos.Z),
-		fmt.Sprintf("CHUNK %d %d", worldChunkX(g.player.Body.Pos.X), worldChunkZ(g.player.Body.Pos.Z)),
-		"BIOME " + biome,
-		fmt.Sprintf("SEED %d", g.seed),
-		"TIME " + g.timeString(),
-		fmt.Sprintf("CHUNKS %d  MESHED %d", g.world.Loaded(), len(g.meshed)),
-		fmt.Sprintf("MOBS %d  DROPS %d", g.mobs.MobCount(), g.mobs.ItemCount()),
-		"TARGET " + target,
-		"FLY " + onOff(g.player.Flying),
+		i18n.T("hud.debug_title"),
+		i18n.T("hud.fps", g.fps),
+		i18n.T("hud.pos", g.player.Body.Pos.X, g.player.Body.Pos.Y, g.player.Body.Pos.Z),
+		i18n.T("hud.chunk", worldChunkX(g.player.Body.Pos.X), worldChunkZ(g.player.Body.Pos.Z)),
+		i18n.T("hud.biome", biome),
+		i18n.T("hud.seed", g.seed),
+		i18n.T("hud.time", g.timeString()),
+		i18n.T("hud.chunk_stats", g.world.Loaded(), len(g.meshed)),
+		i18n.T("hud.mob_stats", g.mobs.MobCount(), g.mobs.ItemCount()),
+		i18n.T("hud.target", target),
+		i18n.T("hud.fly", onOff(g.player.Flying)),
 	}
 	for i, line := range lines {
 		col := ui.TextColor
 		if i == 0 {
 			col = ui.Accent
 		}
-		c.Text(px+12, py+10+float32(i)*20, line, 1.0, col)
+		c.Text(px+12, py+10+float32(i)*21, line, 1.0, col)
 	}
 }
 
@@ -237,8 +250,8 @@ func (g *Game) drawInventory(w, h float32) {
 	c.Rect(0, 0, w, h, [4]float32{0, 0, 0, 0.48})
 	p := g.invPanelRect()
 	c.Panel(p.X, p.Y, p.W, p.H, ui.RGBA(24, 28, 32, 245), ui.RGBA(255, 196, 82, 220))
-	c.Text(p.X+24, p.Y+16, "INVENTORY", 2, ui.TextColor)
-	c.Text(p.X+24, p.Y+46, "CLICK TO MOVE - RIGHT CLICK TO SPLIT - E TO CLOSE", 1, ui.MutedColor)
+	c.Text(p.X+24, p.Y+14, i18n.T("inventory.title"), 2, ui.TextColor)
+	c.Text(p.X+24, p.Y+49, i18n.T("inventory.hint"), 0.9, ui.MutedColor)
 	closeR := g.invCloseRect()
 	c.Rect(closeR.X, closeR.Y, closeR.W, closeR.H, ui.RGBA(180, 60, 60, 230))
 	c.TextCentered(closeR.X+closeR.W/2, closeR.Y+3, "X", 1.5, ui.TextColor)
@@ -258,15 +271,12 @@ func (g *Game) drawInventory(w, h float32) {
 		if !st.Empty() {
 			g.drawItemIcon(r.X+6, r.Y+6, r.W-12, st, 1)
 		}
-		if vis >= 27 {
-			c.Text(r.X+3, r.Y+r.H-13, fmt.Sprint(idx+1), 0.8, ui.MutedColor)
-		}
 	}
 
 	// Crafting column.
 	cx := p.X + 474
-	c.Text(cx, p.Y+16, "CRAFTING", 1.8, ui.Accent)
-	c.Text(cx, p.Y+44, "HANDMADE - NO TABLE NEEDED", 0.9, ui.MutedColor)
+	c.Text(cx, p.Y+14, i18n.T("inventory.crafting"), 1.8, ui.Accent)
+	c.Text(cx, p.Y+47, i18n.T("inventory.handmade"), 0.8, ui.MutedColor)
 	for i, r := range g.recipeRects() {
 		rec := recipes[i]
 		ok := g.canCraft(rec)
@@ -282,20 +292,20 @@ func (g *Game) drawInventory(w, h float32) {
 		}
 		c.Rect(r.X, r.Y, r.W, r.H, bg)
 		c.Border(r.X, r.Y, r.W, r.H, 2, bd)
-		c.Text(r.X+8, r.Y+5, rec.Name, 1.1, ui.TextColor)
-		c.Text(r.X+8, r.Y+18, recipeInputs(rec), 0.8, ui.MutedColor)
+		c.Text(r.X+8, r.Y+2, i18n.ItemName(rec.Output.Item), 1.0, ui.TextColor)
+		c.Text(r.X+8, r.Y+20, recipeInputs(rec), 0.72, ui.MutedColor)
 		// Output count badge.
-		c.Text(r.X+r.W-28, r.Y+5, fmt.Sprintf("x%d", rec.Output.Count), 0.9, ui.Accent)
+		c.Text(r.X+r.W-30, r.Y+3, fmt.Sprintf("x%d", rec.Output.Count), 1.0, ui.Accent)
 	}
-	c.Text(cx, p.Y+402, "TIPS: LOG -> PLANKS -> STICKS", 0.9, ui.MutedColor)
-	c.Text(cx, p.Y+418, "MINE COAL AND IRON FOR TOOLS", 0.9, ui.MutedColor)
+	c.Text(cx, p.Y+402, i18n.T("inventory.tip1"), 0.85, ui.MutedColor)
+	c.Text(cx, p.Y+420, i18n.T("inventory.tip2"), 0.85, ui.MutedColor)
 
 	// Tooltip for the hovered inventory slot.
 	for vis := 0; vis < core.InventorySlots; vis++ {
 		if g.invSlotRect(vis).Contains(g.mouseX, g.mouseY) {
 			st := g.inv.Slots[visualToSlot(vis)]
 			if !st.Empty() {
-				name := st.Item.Name()
+				name := i18n.ItemName(st.Item)
 				tw := c.TextWidth(name, 1.1) + 16
 				c.Panel(g.mouseX+14, g.mouseY+12, tw, 24, ui.RGBA(8, 12, 16, 240), ui.RGBA(90, 105, 115, 220))
 				c.Text(g.mouseX+22, g.mouseY+17, name, 1.1, ui.TextColor)
@@ -311,20 +321,20 @@ func (g *Game) drawInventory(w, h float32) {
 func (g *Game) drawPause(w, h float32) {
 	c := g.canv
 	c.Rect(0, 0, w, h, [4]float32{0, 0, 0, 0.55})
-	c.TextShadowCentered(w/2, h*0.20, "PAUSED", 5, ui.TextColor)
-	labels := []string{"RESUME", "SAVE WORLD", "QUIT TO TITLE", "QUIT GAME"}
+	c.TextShadowCentered(w/2, h*0.13, i18n.T("pause.title"), 4.5, ui.TextColor)
+	labels := []string{i18n.T("pause.resume"), i18n.T("pause.save"), i18n.T("pause.title_screen"), i18n.T("pause.quit")}
 	for i, r := range g.pauseRects() {
 		g.drawButton(r, labels[i], true)
 	}
-	c.TextCentered(w/2, h*0.82, "ESC: RESUME", 1.2, ui.MutedColor)
+	c.TextCentered(w/2, h*0.72, i18n.T("pause.hint"), 1.2, ui.MutedColor)
 }
 
 func (g *Game) drawDead(w, h float32) {
 	c := g.canv
 	c.Rect(0, 0, w, h, [4]float32{0.25, 0, 0, 0.55})
-	c.TextShadowCentered(w/2, h*0.22, "YOU DIED", 5, ui.RGBA(240, 100, 100, 255))
-	c.TextCentered(w/2, h*0.37, "THE WORLD IS UNFORGIVING. YOUR BUILDINGS ARE STILL THERE.", 1.2, ui.MutedColor)
-	g.drawButton(g.respawnRect(), "RESPAWN", true)
+	c.TextShadowCentered(w/2, h*0.16, i18n.T("death.title"), 4.5, ui.RGBA(240, 100, 100, 255))
+	c.TextCentered(w/2, h*0.34, i18n.T("death.subtitle"), 1.2, ui.MutedColor)
+	g.drawButton(g.respawnRect(), i18n.T("death.respawn"), true)
 	r := g.deadTitleRect()
 	hover := r.Contains(g.mouseX, g.mouseY)
 	bg := ui.RGBA(30, 34, 38, 230)
@@ -333,10 +343,14 @@ func (g *Game) drawDead(w, h float32) {
 	}
 	c.Rect(r.X, r.Y, r.W, r.H, bg)
 	c.Border(r.X, r.Y, r.W, r.H, 2, ui.RGBA(90, 105, 115, 220))
-	c.TextCentered(r.X+r.W/2, r.Y+14, "TITLE SCREEN", 1.5, ui.TextColor)
+	c.TextCentered(r.X+r.W/2, r.Y+10, i18n.T("death.title_screen"), 1.4, ui.TextColor)
 }
 
 func (g *Game) drawButton(r ui.Rect, label string, enabled bool) {
+	g.drawButtonScale(r, label, enabled, 1.8)
+}
+
+func (g *Game) drawButtonScale(r ui.Rect, label string, enabled bool, scale float32) {
 	c := g.canv
 	hover := enabled && r.Contains(g.mouseX, g.mouseY)
 	bg := ui.RGBA(24, 30, 35, 235)
@@ -354,7 +368,7 @@ func (g *Game) drawButton(r ui.Rect, label string, enabled bool) {
 	c.Rect(r.X+4, r.Y+4, r.W, r.H, [4]float32{0, 0, 0, 0.35})
 	c.Rect(r.X, r.Y, r.W, r.H, bg)
 	c.Border(r.X, r.Y, r.W, r.H, 2, border)
-	c.TextCentered(r.X+r.W/2, r.Y+r.H/2-8, label, 1.8, text)
+	c.TextCentered(r.X+r.W/2, r.Y+r.H/2-8*scale/1.8, label, scale, text)
 }
 
 func (g *Game) drawItemIcon(x, y, size float32, st core.Stack, alpha float32) {
@@ -371,14 +385,14 @@ func (g *Game) drawItemIcon(x, y, size float32, st core.Stack, alpha float32) {
 	c.Rect(x+1, y+1, size-2, (size-2)*0.28, light)
 	c.Rect(x+size*0.72, y+2, size*0.26, size-3, dark)
 	c.Border(x+1, y+1, size-2, size-2, 1.5, [4]float32{0, 0, 0, 0.35 * alpha})
-	name := st.Item.Name()
+	name := i18n.ItemName(st.Item)
 	if name != "" {
 		letter := string([]rune(name)[0])
-		c.TextCentered(x+size/2, y+size/2-7, letter, 1.3, [4]float32{1, 1, 1, alpha})
+		c.TextCentered(x+size/2, y+size/2-9, letter, 1.0, [4]float32{1, 1, 1, alpha})
 	}
 	if st.Count > 1 {
 		cnt := fmt.Sprint(st.Count)
-		c.Text(x+size-c.TextWidth(cnt, 0.9)-2, y+size-14, cnt, 0.9, ui.TextColor)
+		c.Text(x+size-c.TextWidth(cnt, 0.75)-2, y+size-16, cnt, 0.75, ui.TextColor)
 	}
 }
 
@@ -397,7 +411,7 @@ func recipeInputs(r recipe) string {
 		if i > 0 {
 			out += " + "
 		}
-		out += fmt.Sprintf("%dx %s", in.Count, in.Item.Name())
+		out += fmt.Sprintf("%dx %s", in.Count, i18n.ItemName(in.Item))
 	}
 	return out
 }
@@ -414,6 +428,11 @@ func (g *Game) menuRects() []ui.Rect {
 		out[i] = ui.Rect{X: x, Y: y + float32(i)*(bh+12), W: bw, H: bh}
 	}
 	return out
+}
+
+func (g *Game) menuLangRect() ui.Rect {
+	w := float32(g.gfx.W)
+	return ui.Rect{X: w - 286, Y: 26, W: 250, H: 46}
 }
 
 func (g *Game) pauseRects() []ui.Rect {

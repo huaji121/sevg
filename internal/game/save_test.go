@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"sevg/internal/core"
+	"sevg/internal/i18n"
 	"sevg/internal/mathx"
 )
 
@@ -16,6 +17,8 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	g.player.Yaw = 1.25
 	g.player.Pitch = -0.3
 	g.inv.Slots[0] = core.Stack{Item: core.ItemObsidian, Count: 7}
+	i18n.Set(i18n.EN)
+	defer i18n.Set(i18n.ZH)
 	if err := g.saveGame(); err != nil {
 		t.Fatal(err)
 	}
@@ -34,6 +37,9 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 	if sv.Inventory.Count(core.ItemObsidian) != 7 {
 		t.Fatalf("inventory not saved")
+	}
+	if sv.Language != i18n.EN {
+		t.Fatalf("language %q", sv.Language)
 	}
 }
 

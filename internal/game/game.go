@@ -11,6 +11,7 @@ import (
 
 	"sevg/internal/core"
 	"sevg/internal/entity"
+	"sevg/internal/i18n"
 	"sevg/internal/mathx"
 	"sevg/internal/player"
 	"sevg/internal/render"
@@ -25,6 +26,7 @@ type Options struct {
 	SavePath      string
 	SmokeFrames   int
 	Continue      bool
+	Language      string
 }
 
 type State int
@@ -107,6 +109,11 @@ func Run(opts Options) error {
 	if opts.SavePath == "" {
 		opts.SavePath = "savegame.gob"
 	}
+	if opts.Language == "" {
+		opts.Language = i18n.ZH
+	}
+	i18n.Set(opts.Language)
+	fontAtlas := ui.BuildFontAtlas(i18n.AllRunes())
 
 	var unload func()
 	if err := sdl.LoadLibrary(sdl.Path()); err != nil {
@@ -125,13 +132,13 @@ func Run(opts Options) error {
 	}
 	fmt.Println("SEVG - Simple and Extendable Voxel Game")
 	fmt.Println("SDL", sdl.GetVersion().String())
-	win, err := sdl.CreateWindow("SEVG - Simple and Extendable Voxel Game", opts.Width, opts.Height, sdl.WINDOW_RESIZABLE)
+	win, err := sdl.CreateWindow(i18n.T("window.title"), opts.Width, opts.Height, sdl.WINDOW_RESIZABLE)
 	if err != nil {
 		return fmt.Errorf("create window: %w", err)
 	}
 	defer win.Destroy()
 
-	gfx, err := render.New(win, opts.Width, opts.Height)
+	gfx, err := render.New(win, opts.Width, opts.Height, fontAtlas)
 	if err != nil {
 		return err
 	}
@@ -139,7 +146,7 @@ func Run(opts Options) error {
 		opts:     opts,
 		Win:      win,
 		gfx:      gfx,
-		canv:     ui.NewCanvas(opts.Width, opts.Height, ui.BuildFontAtlas()),
+		canv:     ui.NewCanvas(opts.Width, opts.Height, fontAtlas),
 		state:    StateMenu,
 		saveAt:   opts.SavePath,
 		pending:  make(map[[2]int]bool),
@@ -158,7 +165,7 @@ func Run(opts Options) error {
 		g.setState(StatePlaying)
 	} else if opts.Continue {
 		if err := g.startWorld(true); err != nil {
-			g.notify("COULD NOT LOAD SAVE: "+err.Error(), 4)
+			g.notify(i18n.T("toast.could_not_load_save", err.Error()), 4)
 			g.setState(StateMenu)
 		}
 	}
@@ -277,6 +284,8 @@ func (g *Game) onKey(k sdl.Keycode) {
 			}
 		} else if k == sdl.K_ESCAPE {
 			g.quit = true
+		} else if k == sdl.K_L {
+			g.toggleLanguage()
 		}
 	case StatePlaying:
 		switch k {
@@ -287,7 +296,7 @@ func (g *Game) onKey(k sdl.Keycode) {
 		case sdl.K_F:
 			g.player.Flying = !g.player.Flying
 			g.player.Body.Vel.Y = 0
-			g.notify("FLYING "+onOff(g.player.Flying), 1.6)
+			g.notify(i18n.T("toast.flying", onOff(g.player.Flying)), 1.6)
 		case sdl.K_F3:
 			g.debug = !g.debug
 		case sdl.K_H:
@@ -298,10 +307,12 @@ func (g *Game) onKey(k sdl.Keycode) {
 			}
 		case sdl.K_F5:
 			if err := g.saveGame(); err != nil {
-				g.notify("SAVE FAILED: "+err.Error(), 3)
+				g.notify(i18n.T("toast.save_failed", err.Error()), 3)
 			} else {
-				g.notify("WORLD SAVED", 1.8)
+				g.notify(i18n.T("toast.saved"), 1.8)
 			}
+		case sdl.K_L:
+			g.toggleLanguage()
 		case sdl.K_F11:
 			g.fullscreen = !g.fullscreen
 			_ = g.Win.SetFullscreen(g.fullscreen)
@@ -311,7 +322,9 @@ func (g *Game) onKey(k sdl.Keycode) {
 			g.inv.Select(int(k - sdl.K_1))
 		}
 	case StateInventory:
-		if k == sdl.K_E || k == sdl.K_ESCAPE {
+		if k == sdl.K_L {
+			g.toggleLanguage()
+		} else if k == sdl.K_E || k == sdl.K_ESCAPE {
 			if !g.heldStack.Empty() {
 				left := g.inv.Add(g.heldStack.Item, g.heldStack.Count)
 				if left > 0 && g.mobs != nil {
@@ -324,6 +337,8 @@ func (g *Game) onKey(k sdl.Keycode) {
 	case StatePaused:
 		if k == sdl.K_ESCAPE {
 			g.setState(StatePlaying)
+		} else if k == sdl.K_L {
+			g.toggleLanguage()
 		}
 	case StateDead:
 		if k == sdl.K_R || k == sdl.K_RETURN {
@@ -408,7 +423,7 @@ func (g *Game) updatePlaying(dt float32) {
 	if g.saveTimer > 30 && g.opts.SmokeFrames == 0 {
 		g.saveTimer = 0
 		if err := g.saveGame(); err == nil {
-			g.notify("AUTO-SAVED", 1.2)
+			g.notify(i18n.T("toast.autosaved"), 1.2)
 		}
 	}
 	if g.player.Health <= 0 {
@@ -478,6 +493,15 @@ func (g *Game) sky() render.WorldUniforms {
 	}
 }
 
+func (g *Game) toggleLanguage() {
+	next := i18n.Next()
+	i18n.Set(next)
+	if g.Win != nil {
+		_ = g.Win.SetTitle(i18n.T("window.title"))
+	}
+	g.notify(i18n.T("toast.language", i18n.LocaleName(next)), 2)
+}
+
 func (g *Game) notify(s string, secs float32) {
 	g.toast = s
 	g.toastTime = secs
@@ -508,7 +532,7 @@ func (g *Game) respawn() {
 	g.player.Spawning = g.player.Body.Pos
 	g.player.FallingReset()
 	g.setState(StatePlaying)
-	g.notify("RESPAWNED", 1.5)
+	g.notify(i18n.T("toast.respawned"), 1.5)
 }
 
 func boolToInt(b bool) int {
@@ -520,9 +544,9 @@ func boolToInt(b bool) int {
 
 func onOff(b bool) string {
 	if b {
-		return "ON"
+		return i18n.T("common.on")
 	}
-	return "OFF"
+	return i18n.T("common.off")
 }
 
 func absF(v float32) float32 {

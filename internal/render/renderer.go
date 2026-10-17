@@ -89,9 +89,10 @@ type Renderer struct {
 	depthFormat sdl.GPUTextureFormat
 	depth       *sdl.GPUTexture
 
-	atlasTex *sdl.GPUTexture
-	uiTex    *sdl.GPUTexture
-	sampler  *sdl.GPUSampler
+	atlasTex  *sdl.GPUTexture
+	uiTex     *sdl.GPUTexture
+	fontAtlas ui.FontAtlas
+	sampler   *sdl.GPUSampler
 
 	blockOpaque *sdl.GPUGraphicsPipeline
 	blockTrans  *sdl.GPUGraphicsPipeline
@@ -106,7 +107,7 @@ type Renderer struct {
 	stagingCap         uint32
 }
 
-func New(win *sdl.Window, w, h int) (*Renderer, error) {
+func New(win *sdl.Window, w, h int, fontAtlas ui.FontAtlas) (*Renderer, error) {
 	dev, err := sdl.CreateGPUDevice(sdl.GPU_SHADERFORMAT_SPIRV, true, "")
 	if err != nil {
 		return nil, fmt.Errorf("create GPU device (Vulkan is required): %w", err)
@@ -117,6 +118,7 @@ func New(win *sdl.Window, w, h int) (*Renderer, error) {
 	}
 	r := &Renderer{
 		Dev: dev, Win: win, W: w, H: h,
+		fontAtlas:  fontAtlas,
 		swapFormat: dev.SwapchainTextureFormat(win),
 		chunks:     make(map[[2]int]*gpuChunk),
 	}
@@ -158,8 +160,7 @@ func (r *Renderer) createResources() error {
 	if err != nil {
 		return err
 	}
-	font := ui.BuildFontAtlas()
-	r.uiTex, err = r.uploadTexture(font.Pixels, font.W, font.H)
+	r.uiTex, err = r.uploadTexture(r.fontAtlas.Pixels, r.fontAtlas.W, r.fontAtlas.H)
 	if err != nil {
 		return err
 	}

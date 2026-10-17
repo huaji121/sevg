@@ -67,6 +67,15 @@ SEVG 的目标不是复刻完整的 Minecraft，而是提供一个 **结构清�
 - 掉落物使用材质图集中的纯色材质渲染
 - 实体与地形共用深度/雾/光照管线
 
+### 多语言
+
+- 默认语言：**简体中文**
+- 内置 **English**，可在主菜单点击语言按钮，或按 `L` 即时切换
+- 方块名、物品名、生物群系、按钮、提示、背包/合成、暂停/死亡界面、调试信息均已本地化
+- 语言随存档保存，也可以通过 `-lang en-US` 或 `-lang zh-CN` 启动
+- 中文使用系统 CJK 字体（Windows 微软雅黑、Linux Noto CJK、macOS 苹方）；可用 `SEVG_FONT` 指定字体文件
+- 字体图集在启动时按当前所有翻译字符生成，切换语言无需重启
+
 ### GUI
 
 - 标题界面（程序化像素风背景）
@@ -74,6 +83,7 @@ SEVG 的目标不是复刻完整的 Minecraft，而是提供一个 **结构清�
 - 背包 + 合成界面
 - 生命条、快捷栏、物品名称、准星、挖掘进度
 - F3 调试信息
+- 多语言标题、暂停、背包、提示与调试文本
 - 水下屏幕染色
 - 死亡界面
 - 提示 Toast、区块生成进度
@@ -90,9 +100,13 @@ SEVG 的目标不是复刻完整的 Minecraft，而是提供一个 **结构清�
 
 ## 截图
 
-| 主菜单 | 背包与合成 |
+| 中文主菜单 | 中文背包与合成 |
 | --- | --- |
 | ![menu](docs/menu.png) | ![inventory](docs/inventory.png) |
+
+| English menu | English in-game |
+| --- | --- |
+| ![menu en](docs/menu_en.png) | ![gameplay en](docs/gameplay_en.png) |
 
 ---
 
@@ -104,6 +118,7 @@ SEVG 的目标不是复刻完整的 Minecraft，而是提供一个 **结构清�
 - Python **3.10+**（仅用于开发脚本，游戏本身不需要 Python）
 - 64 位 Windows / Linux / macOS
 - 支持 **Vulkan** 的 GPU 与驱动（当前渲染器只打包了 SPIR-V 着色器）
+- 中文字体：Windows 自带微软雅黑即可；Linux 建议安装 Noto Sans CJK；macOS 自带苹方
 - 不需要 CGo、GCC 或手动安装 SDL3
 
 SDL3 通过 `github.com/Zyko0/go-sdl3/bin/binsdl` 内嵌并在运行时释放；首次运行会略微慢一点。
@@ -145,6 +160,7 @@ py run.py -seed 12345 -renderdist 8
 | `-save` | `savegame.gob` | 存档路径 |
 | `-continue` | `false` | 启动时读取存档 |
 | `-smoke` | `0` | 渲染 N 帧后退出，用于 CI/冒烟测试 |
+| `-lang` | `zh-CN` | UI 语言：`zh-CN` 或 `en-US` |
 
 示例：
 
@@ -172,6 +188,7 @@ py run.py -seed 12345 -renderdist 8
 | `E` | 背包与合成 |
 | `F` | 飞行开关 |
 | `F3` | 调试信息 |
+| `L` | 切换语言（中文 / English） |
 | `H` | 显示/隐藏快速帮助 |
 | `F5` | 保存 |
 | `F11` | 全屏 |
@@ -202,8 +219,9 @@ py run.py -seed 12345 -renderdist 8
 │   │   ├── renderer.go         # SDL_GPU 设备、管线、缓冲、绘制
 │   │   ├── atlas.go            # 程序化方块材质图集
 │   │   └── shaders/            # GLSL + 预编译 SPIR-V
-│   ├── ui/                     # 位图字体与 2D 画布
-│   └── game/                   # 游戏循环、输入、HUD、菜单、存档、流式调度
+│   ├── i18n/                   # 多语言文本、方块/物品/群系名称
+│   ├── ui/                     # CJK 系统字体图集与 2D 画布
+│   └── game/                   # 游戏循环、输入、HUD、菜单、存档、流式调度、语言切换
 ├── cmd/atlasdump/              # 可选：导出材质图集 PNG
 ├── docs/                       # 截图
 ├── build.py / run.py / test.py # Python 开发脚本
@@ -260,6 +278,13 @@ py shaders.py
 - 在 `internal/entity` 添加 `Kind`。
 - 在 `Boxes()` 中组合若干 AABB 部件。
 - 复用 `physics.Body` 与 `Manager` 的生成、更新、掉落逻辑。
+
+### 添加语言/文本
+
+- 在 `internal/i18n/i18n.go` 的 `translations` 中添加 `zh-CN` / `en-US` 键值。
+- 方块/物品名称在 `zhBlockNames` / `zhItemNames` 中维护。
+- 新增文本后 `i18n.AllRunes()` 会自动收集字符，启动时重新生成字体图集。
+- UI 中使用 `i18n.T("key")`；内容名称使用 `i18n.ItemName` / `i18n.BlockName` / `i18n.BiomeName`。
 
 ### 添加 GUI 页面
 

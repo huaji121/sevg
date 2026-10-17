@@ -9,6 +9,7 @@ import (
 
 	"sevg/internal/core"
 	"sevg/internal/entity"
+	"sevg/internal/i18n"
 	"sevg/internal/mathx"
 	"sevg/internal/physics"
 	"sevg/internal/player"
@@ -27,6 +28,7 @@ type playerSave struct {
 type SaveGame struct {
 	Version   int
 	Seed      int64
+	Language  string
 	Time      float64
 	Player    playerSave
 	Inventory core.Inventory
@@ -61,7 +63,7 @@ func (g *Game) startWorld(load bool) error {
 	if load {
 		sv, err = loadSave(g.saveAt)
 		if err != nil {
-			g.notify("COULD NOT LOAD SAVE: "+err.Error(), 4)
+			g.notify(i18n.T("toast.could_not_load_save", err.Error()), 4)
 			return err
 		}
 	}
@@ -80,6 +82,9 @@ func (g *Game) startWorld(load bool) error {
 	if sv != nil {
 		seed = sv.Seed
 		g.seed = seed
+		if sv.Language != "" {
+			i18n.Set(sv.Language)
+		}
 		inv = sv.Inventory
 		inv.Normalize()
 		timeOfDay = sv.Time
@@ -152,12 +157,13 @@ func (g *Game) startWorld(load bool) error {
 	g.mobs.SpawnInitial(w, p.Body.Pos)
 	g.startWorkers()
 	fmt.Printf("WORLD seed=%d spawn=%.2f,%.2f,%.2f loaded=%d meshed=%d mobs=%d\n", seed, p.Body.Pos.X, p.Body.Pos.Y, p.Body.Pos.Z, w.Loaded(), len(g.meshed), g.mobs.MobCount())
+	_ = g.Win.SetTitle(i18n.T("window.title"))
 	g.setState(StatePlaying)
 	g.requestChunks(center)
 	if sv != nil {
-		g.notify("WORLD LOADED", 2)
+		g.notify(i18n.T("toast.loaded"), 2)
 	} else {
-		g.notify("NEW WORLD - SEED "+fmt.Sprint(seed), 3)
+		g.notify(i18n.T("toast.new_world", seed), 3)
 	}
 	return nil
 }
@@ -313,9 +319,10 @@ func (g *Game) saveGame() error {
 		g.heldStack = core.Stack{}
 	}
 	sv := SaveGame{
-		Version: saveVersion,
-		Seed:    g.world.Seed,
-		Time:    g.time,
+		Version:  saveVersion,
+		Seed:     g.world.Seed,
+		Language: i18n.Current(),
+		Time:     g.time,
 		Player: playerSave{
 			X: g.player.Body.Pos.X, Y: g.player.Body.Pos.Y, Z: g.player.Body.Pos.Z,
 			Yaw: g.player.Yaw, Pitch: g.player.Pitch, Health: g.player.Health,

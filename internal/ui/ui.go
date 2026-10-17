@@ -1,76 +1,242 @@
-// Package ui provides a tiny immediate-mode 2D canvas and bitmap font.
+// Package ui provides a small immediate-mode 2D canvas and a CJK-capable
+// system-font atlas with a deterministic fallback bitmap font.
 package ui
 
 import (
+	"fmt"
 	"image"
-	"image/color"
+	"os"
+	"sort"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 )
 
 const (
-	CellW     = 8
-	CellH     = 14
-	Cols      = 16
-	Rows      = 8
-	First     = 32
-	Last      = 126
-	WhiteCell = 127
+	fontSize   = 16.0
+	atlasWidth = 1024
+	cellPad    = 1
 )
 
+type Glyph struct {
+	U0, V0, U1, V1   float32
+	W, H             float32
+	OffsetX, OffsetY float32
+	Advance          float32
+}
+
 type FontAtlas struct {
-	Pixels  []byte
-	W, H    int
-	WhiteUV [2]float32
+	Pixels     []byte
+	W, H       int
+	WhiteUV    [2]float32
+	Glyphs     map[rune]Glyph
+	LineHeight float32
+	Ascent     float32
+	Source     string
 }
 
-func BuildFontAtlas() FontAtlas {
-	w, h := Cols*CellW, Rows*CellH
-	img := image.NewRGBA(image.Rect(0, 0, w, h))
-	face := basicfont.Face7x13
-	for r := rune(First); r <= Last; r++ {
-		cell := int(r - First)
-		cx, cy := cell%Cols, cell/Cols
-		d := &font.Drawer{
-			Dst:  img,
-			Src:  image.White,
-			Face: face,
-			Dot:  fixed.P(cx*CellW, cy*CellH+11),
-		}
-		d.DrawString(string(r))
-	}
-	// A solid white texel for panels and bars.
-	cell := WhiteCell
-	cx, cy := cell%Cols, cell/Cols
-	for y := 0; y < CellH; y++ {
-		for x := 0; x < CellW; x++ {
-			img.SetRGBA(cx*CellW+x, cy*CellH+y, color.RGBA{255, 255, 255, 255})
-		}
-	}
-	white := [2]float32{
-		(float32(cx*CellW) + CellW/2) / float32(w),
-		(float32(cy*CellH) + CellH/2) / float32(h),
-	}
-	return FontAtlas{Pixels: img.Pix, W: w, H: h, WhiteUV: white}
+type placement struct {
+	r   rune
+	g   Glyph
+	img *image.Alpha
 }
 
-func cellUV(r rune) (u0, v0, u1, v1 float32) {
-	if r < First || r > Last {
-		r = '?'
+// BuildFontAtlas rasterizes all requested runes into one texture. It uses a
+// system CJK font when available (Microsoft YaHei, Noto Sans CJK, PingFang,
+// etc.) and falls back to the embedded 7x13 bitmap font.
+func BuildFontAtlas(runes []rune) FontAtlas {
+	face, source := loadFace()
+	if face != nil {
+		defer face.Close()
 	}
-	cell := int(r - First)
-	if cell >= WhiteCell {
-		cell = '?' - First
+
+	set := make(map[rune]bool)
+	for r := rune(32); r < 127; r++ {
+		set[r] = true
 	}
-	cx, cy := cell%Cols, cell/Cols
-	const eps = 0.01
-	u0 = (float32(cx*CellW) + eps) / float32(Cols*CellW)
-	v0 = (float32(cy*CellH) + eps) / float32(Rows*CellH)
-	u1 = (float32((cx+1)*CellW) - eps) / float32(Cols*CellW)
-	v1 = (float32((cy+1)*CellH) - eps) / float32(Rows*CellH)
-	return
+	for _, r := range runes {
+		set[r] = true
+	}
+	set['?'] = true
+	chars := make([]rune, 0, len(set))
+	for r := range set {
+		chars = append(chars, r)
+	}
+	sort.Slice(chars, func(i, j int) bool { return chars[i] < chars[j] })
+
+	metrics := face.Metrics()
+	lineHeight := float32(metrics.Height) / 64
+	ascent := float32(metrics.Ascent) / 64
+	if lineHeight < 8 {
+		lineHeight = 14
+	}
+
+	placements := make([]placement, 0, len(chars))
+	for _, r := range chars {
+		g, img, ok := rasterGlyph(face, r)
+		if !ok {
+			continue
+		}
+		placements = append(placements, placement{r: r, g: g, img: img})
+	}
+
+	// Reserve a 2x2 white block in the top-left corner for panels and bars.
+	const whiteSize = 2
+	cursorX, cursorY, rowH := 4, 0, whiteSize
+	for i := range placements {
+		p := &placements[i]
+		if p.img == nil {
+			continue
+		}
+		if cursorX+p.img.Rect.Dx() > atlasWidth {
+			cursorX = 0
+			cursorY += rowH + 1
+			rowH = 0
+		}
+		w, h := p.img.Rect.Dx(), p.img.Rect.Dy()
+		p.g.W = float32(w)
+		p.g.H = float32(h)
+		p.g.OffsetX = float32(cursorX)
+		p.g.OffsetY = float32(cursorY)
+		cursorX += w + 1
+		if h > rowH {
+			rowH = h
+		}
+	}
+	height := cursorY + rowH
+	if height < 16 {
+		height = 16
+	}
+	for i := range placements {
+		p := &placements[i]
+		if p.img == nil {
+			continue
+		}
+		w, h := p.img.Rect.Dx(), p.img.Rect.Dy()
+		p.g.U0 = (p.g.OffsetX + 0.01) / atlasWidth
+		p.g.V0 = (p.g.OffsetY + 0.01) / float32(height)
+		p.g.U1 = (p.g.OffsetX + float32(w) - 0.01) / atlasWidth
+		p.g.V1 = (p.g.OffsetY + float32(h) - 0.01) / float32(height)
+	}
+
+	pixels := make([]byte, atlasWidth*height*4)
+	for y := 0; y < whiteSize; y++ {
+		for x := 0; x < whiteSize; x++ {
+			i := (y*atlasWidth + x) * 4
+			pixels[i], pixels[i+1], pixels[i+2], pixels[i+3] = 255, 255, 255, 255
+		}
+	}
+	glyphs := make(map[rune]Glyph, len(placements))
+	for _, p := range placements {
+		if p.img == nil {
+			if p.g.Advance > 0 {
+				glyphs[p.r] = p.g
+			}
+			continue
+		}
+		px, py := int(p.g.OffsetX), int(p.g.OffsetY)
+		w, h := p.img.Rect.Dx(), p.img.Rect.Dy()
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				a := p.img.AlphaAt(x, y).A
+				if a == 0 {
+					continue
+				}
+				i := ((py+y)*atlasWidth + (px + x)) * 4
+				pixels[i], pixels[i+1], pixels[i+2], pixels[i+3] = 255, 255, 255, a
+			}
+		}
+		// Restore the glyph's pixel offsets relative to the pen/line top.
+		bounds, _, _ := face.GlyphBounds(p.r)
+		p.g.OffsetX = float32(bounds.Min.X)/64 - cellPad
+		p.g.OffsetY = ascent + float32(bounds.Min.Y)/64 - cellPad
+		glyphs[p.r] = p.g
+	}
+
+	whiteUV := [2]float32{1.0 / atlasWidth, 1.0 / float32(height)}
+	return FontAtlas{
+		Pixels: pixels, W: atlasWidth, H: height,
+		WhiteUV: whiteUV, Glyphs: glyphs,
+		LineHeight: lineHeight, Ascent: ascent, Source: source,
+	}
+}
+
+func rasterGlyph(face font.Face, r rune) (Glyph, *image.Alpha, bool) {
+	bounds, advance, ok := face.GlyphBounds(r)
+	if !ok {
+		return Glyph{}, nil, false
+	}
+	adv := float32(advance) / 64
+	if bounds.Max.X <= bounds.Min.X || bounds.Max.Y <= bounds.Min.Y {
+		return Glyph{Advance: adv}, nil, true
+	}
+	w := bounds.Max.X.Ceil() - bounds.Min.X.Floor()
+	h := bounds.Max.Y.Ceil() - bounds.Min.Y.Floor()
+	if w <= 0 || h <= 0 {
+		return Glyph{Advance: adv}, nil, true
+	}
+	img := image.NewAlpha(image.Rect(0, 0, w+cellPad*2, h+cellPad*2))
+	dot := fixed.Point26_6{
+		X: fixed.I(cellPad) - bounds.Min.X,
+		Y: fixed.I(cellPad) - bounds.Min.Y,
+	}
+	d := &font.Drawer{Dst: img, Src: image.Opaque, Face: face, Dot: dot}
+	d.DrawString(string(r))
+	return Glyph{Advance: adv}, img, true
+}
+
+func loadFace() (font.Face, string) {
+	if path := os.Getenv("SEVG_FONT"); path != "" {
+		if face, err := loadFontFile(path); err == nil {
+			return face, path
+		} else {
+			fmt.Printf("UI font %s: %v\n", path, err)
+		}
+	}
+	candidates := []string{
+		"C:\\Windows\\Fonts\\msyh.ttc",
+		"C:\\Windows\\Fonts\\msyh.ttf",
+		"C:\\Windows\\Fonts\\Deng.ttf",
+		"C:\\Windows\\Fonts\\simhei.ttf",
+		"C:\\Windows\\Fonts\\simsun.ttc",
+		"/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+		"/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+		"/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+		"/System/Library/Fonts/PingFang.ttc",
+		"/System/Library/Fonts/STHeiti Light.ttc",
+	}
+	for _, path := range candidates {
+		if _, err := os.Stat(path); err != nil {
+			continue
+		}
+		face, err := loadFontFile(path)
+		if err == nil {
+			return face, path
+		}
+		fmt.Printf("UI font %s: %v\n", path, err)
+	}
+	fmt.Println("UI font: fallback bitmap (install a CJK font for Chinese glyphs)")
+	return basicfont.Face7x13, "basicfont"
+}
+
+func loadFontFile(path string) (font.Face, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	collection, err := opentype.ParseCollection(data)
+	if err != nil {
+		return nil, err
+	}
+	f, err := collection.Font(0)
+	if err != nil {
+		return nil, err
+	}
+	return opentype.NewFace(f, &opentype.FaceOptions{
+		Size: fontSize, DPI: 72, Hinting: font.HintingFull,
+	})
 }
 
 type Vertex struct {
@@ -86,25 +252,22 @@ func (r Rect) Contains(x, y float32) bool {
 }
 
 type Canvas struct {
-	W, H  int
-	Verts []Vertex
-	White [2]float32
+	W, H       int
+	Verts      []Vertex
+	White      [2]float32
+	Glyphs     map[rune]Glyph
+	LineHeight float32
 }
 
 func NewCanvas(w, h int, atlas FontAtlas) *Canvas {
-	return &Canvas{W: w, H: h, White: atlas.WhiteUV}
+	return &Canvas{W: w, H: h, White: atlas.WhiteUV, Glyphs: atlas.Glyphs, LineHeight: atlas.LineHeight}
 }
 
-func (c *Canvas) Resize(w, h int) {
-	c.W, c.H = w, h
-}
-
-func (c *Canvas) Reset() {
-	c.Verts = c.Verts[:0]
-}
+func (c *Canvas) Resize(w, h int) { c.W, c.H = w, h }
+func (c *Canvas) Reset()          { c.Verts = c.Verts[:0] }
 
 func (c *Canvas) quad(x, y, w, h float32, u0, v0, u1, v1 float32, col [4]float32) {
-	if w <= 0 || h <= 0 {
+	if w <= 0 || h <= 0 || col[3] <= 0 {
 		return
 	}
 	x1, y1 := x+w, y+h
@@ -135,24 +298,34 @@ func (c *Canvas) Panel(x, y, w, h float32, bg, border [4]float32) {
 	c.Border(x, y, w, h, 2, border)
 }
 
+func (c *Canvas) glyph(r rune) Glyph {
+	if g, ok := c.Glyphs[r]; ok {
+		return g
+	}
+	return c.Glyphs['?']
+}
+
 func (c *Canvas) Text(x, y float32, s string, scale float32, col [4]float32) float32 {
 	cx, cy := x, y
 	startX := x
 	for _, r := range s {
 		if r == 10 {
 			cx = startX
-			cy += float32(CellH) * scale
+			cy += c.LineHeight * scale
 			continue
 		}
-		u0, v0, u1, v1 := cellUV(r)
-		c.quad(cx, cy, float32(CellW)*scale, float32(CellH)*scale, u0, v0, u1, v1, col)
-		cx += float32(CellW) * scale * 0.875
+		g := c.glyph(r)
+		if g.W > 0 && g.H > 0 {
+			c.quad(cx+g.OffsetX*scale, cy+g.OffsetY*scale, g.W*scale, g.H*scale, g.U0, g.V0, g.U1, g.V1, col)
+		}
+		cx += g.Advance * scale
 	}
 	return cx
 }
 
 func (c *Canvas) TextShadow(x, y float32, s string, scale float32, col [4]float32) {
-	c.Text(x+scale, y+scale, s, scale, [4]float32{0, 0, 0, col[3] * 0.75})
+	o := scale * 1.2
+	c.Text(x+o, y+o, s, scale, [4]float32{0, 0, 0, col[3] * 0.75})
 	c.Text(x, y, s, scale, col)
 }
 
@@ -176,7 +349,7 @@ func (c *Canvas) TextWidth(s string, scale float32) float32 {
 			line = 0
 			continue
 		}
-		line += float32(CellW) * scale * 0.875
+		line += c.glyph(r).Advance * scale
 	}
 	if line > max {
 		max = line

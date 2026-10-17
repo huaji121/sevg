@@ -17,6 +17,7 @@ func main() {
 	flag.StringVar(&opts.SavePath, "save", "savegame.gob", "save game path")
 	flag.IntVar(&opts.SmokeFrames, "smoke", 0, "render N frames then exit (testing)")
 	flag.BoolVar(&opts.Continue, "continue", false, "load the save game on startup")
+	flag.StringVar(&opts.Language, "lang", "zh-CN", "UI language: zh-CN or en-US")
 	flag.Parse()
 
 	if err := game.Run(opts); err != nil {

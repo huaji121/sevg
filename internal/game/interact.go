@@ -4,25 +4,25 @@ import (
 	"math"
 
 	"sevg/internal/core"
+	"sevg/internal/i18n"
 	"sevg/internal/mathx"
 	"sevg/internal/world"
 )
 
 type recipe struct {
-	Name   string
 	Inputs []core.Stack
 	Output core.Stack
 }
 
 var recipes = []recipe{
-	{Name: "PLANKS", Inputs: []core.Stack{{Item: core.ItemLog, Count: 1}}, Output: core.Stack{Item: core.ItemPlanks, Count: 4}},
-	{Name: "STICKS", Inputs: []core.Stack{{Item: core.ItemPlanks, Count: 2}}, Output: core.Stack{Item: core.ItemStick, Count: 4}},
-	{Name: "STONE BRICKS", Inputs: []core.Stack{{Item: core.ItemCobble, Count: 4}}, Output: core.Stack{Item: core.ItemStoneBrick, Count: 4}},
-	{Name: "GLASS", Inputs: []core.Stack{{Item: core.ItemSand, Count: 4}}, Output: core.Stack{Item: core.ItemGlass, Count: 1}},
-	{Name: "STONE PICKAXE", Inputs: []core.Stack{{Item: core.ItemCobble, Count: 3}, {Item: core.ItemStick, Count: 2}}, Output: core.Stack{Item: core.ItemStonePickaxe, Count: 1}},
-	{Name: "WOODEN SWORD", Inputs: []core.Stack{{Item: core.ItemPlanks, Count: 2}, {Item: core.ItemStick, Count: 1}}, Output: core.Stack{Item: core.ItemWoodSword, Count: 1}},
-	{Name: "IRON SWORD", Inputs: []core.Stack{{Item: core.ItemIronIngot, Count: 2}, {Item: core.ItemStick, Count: 1}}, Output: core.Stack{Item: core.ItemIronSword, Count: 1}},
-	{Name: "IRON PICKAXE", Inputs: []core.Stack{{Item: core.ItemIronIngot, Count: 3}, {Item: core.ItemStick, Count: 2}}, Output: core.Stack{Item: core.ItemIronPickaxe, Count: 1}},
+	{Inputs: []core.Stack{{Item: core.ItemLog, Count: 1}}, Output: core.Stack{Item: core.ItemPlanks, Count: 4}},
+	{Inputs: []core.Stack{{Item: core.ItemPlanks, Count: 2}}, Output: core.Stack{Item: core.ItemStick, Count: 4}},
+	{Inputs: []core.Stack{{Item: core.ItemCobble, Count: 4}}, Output: core.Stack{Item: core.ItemStoneBrick, Count: 4}},
+	{Inputs: []core.Stack{{Item: core.ItemSand, Count: 4}}, Output: core.Stack{Item: core.ItemGlass, Count: 1}},
+	{Inputs: []core.Stack{{Item: core.ItemCobble, Count: 3}, {Item: core.ItemStick, Count: 2}}, Output: core.Stack{Item: core.ItemStonePickaxe, Count: 1}},
+	{Inputs: []core.Stack{{Item: core.ItemPlanks, Count: 2}, {Item: core.ItemStick, Count: 1}}, Output: core.Stack{Item: core.ItemWoodSword, Count: 1}},
+	{Inputs: []core.Stack{{Item: core.ItemIronIngot, Count: 2}, {Item: core.ItemStick, Count: 1}}, Output: core.Stack{Item: core.ItemIronSword, Count: 1}},
+	{Inputs: []core.Stack{{Item: core.ItemIronIngot, Count: 3}, {Item: core.ItemStick, Count: 2}}, Output: core.Stack{Item: core.ItemIronPickaxe, Count: 1}},
 }
 
 func (g *Game) handleActions(dt float32) {
@@ -147,13 +147,13 @@ func (g *Game) useItem(hit world.RayHit) {
 	def := s.Item.Def()
 	if def.Kind == core.KindFood {
 		if g.player.Health >= g.player.MaxHP {
-			g.notify("ALREADY AT FULL HEALTH", 1.2)
+			g.notify(i18n.T("toast.full_health"), 1.2)
 			return
 		}
 		g.player.Heal(def.Food)
 		g.inv.TakeSelected(1)
 		g.placeCool = 0.35
-		g.notify("ATE "+def.Name, 1.2)
+		g.notify(i18n.T("toast.ate", i18n.ItemName(s.Item)), 1.2)
 		return
 	}
 	if def.Kind != core.KindBlock || def.Block == core.Air {
@@ -174,7 +174,7 @@ func (g *Game) useItem(hit world.RayHit) {
 		}
 	}
 	if g.player.IntersectsBlock(x, y, z) {
-		g.notify("NOT ENOUGH ROOM", 1.2)
+		g.notify(i18n.T("toast.no_room"), 1.2)
 		return
 	}
 	for _, m := range g.mobs.Mobs {
@@ -220,13 +220,17 @@ func (g *Game) pickBlock() {
 			return
 		}
 	}
-	g.notify("NO "+item.Name()+" IN INVENTORY", 1.3)
+	g.notify(i18n.T("toast.no_item", i18n.ItemName(item)), 1.3)
 }
 
 func (g *Game) handleUIClick(right bool) {
 	switch g.state {
 	case StateMenu:
 		if right {
+			return
+		}
+		if g.menuLangRect().Contains(g.mouseX, g.mouseY) {
+			g.toggleLanguage()
 			return
 		}
 		rects := g.menuRects()
@@ -237,12 +241,12 @@ func (g *Game) handleUIClick(right bool) {
 			switch i {
 			case 0:
 				if err := g.startWorld(false); err != nil {
-					g.notify("COULD NOT START: "+err.Error(), 3)
+					g.notify(i18n.T("toast.could_not_start", err.Error()), 3)
 				}
 			case 1:
 				if g.saveExists() {
 					if err := g.startWorld(true); err != nil {
-						g.notify("COULD NOT LOAD: "+err.Error(), 3)
+						g.notify(i18n.T("toast.could_not_load", err.Error()), 3)
 					}
 				}
 			case 2:
@@ -263,7 +267,7 @@ func (g *Game) handleUIClick(right bool) {
 				g.setState(StatePlaying)
 			case 1:
 				if err := g.saveGame(); err == nil {
-					g.notify("WORLD SAVED", 1.5)
+					g.notify(i18n.T("toast.saved"), 1.5)
 				}
 			case 2:
 				g.quitToTitle()
@@ -370,7 +374,7 @@ func (g *Game) craft(index int) {
 	r := recipes[index]
 	for _, in := range r.Inputs {
 		if g.inv.Count(in.Item) < in.Count {
-			g.notify("MISSING "+in.Item.Name(), 1.4)
+			g.notify(i18n.T("toast.missing", i18n.ItemName(in.Item)), 1.4)
 			return
 		}
 	}
@@ -381,5 +385,5 @@ func (g *Game) craft(index int) {
 	if left > 0 {
 		g.mobs.Drop(r.Output.Item, left, g.player.Body.Pos, mathx.Vec3{Y: 3})
 	}
-	g.notify("CRAFTED "+r.Name, 1.2)
+	g.notify(i18n.T("toast.crafted", i18n.ItemName(r.Output.Item)), 1.2)
 }
