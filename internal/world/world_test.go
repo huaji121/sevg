@@ -258,3 +258,24 @@ func TestSmoothLightingDefaultsOnAndMarksChunksDirty(t *testing.T) {
 		t.Fatal("toggling smooth lighting did not mark the chunk dirty")
 	}
 }
+func TestBlockLightCrossesChunkBoundaryAndDirtiesNeighbor(t *testing.T) {
+	w := New(123)
+	w.EnsureChunk(ChunkPos{0, 0})
+	n, _ := w.EnsureChunk(ChunkPos{1, 0})
+	w.SetBlock(14, 110, 8, core.Torch)
+	if got := w.BlockLightAt(16, 110, 8); got != 12 {
+		t.Fatalf("light across chunk boundary = %d, want 12", got)
+	}
+	w.ClearDirty(ChunkPos{1, 0})
+	w.SetBlock(14, 110, 8, core.Air)
+	if got := w.BlockLightAt(14, 110, 8); got != 0 {
+		t.Fatalf("removed torch light = %d", got)
+	}
+	w.SetBlock(14, 110, 8, core.Torch)
+	if got := w.BlockLightAt(14, 110, 8); got != 14 {
+		t.Fatalf("torch light = %d", got)
+	}
+	if !n.Dirty {
+		t.Fatal("neighbor chunk was not marked dirty after light changed")
+	}
+}

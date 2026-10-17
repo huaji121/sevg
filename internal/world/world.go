@@ -496,7 +496,16 @@ type lightNode struct {
 // chunk. Light sources are sparse, so a single BFS is cheap even with many
 // loaded chunks.
 func (w *World) rebuildBlockLightLocked() {
+	// Block light crosses chunk borders. Track every chunk whose light values
+	// changed (including removed light) so all affected meshes are rebuilt.
+	dirty := make(map[[2]int]bool)
 	for _, c := range w.chunks {
+		for _, v := range c.BlockLight {
+			if v != 0 {
+				dirty[c.Pos.Key()] = true
+				break
+			}
+		}
 		clear(c.BlockLight)
 	}
 	queue := make([]lightNode, 0, 64)
@@ -508,6 +517,7 @@ func (w *World) rebuildBlockLightLocked() {
 				continue
 			}
 			c.BlockLight[i] = l
+			dirty[c.Pos.Key()] = true
 			x := i % ChunkSize
 			y := i / (ChunkSize * ChunkSize)
 			z := (i / ChunkSize) % ChunkSize
@@ -540,7 +550,17 @@ func (w *World) rebuildBlockLightLocked() {
 				continue
 			}
 			c.BlockLight[i] = next
+			dirty[cp.Key()] = true
 			queue = append(queue, lightNode{x: x, y: y, z: z, level: next})
+		}
+	}
+	// Smooth lighting samples across chunk borders, so neighbours of a
+	// changed chunk also need a remesh.
+	for key := range dirty {
+		for dz := -1; dz <= 1; dz++ {
+			for dx := -1; dx <= 1; dx++ {
+				w.markDirtyLocked(ChunkPos{X: key[0] + dx, Z: key[1] + dz})
+			}
 		}
 	}
 }
