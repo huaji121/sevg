@@ -60,13 +60,15 @@ func TestAllTranslationKeysExist(t *testing.T) {
 }
 func TestContentNamesComplete(t *testing.T) {
 	for id := core.BlockID(0); id < core.BlockCount; id++ {
-		if zhBlockNames[id] == "" {
-			t.Fatalf("missing Chinese block name for %d", id)
+		key := "block." + keySlug(id.Name())
+		if translations[ZH][key] == "" {
+			t.Fatalf("missing Chinese block name for %s", key)
 		}
 	}
 	for id := core.ItemID(0); id < core.ItemCount; id++ {
-		if zhItemNames[id] == "" {
-			t.Fatalf("missing Chinese item name for %d", id)
+		key := "item." + keySlug(id.Name())
+		if translations[ZH][key] == "" {
+			t.Fatalf("missing Chinese item name for %s", key)
 		}
 	}
 }

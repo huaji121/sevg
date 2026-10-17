@@ -12,3 +12,8 @@ var Textures embed.FS
 //
 //go:embed sounds/*.wav
 var Sounds embed.FS
+
+// Lang contains the UI and content translation tables.
+//
+//go:embed lang/*.json
+var Lang embed.FS

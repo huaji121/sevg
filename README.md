@@ -267,6 +267,7 @@ py run.py -seed 12345 -renderdist 8
 │   ├── blocks/                 # 16 × 16 方块、裂纹、火把、调色板贴图
 │   └── items/                  # 40 × 40 纯贴图物品图标（工具、食物、材料）
 ├── assets/sounds/              # WAV 音效素材，嵌入二进制并由软件混音
+├── assets/lang/                # 多语言 JSON 文本，嵌入二进制
 ├── settings.json               # 运行时自动生成的视频设置
 ├── cmd/atlasdump/              # 可选：导出材质图集 PNG
 ├── docs/                       # 截图
@@ -328,7 +329,7 @@ py shaders.py
 
 ### 添加语言/文本
 
-- 在 `internal/i18n/i18n.go` 的 `translations` 中添加 `zh-CN` / `en-US` 键值。
+- 在 `assets/lang/zh-CN.json` 和 `assets/lang/en-US.json` 中添加相同 key 的翻译值。
 - 方块/物品名称在 `zhBlockNames` / `zhItemNames` 中维护。
 - 新增文本后 `i18n.AllRunes()` 会自动收集字符，启动时重新生成字体图集。
 - UI 中使用 `i18n.T("key")`；内容名称使用 `i18n.ItemName` / `i18n.BlockName` / `i18n.BiomeName`。
