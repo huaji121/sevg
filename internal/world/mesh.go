@@ -211,9 +211,10 @@ func (w *World) Mesh(pos ChunkPos) (ChunkMesh, bool) {
 				for fi := 0; fi < 6; fi++ {
 					f := &faces[fi]
 					nx, ny, nz := x+f.normal[0], y+f.normal[1], z+f.normal[2]
-					if !padPresent[(nx+1)+(nz+1)*padSizeX] {
-						// Do not generate a wall against a chunk that has not been
-						// committed yet. The face is added on the next remesh.
+					if !padPresent[(nx+1)+(nz+1)*padSizeX] && b == core.Water {
+						// Water would show a dark wall against a chunk that has not
+						// been committed yet. Other blocks keep their boundary faces so
+						// trees and terrain are not visibly cut off at the frontier.
 						continue
 					}
 					nb := at(nx, ny, nz)
