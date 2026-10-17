@@ -593,6 +593,7 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 			}
 		}
 	}
+	g.appendFallingBlocks(&opaque)
 	g.appendParticleMeshes(&opaque, &transparent)
 	g.appendBreakOverlay(&transparent)
 	if g.player != nil && g.targetValid {
@@ -901,6 +902,35 @@ func appendOutline(m *world.MeshData, min, max mathx.Vec3, col [4]float32) {
 	for _, x := range xs {
 		for _, y := range ys {
 			appendEntityBox(m, mathx.V3(x, y, min.Z), mathx.V3(x+t, y+t, max.Z), col)
+		}
+	}
+}
+func (g *Game) appendFallingBlocks(m *world.MeshData) {
+	if g.mobs == nil || g.world == nil {
+		return
+	}
+	for _, f := range g.mobs.Falling {
+		min, max := f.Body.Min(), f.Body.Max()
+		x := int(math.Floor(float64(f.Body.Pos.X)))
+		y := int(math.Floor(float64(f.Body.Pos.Y + 0.5)))
+		z := int(math.Floor(float64(f.Body.Pos.Z)))
+		sky := float32(g.world.SkyLightAt(x, y, z)) / 15
+		blk := float32(g.world.BlockLightAt(x, y, z)) / 15
+		for fi, face := range entityFaces {
+			u0, v0, u1, v1 := world.TileUV(f.Block.Tile(fi))
+			base := uint32(len(m.Vertices))
+			for i := 0; i < 4; i++ {
+				c := face.corners[i]
+				m.Vertices = append(m.Vertices, world.Vertex{
+					X:     min.X + (max.X-min.X)*c[0],
+					Y:     min.Y + (max.Y-min.Y)*c[1],
+					Z:     min.Z + (max.Z-min.Z)*c[2],
+					U:     u0 + (u1-u0)*face.uv[i][0],
+					V:     v0 + (v1-v0)*face.uv[i][1],
+					Light: face.light, Sky: sky, Block: blk,
+				})
+			}
+			m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)
 		}
 	}
 }

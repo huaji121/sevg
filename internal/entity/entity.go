@@ -168,6 +168,7 @@ func (d *ItemDrop) Transparent() bool {
 type Manager struct {
 	Mobs         []*Mob
 	Items        []*ItemDrop
+	Falling      []*FallingBlock
 	PickupEvents int
 	rng          *rand.Rand
 	nextID       int
@@ -301,6 +302,8 @@ func (m *Manager) Update(dt float32, w *world.World, playerPos mathx.Vec3, inv *
 			mob.Dead = true
 		}
 	}
+
+	m.UpdateFalling(w, dt)
 
 	// Collect pickups and expire old drops.
 	for _, d := range m.Items {

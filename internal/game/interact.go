@@ -84,6 +84,7 @@ func (g *Game) mineBlock(dt float32, hit world.RayHit) {
 		g.spawnBlockParticles(b, hit.Pos, hit.Normal, 18)
 		g.playSound(breakSound(b))
 		g.world.SetBlock(x, y, z, core.Air)
+		g.mobs.StartFalling(g.world, x, y+1, z)
 		g.breakCool = 0.12
 		g.breakActive = false
 		g.breakProgress = 0
@@ -130,6 +131,7 @@ func (g *Game) mineBlock(dt float32, hit world.RayHit) {
 	g.spawnBlockParticles(b, hit.Pos, hit.Normal, 18)
 	g.playSound(breakSound(b))
 	g.world.SetBlock(x, y, z, core.Air)
+	g.mobs.StartFalling(g.world, x, y+1, z)
 	drop := dropForBlock(b)
 	if drop != core.ItemNone {
 		pos := mathx.Vec3{X: float32(x) + 0.5, Y: float32(y) + 0.35, Z: float32(z) + 0.5}
@@ -225,6 +227,7 @@ func (g *Game) useItem(hit world.RayHit) {
 		}
 	}
 	if g.world.SetBlock(x, y, z, def.Block) {
+		g.mobs.StartFalling(g.world, x, y, z)
 		g.playSound("place")
 		if g.mode != ModeCreative {
 			g.inv.TakeSelected(1)
