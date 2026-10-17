@@ -461,6 +461,7 @@ func (g *Game) renderFrame() {
 		World:             sky,
 		Entity:            opaque,
 		EntityTransparent: transparent,
+		Held:              g.buildHeldMesh(),
 		UI:                g.canv,
 	}
 	if err := g.gfx.Render(f); err != nil {

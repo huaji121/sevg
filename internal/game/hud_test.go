@@ -64,3 +64,21 @@ func TestGlassDropUsesTransparentMesh(t *testing.T) {
 		t.Fatalf("glass drop leaked into opaque mesh: %d vertices", len(opaque.Vertices))
 	}
 }
+func TestHeldItemMesh(t *testing.T) {
+	g := newTestGame(t)
+	g.state = StatePlaying
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{Item: core.ItemPlanks, Count: 4}
+	m := g.buildHeldMesh()
+	if len(m.Vertices) == 0 || len(m.Indices) == 0 {
+		t.Fatal("held planks produced no mesh")
+	}
+	g.inv.Slots[0] = core.Stack{}
+	if m = g.buildHeldMesh(); len(m.Vertices) != 0 {
+		t.Fatal("empty hand should produce no mesh")
+	}
+	g.inv.Slots[0] = core.Stack{Item: core.ItemStonePickaxe, Count: 1}
+	if m = g.buildHeldMesh(); len(m.Vertices) == 0 {
+		t.Fatal("held pickaxe produced no mesh")
+	}
+}

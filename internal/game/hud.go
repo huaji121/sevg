@@ -572,6 +572,73 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData) {
 	return opaque, transparent
 }
 
+// buildHeldMesh creates a small first-person view model for the selected
+// item. It is built in camera space and drawn with depth testing disabled.
+func (g *Game) buildHeldMesh() world.MeshData {
+	if g.state != StatePlaying || g.player == nil {
+		return world.MeshData{}
+	}
+	st := g.inv.SelectedStack()
+	if st.Empty() {
+		return world.MeshData{}
+	}
+	def := st.Item.Def()
+	var local world.MeshData
+	c := mathx.Vec3{}
+	scale := float32(0.65)
+	switch entity.VisualForItem(st.Item) {
+	case entity.DropVisualBlock:
+		appendBlockBox(&local, c.Sub(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), c.Add(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), def.Block)
+	case entity.DropVisualGlass:
+		appendBlockBox(&local, c.Sub(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), c.Add(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), def.Block)
+	case entity.DropVisualPlant:
+		appendPlant(&local, c, 0.30, 0.38, def.Block)
+	case entity.DropVisualSword:
+		blade := uint8(core.TileWood)
+		if st.Item == core.ItemIronSword {
+			blade = uint8(core.TileWhite)
+		}
+		appendSword(&local, c, blade)
+	case entity.DropVisualPickaxe:
+		head := uint8(core.TileGray)
+		if st.Item == core.ItemIronPickaxe {
+			head = uint8(core.TileWhite)
+		}
+		appendPickaxe(&local, c, head)
+	default:
+		col := [4]float32{def.Color[0], def.Color[1], def.Color[2], 1}
+		appendEntityBox(&local, c.Sub(mathx.Vec3{X: 0.13, Y: 0.13, Z: 0.13}), c.Add(mathx.Vec3{X: 0.13, Y: 0.13, Z: 0.13}), col)
+	}
+	if len(local.Indices) == 0 {
+		return world.MeshData{}
+	}
+
+	fwd := g.player.LookDir()
+	worldUp := mathx.V3(0, 1, 0)
+	right := fwd.Cross(worldUp).Normalize()
+	up := right.Cross(fwd)
+	eye := g.player.Eye()
+	offR := float32(0.32)
+	offU := float32(-0.24) + g.player.Bob*1.5
+	offF := float32(0.52)
+	rot := float32(0.35)
+	rc, rs := float32(math.Cos(float64(rot))), float32(math.Sin(float64(rot)))
+
+	out := world.MeshData{
+		Vertices: make([]world.Vertex, len(local.Vertices)),
+		Indices:  local.Indices,
+	}
+	for i, v := range local.Vertices {
+		lx := (v.X*rc - v.Z*rs) * scale
+		lz := (v.X*rs + v.Z*rc) * scale
+		ly := v.Y * scale
+		p := eye.Add(right.Mul(offR + lx)).Add(up.Mul(offU + ly)).Add(fwd.Mul(offF + lz))
+		out.Vertices[i] = v
+		out.Vertices[i].X, out.Vertices[i].Y, out.Vertices[i].Z = p.X, p.Y, p.Z
+	}
+	return out
+}
+
 func appendPlant(m *world.MeshData, c mathx.Vec3, width, height float32, block core.BlockID) {
 	u0, v0, u1, v1 := world.TileUV(block.Tile(2))
 	hx, hz := width/2, width/2

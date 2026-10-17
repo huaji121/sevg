@@ -45,6 +45,7 @@ type Frame struct {
 	World             WorldUniforms
 	Entity            world.MeshData
 	EntityTransparent world.MeshData
+	Held              world.MeshData
 	UI                *ui.Canvas
 }
 
@@ -97,14 +98,18 @@ type Renderer struct {
 
 	blockOpaque *sdl.GPUGraphicsPipeline
 	blockTrans  *sdl.GPUGraphicsPipeline
+	blockView   *sdl.GPUGraphicsPipeline
 	uiPipeline  *sdl.GPUGraphicsPipeline
 
 	chunks map[[2]int]*gpuChunk
 
 	uiVB, entVB, entIB         *sdl.GPUBuffer
 	entTransVB, entTransIB     *sdl.GPUBuffer
+	heldVB, heldIB             *sdl.GPUBuffer
 	uiCap, entCap, entTransCap uint32
+	heldCap                    uint32
 	entICount, entTransICount  uint32
+	heldICount                 uint32
 	staging                    *sdl.GPUTransferBuffer
 	stagingCap                 uint32
 }
@@ -194,13 +199,19 @@ func (r *Renderer) createResources() error {
 		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT, Location: 2, Offset: 20},
 	}
 	blockLayout.VertexBufferDescriptions[0].Pitch = 24
-	r.blockOpaque, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, false, true)
+	r.blockOpaque, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, false, true, true)
 	if err != nil {
 		r.Dev.ReleaseShader(blockVS)
 		r.Dev.ReleaseShader(blockFS)
 		return err
 	}
-	r.blockTrans, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, true, false)
+	r.blockTrans, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, true, false, true)
+	if err != nil {
+		r.Dev.ReleaseShader(blockVS)
+		r.Dev.ReleaseShader(blockFS)
+		return err
+	}
+	r.blockView, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, true, false, false)
 	r.Dev.ReleaseShader(blockVS)
 	r.Dev.ReleaseShader(blockFS)
 	if err != nil {
@@ -223,7 +234,7 @@ func (r *Renderer) createResources() error {
 		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT2, Location: 1, Offset: 8},
 		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT4, Location: 2, Offset: 16},
 	}
-	r.uiPipeline, err = r.makePipeline(uiVS, uiFS, uiLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, false, true, false)
+	r.uiPipeline, err = r.makePipeline(uiVS, uiFS, uiLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, false, true, false, false)
 	r.Dev.ReleaseShader(uiVS)
 	r.Dev.ReleaseShader(uiFS)
 	if err != nil {
@@ -253,6 +264,15 @@ func (r *Renderer) createResources() error {
 	if err != nil {
 		return err
 	}
+	r.heldCap = r.entCap
+	r.heldVB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: r.heldCap})
+	if err != nil {
+		return err
+	}
+	r.heldIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.heldCap})
+	if err != nil {
+		return err
+	}
 	r.stagingCap = 8 * 1024 * 1024
 	r.staging, err = r.Dev.CreateTransferBuffer(&sdl.GPUTransferBufferCreateInfo{Usage: sdl.GPU_TRANSFERBUFFERUSAGE_UPLOAD, Size: r.stagingCap})
 	return err
@@ -268,7 +288,7 @@ func vertexLayout(formatA, formatB sdl.GPUVertexElementFormat) sdl.GPUVertexInpu
 	}
 }
 
-func (r *Renderer) makePipeline(vs, fs *sdl.GPUShader, layout sdl.GPUVertexInputState, prim sdl.GPUPrimitiveType, depthTarget, blend, depthWrite bool) (*sdl.GPUGraphicsPipeline, error) {
+func (r *Renderer) makePipeline(vs, fs *sdl.GPUShader, layout sdl.GPUVertexInputState, prim sdl.GPUPrimitiveType, depthTarget, blend, depthWrite, depthTest bool) (*sdl.GPUGraphicsPipeline, error) {
 	blendState := sdl.GPUColorTargetBlendState{}
 	if blend {
 		blendState = sdl.GPUColorTargetBlendState{
@@ -300,7 +320,7 @@ func (r *Renderer) makePipeline(vs, fs *sdl.GPUShader, layout sdl.GPUVertexInput
 		MultisampleState: sdl.GPUMultisampleState{SampleCount: sdl.GPU_SAMPLECOUNT_1},
 		DepthStencilState: sdl.GPUDepthStencilState{
 			CompareOp:        sdl.GPU_COMPAREOP_LESS,
-			EnableDepthTest:  depthTarget,
+			EnableDepthTest:  depthTest,
 			EnableDepthWrite: depthWrite,
 		},
 	}
@@ -613,6 +633,17 @@ func (r *Renderer) Render(f *Frame) error {
 		rp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.entTransIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
 		rp.DrawIndexedPrimitives(r.entTransICount, 1, 0, 0, 0)
 	}
+	// First-person held item: drawn last with depth testing disabled so it
+	// stays in front of nearby terrain.
+	if r.heldICount > 0 && r.heldVB != nil && r.heldIB != nil {
+		rp.BindGraphicsPipeline(r.blockView)
+		cb.PushVertexUniformData(0, bytesOf(&wu))
+		cb.PushFragmentUniformData(0, bytesOf(&wu))
+		rp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}})
+		rp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.heldVB, Offset: 0}})
+		rp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.heldIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
+		rp.DrawIndexedPrimitives(r.heldICount, 1, 0, 0, 0)
+	}
 	rp.End()
 
 	if f.UI != nil && len(f.UI.Verts) > 0 && r.uiVB != nil {
@@ -638,9 +669,12 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 	entI := meshIndexBytes(f.Entity)
 	entTV := meshVertBytes(f.EntityTransparent)
 	entTI := meshIndexBytes(f.EntityTransparent)
+	heldV := meshVertBytes(f.Held)
+	heldI := meshIndexBytes(f.Held)
 	r.entICount = uint32(len(f.Entity.Indices))
 	r.entTransICount = uint32(len(f.EntityTransparent.Indices))
-	total := len(uiBytes) + len(entV) + len(entI) + len(entTV) + len(entTI)
+	r.heldICount = uint32(len(f.Held.Indices))
+	total := len(uiBytes) + len(entV) + len(entI) + len(entTV) + len(entTI) + len(heldV) + len(heldI)
 	if total == 0 {
 		return nil
 	}
@@ -692,6 +726,21 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 			return err
 		}
 	}
+	needHeld := maxInt(len(heldV), len(heldI))
+	if uint32(needHeld) > r.heldCap {
+		r.Dev.ReleaseBuffer(r.heldVB)
+		r.Dev.ReleaseBuffer(r.heldIB)
+		r.heldCap = uint32(needHeld * 2)
+		var err error
+		r.heldVB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: r.heldCap})
+		if err != nil {
+			return err
+		}
+		r.heldIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.heldCap})
+		if err != nil {
+			return err
+		}
+	}
 	ptr, err := r.Dev.MapTransferBuffer(r.staging, true)
 	if err != nil {
 		return err
@@ -702,11 +751,15 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 	offEntI := offEntV + len(entV)
 	offEntTV := offEntI + len(entI)
 	offEntTI := offEntTV + len(entTV)
+	offHeldV := offEntTI + len(entTI)
+	offHeldI := offHeldV + len(heldV)
 	copy(mem[offUI:], uiBytes)
 	copy(mem[offEntV:], entV)
 	copy(mem[offEntI:], entI)
 	copy(mem[offEntTV:], entTV)
 	copy(mem[offEntTI:], entTI)
+	copy(mem[offHeldV:], heldV)
+	copy(mem[offHeldI:], heldI)
 	r.Dev.UnmapTransferBuffer(r.staging)
 	cb, err := r.Dev.AcquireCommandBuffer()
 	if err != nil {
@@ -745,6 +798,20 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 		cp.UploadToGPUBuffer(
 			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offEntTI)},
 			&sdl.GPUBufferRegion{Buffer: r.entTransIB, Offset: 0, Size: uint32(len(entTI))},
+			true,
+		)
+	}
+	if len(heldV) > 0 {
+		cp.UploadToGPUBuffer(
+			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offHeldV)},
+			&sdl.GPUBufferRegion{Buffer: r.heldVB, Offset: 0, Size: uint32(len(heldV))},
+			true,
+		)
+	}
+	if len(heldI) > 0 {
+		cp.UploadToGPUBuffer(
+			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offHeldI)},
+			&sdl.GPUBufferRegion{Buffer: r.heldIB, Offset: 0, Size: uint32(len(heldI))},
 			true,
 		)
 	}
@@ -802,7 +869,7 @@ func (r *Renderer) Close() {
 		gc.transparent.release(r.Dev)
 	}
 	r.chunks = map[[2]int]*gpuChunk{}
-	for _, b := range []*sdl.GPUBuffer{r.uiVB, r.entVB, r.entIB, r.entTransVB, r.entTransIB} {
+	for _, b := range []*sdl.GPUBuffer{r.uiVB, r.entVB, r.entIB, r.entTransVB, r.entTransIB, r.heldVB, r.heldIB} {
 		if b != nil {
 			r.Dev.ReleaseBuffer(b)
 		}
@@ -810,7 +877,7 @@ func (r *Renderer) Close() {
 	if r.staging != nil {
 		r.Dev.ReleaseTransferBuffer(r.staging)
 	}
-	for _, p := range []*sdl.GPUGraphicsPipeline{r.blockOpaque, r.blockTrans, r.uiPipeline} {
+	for _, p := range []*sdl.GPUGraphicsPipeline{r.blockOpaque, r.blockTrans, r.blockView, r.uiPipeline} {
 		if p != nil {
 			r.Dev.ReleaseGraphicsPipeline(p)
 		}

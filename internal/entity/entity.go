@@ -131,10 +131,14 @@ func (d *ItemDrop) Boxes() []Box {
 }
 
 func (d *ItemDrop) Visual() DropVisual {
-	if !d.Item.Valid() {
+	return VisualForItem(d.Item)
+}
+
+func VisualForItem(item core.ItemID) DropVisual {
+	if !item.Valid() {
 		return DropVisualCube
 	}
-	def := d.Item.Def()
+	def := item.Def()
 	if def.Kind == core.KindBlock {
 		switch {
 		case def.Block == core.Air:
@@ -147,7 +151,7 @@ func (d *ItemDrop) Visual() DropVisual {
 			return DropVisualBlock
 		}
 	}
-	switch d.Item {
+	switch item {
 	case core.ItemWoodSword, core.ItemIronSword:
 		return DropVisualSword
 	case core.ItemStonePickaxe, core.ItemIronPickaxe:
