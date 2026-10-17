@@ -54,8 +54,8 @@ const (
 )
 
 type genResult struct {
-	pos world.ChunkPos
-	ok  bool
+	pos    world.ChunkPos
+	blocks []core.BlockID
 }
 
 type Game struct {

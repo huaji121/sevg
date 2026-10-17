@@ -200,6 +200,7 @@ func (g *Game) startWorkers() {
 	g.genJobs = make(chan world.ChunkPos, 128)
 	g.genResult = make(chan genResult, 128)
 	w := g.world
+	gen := w.Gen
 	for i := 0; i < 2; i++ {
 		g.genWG.Add(1)
 		go func() {
@@ -210,9 +211,11 @@ func (g *Game) startWorkers() {
 					if !ok {
 						return
 					}
-					_, created := w.EnsureChunk(cp)
+					// Terrain generation is pure: workers never touch the world
+					// lock or its chunk maps.
+					blocks := gen.GenerateChunk(cp)
 					select {
-					case g.genResult <- genResult{pos: cp, ok: created}:
+					case g.genResult <- genResult{pos: cp, blocks: blocks}:
 					case <-g.genDone:
 						return
 					}
@@ -241,13 +244,14 @@ func (g *Game) updateStreaming(dt float32) {
 	if g.world == nil {
 		return
 	}
-	for {
+	for commits := 0; commits < 2; {
 		select {
 		case res := <-g.genResult:
 			delete(g.pending, res.pos.Key())
-			if res.ok {
+			if _, created := g.world.CommitChunk(res.pos, res.blocks); created {
 				g.world.MarkNeighborsDirty(res.pos)
 			}
+			commits++
 		default:
 			goto drained
 		}

@@ -139,6 +139,27 @@ func (w *World) EnsureChunk(pos ChunkPos) (*Chunk, bool) {
 	return w.insertChunkLocked(pos, blocks)
 }
 
+// ChunkBlocks generates terrain data without touching shared world state.
+// Generation workers use this to run fully outside the world lock.
+func (w *World) ChunkBlocks(pos ChunkPos) []core.BlockID {
+	return w.Gen.GenerateChunk(pos)
+}
+
+// CommitChunk installs pre-generated blocks on the main thread. Only this
+// short insertion/lighting step takes the world lock; terrain generation does
+// not.
+func (w *World) CommitChunk(pos ChunkPos, blocks []core.BlockID) (*Chunk, bool) {
+	if len(blocks) != ChunkArea {
+		return nil, false
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if c := w.chunks[pos.Key()]; c != nil {
+		return c, false
+	}
+	return w.insertChunkLocked(pos, blocks)
+}
+
 func (w *World) ensureLocked(pos ChunkPos) (*Chunk, bool) {
 	key := pos.Key()
 	if c := w.chunks[key]; c != nil {
@@ -182,6 +203,17 @@ func (w *World) insertChunkLocked(pos ChunkPos, blocks []core.BlockID) (*Chunk, 
 		}
 	}
 	return c, true
+}
+
+func (w *World) NeighborsLoaded(pos ChunkPos) bool {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	for _, d := range [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+		if w.chunks[ChunkPos{X: pos.X + d[0], Z: pos.Z + d[1]}.Key()] == nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (w *World) HasChunk(pos ChunkPos) bool {

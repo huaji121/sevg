@@ -346,3 +346,50 @@ func TestDeferredDynamicLightForNewChunk(t *testing.T) {
 		t.Fatalf("deferred dynamic light across chunk = %d", got)
 	}
 }
+func TestCommitGeneratedChunk(t *testing.T) {
+	w := New(99)
+	pos := ChunkPos{2, -1}
+	blocks := w.ChunkBlocks(pos)
+	if len(blocks) != ChunkArea {
+		t.Fatalf("generated %d blocks", len(blocks))
+	}
+	c, created := w.CommitChunk(pos, blocks)
+	if !created || c == nil {
+		t.Fatal("chunk was not committed")
+	}
+	if !w.HasChunk(pos) {
+		t.Fatal("committed chunk not present")
+	}
+	if _, created := w.CommitChunk(pos, blocks); created {
+		t.Fatal("duplicate commit reported as new")
+	}
+}
+
+func TestChunkGenerationIsDeterministic(t *testing.T) {
+	a := New(1234)
+	b := New(1234)
+	pos := ChunkPos{-3, 4}
+	ba := a.ChunkBlocks(pos)
+	bb := b.ChunkBlocks(pos)
+	if len(ba) != len(bb) {
+		t.Fatal("generated chunk sizes differ")
+	}
+	for i := range ba {
+		if ba[i] != bb[i] {
+			t.Fatalf("block %d differs: %v vs %v", i, ba[i], bb[i])
+		}
+	}
+}
+func TestNeighborsLoaded(t *testing.T) {
+	w := New(1)
+	w.EnsureChunk(ChunkPos{0, 0})
+	if w.NeighborsLoaded(ChunkPos{0, 0}) {
+		t.Fatal("chunk with no neighbours reported ready")
+	}
+	for _, p := range []ChunkPos{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+		w.EnsureChunk(p)
+	}
+	if !w.NeighborsLoaded(ChunkPos{0, 0}) {
+		t.Fatal("chunk with all neighbours reported missing")
+	}
+}

@@ -105,6 +105,7 @@ func (w *World) Mesh(pos ChunkPos) (ChunkMesh, bool) {
 	padSky := make([]uint8, padArea)
 	padBlock := make([]uint8, padArea)
 	padWater := make([]uint8, padArea)
+	padPresent := make([]bool, padSizeX*padSizeX)
 	for pz := 0; pz < padSizeX; pz++ {
 		wz := pos.Z*ChunkSize + pz - 1
 		for px := 0; px < padSizeX; px++ {
@@ -114,6 +115,7 @@ func (w *World) Mesh(pos ChunkPos) (ChunkMesh, bool) {
 			if nc == nil {
 				continue
 			}
+			padPresent[px+pz*padSizeX] = true
 			lx, lz := Mod(wx, ChunkSize), Mod(wz, ChunkSize)
 			base := (px + pz*padSizeX) * ChunkHeight
 			src := lx + lz*ChunkSize
@@ -176,6 +178,15 @@ func (w *World) Mesh(pos ChunkPos) (ChunkMesh, bool) {
 		return padWater[(x+z*padSizeX)*ChunkHeight+y]
 	}
 
+	presentAt := func(x, z int) bool {
+		x++
+		z++
+		if x < 0 || x >= padSizeX || z < 0 || z >= padSizeX {
+			return false
+		}
+		return padPresent[x+z*padSizeX]
+	}
+
 	var out ChunkMesh
 	for x := 0; x < ChunkSize; x++ {
 		for z := 0; z < ChunkSize; z++ {
@@ -200,6 +211,11 @@ func (w *World) Mesh(pos ChunkPos) (ChunkMesh, bool) {
 				for fi := 0; fi < 6; fi++ {
 					f := &faces[fi]
 					nx, ny, nz := x+f.normal[0], y+f.normal[1], z+f.normal[2]
+					if !padPresent[(nx+1)+(nz+1)*padSizeX] {
+						// Do not generate a wall against a chunk that has not been
+						// committed yet. The face is added on the next remesh.
+						continue
+					}
 					nb := at(nx, ny, nz)
 					if b == core.Water && nb == core.Water {
 						// Close the vertical step between different water heights.
@@ -213,7 +229,7 @@ func (w *World) Mesh(pos ChunkPos) (ChunkMesh, bool) {
 					if !faceVisible(b, nb) {
 						continue
 					}
-					addFace(target, at, solidAO, atSky, atBlock, x, y, z, pos.X*ChunkSize, pos.Z*ChunkSize, b, height, w.SmoothLighting, fi)
+					addFace(target, at, solidAO, atSky, atBlock, presentAt, x, y, z, pos.X*ChunkSize, pos.Z*ChunkSize, b, height, w.SmoothLighting, fi)
 				}
 			}
 		}
@@ -240,7 +256,7 @@ func faceVisible(cur, nb core.BlockID) bool {
 	return true
 }
 
-func addFace(m *MeshData, at func(int, int, int) core.BlockID, solid func(int, int, int) bool, skyAt, blockAt func(int, int, int) uint8, bx, by, bz, ox, oz int, b core.BlockID, height float32, smooth bool, fi int) {
+func addFace(m *MeshData, at func(int, int, int) core.BlockID, solid func(int, int, int) bool, skyAt, blockAt func(int, int, int) uint8, present func(int, int) bool, bx, by, bz, ox, oz int, b core.BlockID, height float32, smooth bool, fi int) {
 	f := &faces[fi]
 	u0, v0, u1, v1 := tileUV(b.Tile(fi))
 	base := uint32(len(m.Vertices))
@@ -283,17 +299,17 @@ func addFace(m *MeshData, at func(int, int, int) core.BlockID, solid func(int, i
 			skySum := float32(skyAt(sx, sy, sz))
 			blkSum := float32(blockAt(sx, sy, sz))
 			nSamples := float32(1)
-			if !s1 {
+			if !s1 && present(p1[0], p1[2]) {
 				skySum += float32(skyAt(p1[0], p1[1], p1[2]))
 				blkSum += float32(blockAt(p1[0], p1[1], p1[2]))
 				nSamples++
 			}
-			if !s2 {
+			if !s2 && present(p2[0], p2[2]) {
 				skySum += float32(skyAt(p2[0], p2[1], p2[2]))
 				blkSum += float32(blockAt(p2[0], p2[1], p2[2]))
 				nSamples++
 			}
-			if !s1 && !s2 && !cc {
+			if !s1 && !s2 && !cc && present(pc[0], pc[2]) {
 				skySum += float32(skyAt(pc[0], pc[1], pc[2]))
 				blkSum += float32(blockAt(pc[0], pc[1], pc[2]))
 				nSamples++
