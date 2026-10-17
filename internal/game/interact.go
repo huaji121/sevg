@@ -47,6 +47,9 @@ func (g *Game) handleActions(dt float32) {
 			g.breakActive = false
 			if g.attackCool <= 0 {
 				dmg := g.selectedDamage()
+				if g.mode == ModeCreative {
+					dmg = 1000
+				}
 				g.mobs.DamageMob(mob, dmg, g.player.Body.Pos)
 				g.attackCool = 0.32
 			}
@@ -64,6 +67,24 @@ func (g *Game) handleActions(dt float32) {
 }
 
 func (g *Game) mineBlock(dt float32, hit world.RayHit) {
+	if g.mode == ModeCreative {
+		if g.breakCool > 0 {
+			return
+		}
+		b := hit.Block
+		if b == core.Air || b == core.Water || b == core.Bedrock {
+			return
+		}
+		x, y, z := hit.Pos[0], hit.Pos[1], hit.Pos[2]
+		if g.world.GetBlock(x, y, z) != b {
+			return
+		}
+		g.world.SetBlock(x, y, z, core.Air)
+		g.breakCool = 0.12
+		g.breakActive = false
+		g.breakProgress = 0
+		return
+	}
 	hard := hit.Block.Hardness()
 	if hard < 0 {
 		g.breakProgress = 0
@@ -187,7 +208,9 @@ func (g *Game) useItem(hit world.RayHit) {
 		}
 	}
 	if g.world.SetBlock(x, y, z, def.Block) {
-		g.inv.TakeSelected(1)
+		if g.mode != ModeCreative {
+			g.inv.TakeSelected(1)
+		}
 		g.placeCool = 0.18
 	}
 }

@@ -22,6 +22,7 @@ type Player struct {
 	Health   float32
 	MaxHP    float32
 	Flying   bool
+	Creative bool
 	InWater  bool
 	Spawning mathx.Vec3
 
@@ -68,7 +69,7 @@ func (p *Player) Rotate(dx, dy, sensitivity float32) {
 }
 
 func (p *Player) Damage(amount float32) bool {
-	if p.hurtCooldown > 0 || amount <= 0 {
+	if p.Creative || p.hurtCooldown > 0 || amount <= 0 {
 		return false
 	}
 	p.Health -= amount

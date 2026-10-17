@@ -137,13 +137,19 @@ func (g *Game) drawHUD(w, h float32) {
 		}
 	}
 
-	// Health.
 	hx, hy := float32(24), float32(22)
-	c.Panel(hx, hy, 214, 48, ui.RGBA(12, 16, 20, 190), ui.RGBA(70, 90, 100, 180))
-	c.Text(hx+12, hy+6, i18n.T("hud.health"), 1.1, ui.MutedColor)
-	c.Rect(hx+12, hy+27, 180, 10, ui.RGBA(60, 20, 20, 255))
-	c.Rect(hx+12, hy+27, 180*clampF(g.player.Health/g.player.MaxHP, 0, 1), 10, ui.RGBA(220, 55, 60, 255))
-	c.Text(hx+196-c.TextWidth(fmt.Sprintf("%.0f", g.player.Health), 1), hy+6, fmt.Sprintf("%.0f", g.player.Health), 1, ui.TextColor)
+	if g.mode == ModeCreative {
+		// Creative mode has no health/damage, so keep the corner clean and
+		// only show the active mode.
+		c.Text(hx, hy+4, i18n.T("hud.mode", g.modeName()), 1.1, ui.Accent)
+	} else {
+		c.Panel(hx, hy, 214, 48, ui.RGBA(12, 16, 20, 190), ui.RGBA(70, 90, 100, 180))
+		c.Text(hx+12, hy+6, i18n.T("hud.health"), 1.1, ui.MutedColor)
+		c.Rect(hx+12, hy+27, 180, 10, ui.RGBA(60, 20, 20, 255))
+		c.Rect(hx+12, hy+27, 180*clampF(g.player.Health/g.player.MaxHP, 0, 1), 10, ui.RGBA(220, 55, 60, 255))
+		c.Text(hx+196-c.TextWidth(fmt.Sprintf("%.0f", g.player.Health), 1), hy+6, fmt.Sprintf("%.0f", g.player.Health), 1, ui.TextColor)
+		c.Text(hx+224, hy+16, i18n.T("hud.mode", g.modeName()), 1.0, ui.MutedColor)
+	}
 
 	// Time and chunk progress.
 	clock := g.timeString()
@@ -195,7 +201,7 @@ func (g *Game) drawHUD(w, h float32) {
 
 	if g.helpTime > 0 && g.state == StatePlaying && !g.chatOpen {
 		px, py := float32(24), h-300
-		c.Panel(px, py, 500, 192, ui.RGBA(12, 16, 20, 195), ui.RGBA(80, 100, 110, 160))
+		c.Panel(px, py, 500, 214, ui.RGBA(12, 16, 20, 195), ui.RGBA(80, 100, 110, 160))
 		c.Text(px+14, py+10, i18n.T("hud.quick_start"), 1.5, ui.Accent)
 		lines := []string{
 			i18n.T("hud.help1"),
@@ -204,6 +210,7 @@ func (g *Game) drawHUD(w, h float32) {
 			i18n.T("hud.help4"),
 			i18n.T("hud.help5"),
 			i18n.T("hud.help6"),
+			i18n.T("hud.help7"),
 		}
 		for i, line := range lines {
 			c.Text(px+14, py+38+float32(i)*22, line, 1.0, ui.TextColor)
@@ -229,6 +236,7 @@ func (g *Game) drawDebug(w float32) {
 	}
 	lines := []string{
 		i18n.T("hud.debug_title"),
+		i18n.T("hud.mode", g.modeName()),
 		i18n.T("hud.fps", g.fps, g.frameMs),
 		i18n.T("hud.pos", g.player.Body.Pos.X, g.player.Body.Pos.Y, g.player.Body.Pos.Z),
 		i18n.T("hud.chunk", worldChunkX(g.player.Body.Pos.X), worldChunkZ(g.player.Body.Pos.Z)),
@@ -393,7 +401,7 @@ func (g *Game) drawItemIcon(x, y, size float32, st core.Stack, alpha float32) {
 	} else {
 		c.Icon(st.Item, x+1, y+1, size-2, size-2, alpha)
 	}
-	if st.Count > 1 {
+	if st.Count > 1 && g.mode != ModeCreative {
 		cnt := fmt.Sprint(st.Count)
 		c.Text(x+size-c.TextWidth(cnt, 0.75)-2, y+size-16, cnt, 0.75, ui.TextColor)
 	}

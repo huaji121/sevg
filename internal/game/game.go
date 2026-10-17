@@ -39,6 +39,13 @@ const (
 	StateDead
 )
 
+type GameMode int
+
+const (
+	ModeSurvival GameMode = iota
+	ModeCreative
+)
+
 type genResult struct {
 	pos world.ChunkPos
 	ok  bool
@@ -51,6 +58,7 @@ type Game struct {
 	canv *ui.Canvas
 
 	state  State
+	mode   GameMode
 	seed   int64
 	world  *world.World
 	player *player.Player
@@ -71,6 +79,8 @@ type Game struct {
 	attackCool    float32
 	placeCool     float32
 	pickCool      float32
+	breakCool     float32
+	spaceTapTimer float32
 
 	chatOpen        bool
 	chatInput       []rune
@@ -335,10 +345,17 @@ func (g *Game) onKey(k sdl.Keycode) {
 			g.setState(StatePaused)
 		case sdl.K_E:
 			g.setState(StateInventory)
-		case sdl.K_F:
-			g.player.Flying = !g.player.Flying
-			g.player.Body.Vel.Y = 0
-			g.notify(i18n.T("toast.flying", onOff(g.player.Flying)), 1.6)
+		case sdl.K_SPACE:
+			if g.mode == ModeCreative {
+				if g.spaceTapTimer > 0 {
+					g.spaceTapTimer = 0
+					g.player.Flying = !g.player.Flying
+					g.player.Body.Vel.Y = 0
+					g.notify(i18n.T("toast.flying", onOff(g.player.Flying)), 1.6)
+				} else {
+					g.spaceTapTimer = 0.30
+				}
+			}
 		case sdl.K_F3:
 			g.debug = !g.debug
 		case sdl.K_H:
@@ -464,6 +481,12 @@ func (g *Game) updatePlaying(dt float32) {
 	}
 	if g.pickCool > 0 {
 		g.pickCool -= dt
+	}
+	if g.breakCool > 0 {
+		g.breakCool -= dt
+	}
+	if g.spaceTapTimer > 0 {
+		g.spaceTapTimer -= dt
 	}
 	if !g.chatOpen {
 		g.handleActions(dt)

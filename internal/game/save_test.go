@@ -17,6 +17,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	g.player.Yaw = 1.25
 	g.player.Pitch = -0.3
 	g.inv.Slots[0] = core.Stack{Item: core.ItemObsidian, Count: 7}
+	g.mode = ModeCreative
 	i18n.Set(i18n.EN)
 	defer i18n.Set(i18n.ZH)
 	if err := g.saveGame(); err != nil {
@@ -40,6 +41,9 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 	if sv.Language != i18n.EN {
 		t.Fatalf("language %q", sv.Language)
+	}
+	if sv.Mode != int(ModeCreative) {
+		t.Fatalf("mode %d", sv.Mode)
 	}
 }
 

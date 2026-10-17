@@ -29,6 +29,7 @@ type SaveGame struct {
 	Version   int
 	Seed      int64
 	Language  string
+	Mode      int
 	Time      float64
 	Player    playerSave
 	Inventory core.Inventory
@@ -85,6 +86,10 @@ func (g *Game) startWorld(load bool) error {
 		if sv.Language != "" {
 			i18n.Set(sv.Language)
 		}
+		g.mode = GameMode(sv.Mode)
+		if g.mode != ModeCreative {
+			g.mode = ModeSurvival
+		}
 		inv = sv.Inventory
 		inv.Normalize()
 		timeOfDay = sv.Time
@@ -100,12 +105,19 @@ func (g *Game) startWorld(load bool) error {
 		}
 		p.Flying = sv.Player.Flying
 	} else {
+		g.mode = ModeSurvival
 		w = world.New(seed)
 		spawn := w.FindSpawn()
 		p = player.New(spawn)
 	}
 	if p.Body.Pos.Y < 1 {
 		p.Body.Pos.Y = 64
+	}
+	p.Creative = g.mode == ModeCreative
+	if p.Creative {
+		p.Health = p.MaxHP
+	} else {
+		p.Flying = false
 	}
 
 	center := world.ChunkOf(int(p.Body.Pos.X), int(p.Body.Pos.Z))
@@ -325,6 +337,7 @@ func (g *Game) saveGame() error {
 		Version:  saveVersion,
 		Seed:     g.world.Seed,
 		Language: i18n.Current(),
+		Mode:     int(g.mode),
 		Time:     g.time,
 		Player: playerSave{
 			X: g.player.Body.Pos.X, Y: g.player.Body.Pos.Y, Z: g.player.Body.Pos.Z,

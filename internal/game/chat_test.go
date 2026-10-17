@@ -40,3 +40,21 @@ func TestChatEscape(t *testing.T) {
 		t.Fatal("escape did not close and clear chat")
 	}
 }
+func TestGamemodeCommand(t *testing.T) {
+	g := newTestGame(t)
+	g.chatOpen = true
+	g.chatInput = []rune("/gamemode 1")
+	g.sendChat()
+	if g.mode != ModeCreative || !g.player.Creative {
+		t.Fatal("creative mode was not applied")
+	}
+	if len(g.chatMessages) == 0 {
+		t.Fatal("gamemode command produced no system message")
+	}
+	g.chatOpen = true
+	g.chatInput = []rune("/gamemode 0")
+	g.sendChat()
+	if g.mode != ModeSurvival || g.player.Creative {
+		t.Fatal("survival mode was not applied")
+	}
+}

@@ -123,6 +123,11 @@ func (g *Game) chatInsert(text string) {
 
 func (g *Game) sendChat() {
 	text := strings.TrimSpace(string(g.chatInput))
+	if strings.HasPrefix(text, "/") {
+		g.executeCommand(text[1:])
+		g.closeChat()
+		return
+	}
 	if text != "" {
 		g.addChat(fmt.Sprintf("<%s> %s", i18n.T("chat.you"), text))
 	}

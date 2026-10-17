@@ -3,6 +3,8 @@ package game
 import (
 	"testing"
 
+	"github.com/Zyko0/go-sdl3/sdl"
+
 	"sevg/internal/core"
 	"sevg/internal/entity"
 	"sevg/internal/mathx"
@@ -69,5 +71,67 @@ func TestDropMapping(t *testing.T) {
 	}
 	if dropForBlock(core.Glass) != core.ItemNone {
 		t.Fatal("glass should drop nothing")
+	}
+}
+func TestCreativeMiningIsInstantAndDropsNothing(t *testing.T) {
+	g := newTestGame(t)
+	g.mode = ModeCreative
+	g.player.Creative = true
+	g.world.SetBlock(8, 70, 8, core.Stone)
+	hit := world.RayHit{Hit: true, Block: core.Stone, Pos: [3]int{8, 70, 8}, Normal: mathx.Vec3{Y: 1}, Distance: 2}
+	g.mineBlock(0.016, hit)
+	if b := g.world.GetBlock(8, 70, 8); b != core.Air {
+		t.Fatalf("creative block not broken: %v", b)
+	}
+	if g.mobs.ItemCount() != 0 {
+		t.Fatalf("creative mining dropped %d items", g.mobs.ItemCount())
+	}
+}
+
+func TestCreativePlacementDoesNotConsume(t *testing.T) {
+	g := newTestGame(t)
+	g.mode = ModeCreative
+	g.player.Creative = true
+	g.world.SetBlock(8, 70, 8, core.Stone)
+	g.player.Body.Pos = mathx.Vec3{X: 12.5, Y: 72, Z: 12.5}
+	g.inv = core.Inventory{}
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{Item: core.ItemPlanks, Count: 1}
+	hit := world.RayHit{Hit: true, Block: core.Stone, Pos: [3]int{8, 70, 8}, Normal: mathx.Vec3{Y: 1}}
+	g.useItem(hit)
+	if got := g.inv.Count(core.ItemPlanks); got != 1 {
+		t.Fatalf("creative placement consumed item, count %d", got)
+	}
+}
+
+func TestCreativeDamageIsIgnored(t *testing.T) {
+	g := newTestGame(t)
+	g.mode = ModeCreative
+	g.player.Creative = true
+	before := g.player.Health
+	if g.player.Damage(5) {
+		t.Fatal("creative player took damage")
+	}
+	if g.player.Health != before {
+		t.Fatalf("health changed: %v -> %v", before, g.player.Health)
+	}
+}
+func TestDoubleSpaceTogglesCreativeFlight(t *testing.T) {
+	g := newTestGame(t)
+	g.state = StatePlaying
+	g.mode = ModeCreative
+	g.player.Creative = true
+	g.onKey(sdl.K_SPACE)
+	if g.spaceTapTimer <= 0 {
+		t.Fatal("first space tap did not arm the double-tap timer")
+	}
+	g.onKey(sdl.K_SPACE)
+	if !g.player.Flying {
+		t.Fatal("double space did not enable flight")
+	}
+	g.onKey(sdl.K_SPACE)
+	g.onKey(sdl.K_SPACE)
+	if g.player.Flying {
+		t.Fatal("double space did not disable flight")
 	}
 }
