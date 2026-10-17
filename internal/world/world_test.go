@@ -211,3 +211,38 @@ func TestSkyAndTorchLight(t *testing.T) {
 		t.Fatal("torch light was not baked into the chunk mesh")
 	}
 }
+func TestWaterFlowsAndRetracts(t *testing.T) {
+	w := New(42)
+	w.EnsureChunk(ChunkPos{0, 0})
+	for x := 6; x <= 18; x++ {
+		for z := 6; z <= 10; z++ {
+			w.SetBlock(x, 69, z, core.Stone)
+			for y := 70; y <= 73; y++ {
+				w.SetBlock(x, y, z, core.Air)
+			}
+		}
+	}
+	w.SetBlock(8, 70, 8, core.Water)
+	for i := 0; i < 40; i++ {
+		w.TickFluids()
+	}
+	if got := w.GetBlock(9, 70, 8); got != core.Water || w.WaterLevelAt(9, 70, 8) != 1 {
+		t.Fatalf("first flow cell = %v level %d", got, w.WaterLevelAt(9, 70, 8))
+	}
+	if got := w.WaterLevelAt(15, 70, 8); got != 7 {
+		t.Fatalf("last flow level = %d, want 7", got)
+	}
+	if got := w.GetBlock(16, 70, 8); got != core.Air {
+		t.Fatalf("water exceeded max range: %v", got)
+	}
+
+	w.SetBlock(8, 70, 8, core.Air)
+	for i := 0; i < 60; i++ {
+		w.TickFluids()
+	}
+	for x := 9; x <= 15; x++ {
+		if got := w.GetBlock(x, 70, 8); got != core.Air {
+			t.Fatalf("flow did not retract at %d: %v", x, got)
+		}
+	}
+}

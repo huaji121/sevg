@@ -104,6 +104,7 @@ func (w *World) Mesh(pos ChunkPos) (ChunkMesh, bool) {
 	pad := make([]core.BlockID, padArea)
 	padSky := make([]uint8, padArea)
 	padBlock := make([]uint8, padArea)
+	padWater := make([]uint8, padArea)
 	for pz := 0; pz < padSizeX; pz++ {
 		wz := pos.Z*ChunkSize + pz - 1
 		for px := 0; px < padSizeX; px++ {
@@ -121,6 +122,7 @@ func (w *World) Mesh(pos ChunkPos) (ChunkMesh, bool) {
 				pad[base+y] = nc.Blocks[si]
 				padSky[base+y] = nc.SkyLight[si]
 				padBlock[base+y] = nc.BlockLight[si]
+				padWater[base+y] = nc.WaterLevel[si]
 			}
 		}
 	}
@@ -158,6 +160,17 @@ func (w *World) Mesh(pos ChunkPos) (ChunkMesh, bool) {
 		}
 		return padBlock[(x+z*padSizeX)*ChunkHeight+y]
 	}
+	atWater := func(x, y, z int) uint8 {
+		if y < 0 || y >= ChunkHeight {
+			return 0
+		}
+		x++
+		z++
+		if x < 0 || x >= padSizeX || z < 0 || z >= padSizeX {
+			return 0
+		}
+		return padWater[(x+z*padSizeX)*ChunkHeight+y]
+	}
 
 	var out ChunkMesh
 	for x := 0; x < ChunkSize; x++ {
@@ -176,14 +189,27 @@ func (w *World) Mesh(pos ChunkPos) (ChunkMesh, bool) {
 				if transparent {
 					target = &out.Transparent
 				}
+				height := float32(1)
+				if b == core.Water {
+					height = waterSurface(atWater(x, y, z))
+				}
 				for fi := 0; fi < 6; fi++ {
 					f := &faces[fi]
 					nx, ny, nz := x+f.normal[0], y+f.normal[1], z+f.normal[2]
 					nb := at(nx, ny, nz)
+					if b == core.Water && nb == core.Water {
+						// Close the vertical step between different water heights.
+						nbHeight := waterSurface(atWater(nx, ny, nz))
+						if f.normal[1] != 0 || height <= nbHeight+0.001 {
+							continue
+						}
+						addWaterStep(target, atSky, atBlock, x, y, z, pos.X*ChunkSize, pos.Z*ChunkSize, nbHeight, height, fi)
+						continue
+					}
 					if !faceVisible(b, nb) {
 						continue
 					}
-					addFace(target, at, solidAO, atSky, atBlock, x, y, z, pos.X*ChunkSize, pos.Z*ChunkSize, b, fi)
+					addFace(target, at, solidAO, atSky, atBlock, x, y, z, pos.X*ChunkSize, pos.Z*ChunkSize, b, height, fi)
 				}
 			}
 		}
@@ -210,7 +236,7 @@ func faceVisible(cur, nb core.BlockID) bool {
 	return true
 }
 
-func addFace(m *MeshData, at func(int, int, int) core.BlockID, solid func(int, int, int) bool, skyAt, blockAt func(int, int, int) uint8, bx, by, bz, ox, oz int, b core.BlockID, fi int) {
+func addFace(m *MeshData, at func(int, int, int) core.BlockID, solid func(int, int, int) bool, skyAt, blockAt func(int, int, int) uint8, bx, by, bz, ox, oz int, b core.BlockID, height float32, fi int) {
 	f := &faces[fi]
 	u0, v0, u1, v1 := tileUV(b.Tile(fi))
 	base := uint32(len(m.Vertices))
@@ -249,11 +275,36 @@ func addFace(m *MeshData, at func(int, int, int) core.BlockID, solid func(int, i
 		uu := u0 + (u1-u0)*f.uv[i][0]
 		vv := v0 + (v1-v0)*f.uv[i][1]
 		m.Vertices = append(m.Vertices, Vertex{
-			X: float32(ox+bx) + c[0], Y: float32(by) + c[1], Z: float32(oz+bz) + c[2],
+			X: float32(ox+bx) + c[0], Y: float32(by) + c[1]*height, Z: float32(oz+bz) + c[2],
 			U: uu, V: vv, Light: light, Sky: sky, Block: blk,
 		})
 	}
 	m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)
+}
+
+func addWaterStep(m *MeshData, skyAt, blockAt func(int, int, int) uint8, bx, by, bz, ox, oz int, low, high float32, fi int) {
+	f := &faces[fi]
+	u0, v0, u1, v1 := tileUV(core.TileWater)
+	base := uint32(len(m.Vertices))
+	for i := 0; i < 4; i++ {
+		c := f.corners[i]
+		sx, sy, sz := bx+f.normal[0], by+f.normal[1], bz+f.normal[2]
+		sky := float32(skyAt(sx, sy, sz)) / 15
+		blk := float32(blockAt(sx, sy, sz)) / 15
+		m.Vertices = append(m.Vertices, Vertex{
+			X: float32(ox+bx) + c[0], Y: float32(by) + low + c[1]*(high-low), Z: float32(oz+bz) + c[2],
+			U: u0 + (u1-u0)*f.uv[i][0], V: v0 + (v1-v0)*f.uv[i][1],
+			Light: f.light * 0.92, Sky: sky, Block: blk,
+		})
+	}
+	m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)
+}
+
+func waterSurface(level uint8) float32 {
+	if level > maxWaterLevel {
+		level = maxWaterLevel
+	}
+	return 0.9 - float32(level)*0.1
 }
 
 func addCross(m *MeshData, bx, by, bz, ox, oz int, b core.BlockID, skyAt, blockAt func(int, int, int) uint8) {

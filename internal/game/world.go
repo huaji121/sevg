@@ -171,6 +171,7 @@ func (g *Game) startWorld(load bool) error {
 	g.breakActive = false
 	g.particles = nil
 	g.particleTimer = 0
+	g.fluidTimer = 0
 	g.mobs.SpawnInitial(w, p.Body.Pos)
 	g.startWorkers()
 	fmt.Printf("WORLD seed=%d spawn=%.2f,%.2f,%.2f loaded=%d meshed=%d mobs=%d\n", seed, p.Body.Pos.X, p.Body.Pos.Y, p.Body.Pos.Z, w.Loaded(), len(g.meshed), g.mobs.MobCount())

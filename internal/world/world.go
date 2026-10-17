@@ -13,6 +13,7 @@ type Chunk struct {
 	Blocks     []core.BlockID
 	SkyLight   []uint8
 	BlockLight []uint8
+	WaterLevel []uint8
 	Dirty      bool
 }
 
@@ -22,6 +23,7 @@ func NewChunk(pos ChunkPos) *Chunk {
 		Blocks:     make([]core.BlockID, ChunkArea),
 		SkyLight:   make([]uint8, ChunkArea),
 		BlockLight: make([]uint8, ChunkArea),
+		WaterLevel: make([]uint8, ChunkArea),
 		Dirty:      true,
 	}
 }
@@ -91,15 +93,17 @@ type World struct {
 	Gen          *Generator
 	chunks       map[[2]int]*Chunk
 	edits        map[[2]int]map[int]core.BlockID
+	fluidQueue   map[[3]int]bool
 	lightSources int
 }
 
 func New(seed int64) *World {
 	return &World{
-		Seed:   seed,
-		Gen:    NewGenerator(seed),
-		chunks: make(map[[2]int]*Chunk),
-		edits:  make(map[[2]int]map[int]core.BlockID),
+		Seed:       seed,
+		Gen:        NewGenerator(seed),
+		chunks:     make(map[[2]int]*Chunk),
+		edits:      make(map[[2]int]map[int]core.BlockID),
+		fluidQueue: make(map[[3]int]bool),
 	}
 }
 
@@ -197,8 +201,16 @@ func (w *World) SetBlock(wx, wy, wz int, b core.BlockID) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	c, _ := w.ensureLocked(cp)
+	i := index(lx, wy, lz)
+	old := c.Blocks[i]
+	oldLevel := c.WaterLevel[i]
 	if !c.SetLocal(lx, wy, lz, b) {
 		return false
+	}
+	c.WaterLevel[i] = 0
+	w.queueFluidLocked(wx, wy, wz)
+	if old == core.Water && oldLevel == 0 && b != core.Water {
+		w.drainLocalWaterLocked(wx, wy, wz)
 	}
 	c.RebuildSkyLight()
 	w.rebuildBlockLightLocked()

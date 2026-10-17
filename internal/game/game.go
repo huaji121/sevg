@@ -89,6 +89,7 @@ type Game struct {
 	breakCool     float32
 	spaceTapTimer float32
 	stepTimer     float32
+	fluidTimer    float32
 
 	chatOpen          bool
 	chatInput         []rune
@@ -533,6 +534,11 @@ func (g *Game) updatePlaying(dt float32) {
 	}
 	if !g.chatOpen {
 		g.handleActions(dt)
+	}
+	g.fluidTimer -= dt
+	if g.fluidTimer <= 0 {
+		g.world.TickFluids()
+		g.fluidTimer = 0.12
 	}
 	g.saveTimer += dt
 	if g.saveTimer > 30 && g.opts.SmokeFrames == 0 {
