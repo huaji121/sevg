@@ -63,6 +63,16 @@ const (
 	TileIce
 	TileObsidian
 	TileWool
+	TileCrack0
+	TileCrack1
+	TileCrack2
+	TileCrack3
+	TileCrack4
+	TileCrack5
+	TileCrack6
+	TileCrack7
+	TileCrack8
+	TileCrack9
 	TileWhite
 	TilePig
 	TileDark

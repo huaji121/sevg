@@ -381,6 +381,8 @@ func drawTile(tile int, put func(tile, x, y int, c rgba)) {
 		for i := 0; i < 20; i++ {
 			put(tile, rng.Intn(16), rng.Intn(16), rgba{207, 207, 199, 255})
 		}
+	case core.TileCrack0, core.TileCrack1, core.TileCrack2, core.TileCrack3, core.TileCrack4, core.TileCrack5, core.TileCrack6, core.TileCrack7, core.TileCrack8, core.TileCrack9:
+		drawCrackTile(tile, tile-core.TileCrack0, put)
 	case core.TileWhite:
 		fill(rgba{238, 238, 234, 255}, 2)
 	case core.TilePig:
@@ -427,4 +429,61 @@ func cosInt(a int) float32 {
 
 func sinInt(a int) float32 {
 	return cosInt((a + 6) % 8)
+}
+func drawCrackTile(tile, stage int, put func(tile, x, y int, c rgba)) {
+	segments := [][4]int{
+		{8, 1, 7, 5}, {7, 5, 9, 8}, {9, 8, 7, 12}, {7, 12, 8, 15},
+		{7, 5, 4, 3}, {4, 3, 2, 5}, {9, 8, 12, 6}, {12, 6, 14, 8},
+		{7, 12, 4, 13}, {4, 13, 3, 15}, {9, 8, 11, 10}, {11, 10, 14, 9},
+		{8, 1, 10, 3}, {10, 3, 9, 5}, {7, 12, 10, 14}, {10, 14, 11, 15},
+		{2, 5, 1, 7}, {14, 8, 15, 10}, {3, 15, 5, 14}, {11, 10, 13, 13},
+	}
+	n := 2 + stage*2
+	if n > len(segments) {
+		n = len(segments)
+	}
+	for i := 0; i < n; i++ {
+		s := segments[i]
+		drawCrackLine(s[0], s[1], s[2], s[3], func(x, y int) {
+			a := uint8(190)
+			if i%3 == 0 {
+				a = 225
+			}
+			put(tile, x, y, rgba{18, 18, 20, a})
+		})
+	}
+}
+
+func drawCrackLine(x0, y0, x1, y1 int, pix func(x, y int)) {
+	dx, dy := absInt(x1-x0), -absInt(y1-y0)
+	sx, sy := 1, 1
+	if x0 > x1 {
+		sx = -1
+	}
+	if y0 > y1 {
+		sy = -1
+	}
+	err := dx + dy
+	for {
+		pix(x0, y0)
+		if x0 == x1 && y0 == y1 {
+			break
+		}
+		e2 := 2 * err
+		if e2 >= dy {
+			err += dy
+			x0 += sx
+		}
+		if e2 <= dx {
+			err += dx
+			y0 += sy
+		}
+	}
+}
+
+func absInt(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
 }

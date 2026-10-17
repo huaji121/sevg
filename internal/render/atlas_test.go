@@ -35,3 +35,23 @@ func TestPaletteTilesOpaque(t *testing.T) {
 		}
 	}
 }
+func TestCrackTilesContainPixels(t *testing.T) {
+	atlas := BuildAtlas()
+	for tile := core.TileCrack0; tile <= core.TileCrack9; tile++ {
+		cx := tile % core.AtlasCols
+		cy := tile / core.AtlasCols
+		base := cy*core.AtlasCell + core.AtlasPad
+		count := 0
+		for y := 0; y < core.AtlasTilePx; y++ {
+			for x := 0; x < core.AtlasTilePx; x++ {
+				i := ((base+y)*core.AtlasW + cx*core.AtlasCell + core.AtlasPad + x) * 4
+				if atlas[i+3] > 0 {
+					count++
+				}
+			}
+		}
+		if count == 0 {
+			t.Fatalf("crack tile %d is empty", tile)
+		}
+	}
+}

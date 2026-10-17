@@ -129,12 +129,6 @@ func (g *Game) drawHUD(w, h float32) {
 			c.Rect(r.X+1, r.Y+1, r.W, r.H, shadow)
 			c.Rect(r.X, r.Y, r.W, r.H, col)
 		}
-		if g.breakActive && g.breakProgress > 0 {
-			bw := float32(76)
-			bx, by := cx-bw/2, cy+20
-			c.Rect(bx-2, by-2, bw+4, 10, ui.RGBA(0, 0, 0, 180))
-			c.Rect(bx, by, bw*clampF(g.breakProgress, 0, 1), 6, ui.Accent)
-		}
 	}
 
 	hx, hy := float32(24), float32(22)
@@ -590,6 +584,7 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 			}
 		}
 	}
+	g.appendBreakOverlay(&transparent)
 	if g.player != nil && g.targetValid {
 		x, y, z := g.breakPos[0], g.breakPos[1], g.breakPos[2]
 		min := mathx.V3(float32(x)-0.003, float32(y)-0.003, float32(z)-0.003)
