@@ -6,90 +6,128 @@ import (
 	"sevg/internal/mathx"
 )
 
-const craftGridSize = 4
-
-func recipeFits2x2(r recipe) bool {
-	total := 0
-	for _, in := range r.Inputs {
-		total += in.Count
-		if total > craftGridSize {
-			return false
+func recipeWidth(r recipe) int {
+	w := 0
+	for _, row := range r.Pattern {
+		if len([]rune(row)) > w {
+			w = len([]rune(row))
 		}
 	}
-	return len(r.Inputs) <= craftGridSize
+	return w
 }
 
+func recipeHeight(r recipe) int { return len(r.Pattern) }
+
+func recipeFitsGrid(r recipe, size int) bool {
+	return recipeWidth(r) <= size && recipeHeight(r) <= size
+}
+
+func recipeFits2x2(r recipe) bool { return recipeFitsGrid(r, 2) }
+
 func (g *Game) recipeBookRecipes() []recipe {
+	size := g.craftSize
+	if size < 2 {
+		size = 2
+	}
 	out := make([]recipe, 0, len(recipes))
 	for _, r := range recipes {
-		if recipeFits2x2(r) {
+		if recipeFitsGrid(r, size) {
 			out = append(out, r)
 		}
 	}
 	return out
 }
 
-func (g *Game) gridCounts() map[core.ItemID]int {
-	counts := make(map[core.ItemID]int)
-	for _, st := range g.craftGrid {
-		if !st.Empty() {
-			counts[st.Item] += st.Count
+func (g *Game) craftGridN() int {
+	if g.craftSize == 3 {
+		return 3
+	}
+	return 2
+}
+
+// recipeAt checks whether the shaped recipe occupies the grid at the given
+// offset. Stack sizes above one are allowed in required cells; each occupied
+// pattern cell consumes one item.
+func (g *Game) recipeAt(r recipe, ox, oy int) bool {
+	n := g.craftGridN()
+	w, h := recipeWidth(r), recipeHeight(r)
+	rows := make([][]rune, 0, h)
+	for _, row := range r.Pattern {
+		rows = append(rows, []rune(row))
+	}
+	for gy := 0; gy < n; gy++ {
+		for gx := 0; gx < n; gx++ {
+			st := g.craftGrid[gy*n+gx]
+			ch := rune(' ')
+			if gy >= oy && gy < oy+h && gx >= ox && gx < ox+w {
+				row := rows[gy-oy]
+				if gx-ox < len(row) {
+					ch = row[gx-ox]
+				}
+			}
+			item, required := r.Key[ch]
+			if !required || ch == ' ' {
+				if !st.Empty() {
+					return false
+				}
+				continue
+			}
+			if st.Item != item || st.Count < 1 {
+				return false
+			}
 		}
 	}
-	return counts
+	return true
+}
+
+func (g *Game) matchedGridRecipeAt() (recipe, int, int, bool) {
+	n := g.craftGridN()
+	for _, r := range recipes {
+		if !recipeFitsGrid(r, n) {
+			continue
+		}
+		for oy := 0; oy+recipeHeight(r) <= n; oy++ {
+			for ox := 0; ox+recipeWidth(r) <= n; ox++ {
+				if g.recipeAt(r, ox, oy) {
+					return r, ox, oy, true
+				}
+			}
+		}
+	}
+	return recipe{}, 0, 0, false
 }
 
 func (g *Game) matchedGridRecipe() (recipe, bool) {
-	counts := g.gridCounts()
-	if len(counts) == 0 {
-		return recipe{}, false
-	}
-	for _, r := range recipes {
-		if !recipeFits2x2(r) {
-			continue
-		}
-		want := make(map[core.ItemID]int)
-		for _, in := range r.Inputs {
-			want[in.Item] += in.Count
-		}
-		if len(want) != len(counts) {
-			continue
-		}
-		ok := true
-		for item, n := range want {
-			if counts[item] < n {
-				ok = false
-				break
-			}
-		}
-		if ok {
-			return r, true
-		}
-	}
-	return recipe{}, false
+	r, _, _, ok := g.matchedGridRecipeAt()
+	return r, ok
 }
 
 func (g *Game) takeCraftOutput() {
-	r, ok := g.matchedGridRecipe()
+	r, ox, oy, ok := g.matchedGridRecipeAt()
 	if !ok {
 		return
 	}
-	for _, in := range r.Inputs {
-		need := in.Count
-		for i := range g.craftGrid {
-			if need <= 0 {
-				break
-			}
-			st := &g.craftGrid[i]
-			if st.Item != in.Item || st.Count <= 0 {
+	n := g.craftGridN()
+	rows := make([][]rune, 0, len(r.Pattern))
+	for _, row := range r.Pattern {
+		rows = append(rows, []rune(row))
+	}
+	for gy, row := range rows {
+		for gx, ch := range row {
+			if ch == ' ' {
 				continue
 			}
-			take := st.Count
-			if take > need {
-				take = need
+			if _, required := r.Key[ch]; !required {
+				continue
 			}
-			st.Count -= take
-			need -= take
+			idx := (oy+gy)*n + (ox + gx)
+			if idx < 0 || idx >= len(g.craftGrid) {
+				continue
+			}
+			st := &g.craftGrid[idx]
+			if st.Count > 0 {
+				st.Count--
+			}
 			if st.Count <= 0 {
 				*st = core.Stack{}
 			}
@@ -130,11 +168,23 @@ func (g *Game) fillCraftingRecipe(index int) bool {
 			return false
 		}
 	}
-	slot := 0
-	for _, in := range r.Inputs {
-		g.inv.Remove(in.Item, in.Count)
-		g.craftGrid[slot] = core.Stack{Item: in.Item, Count: in.Count}
-		slot++
+	n := g.craftGridN()
+	for gy, row := range r.Pattern {
+		for gx, ch := range row {
+			if ch == ' ' {
+				continue
+			}
+			item, ok := r.Key[ch]
+			if !ok {
+				continue
+			}
+			if g.inv.Remove(item, 1) > 0 {
+				idx := gy*n + gx
+				if idx >= 0 && idx < len(g.craftGrid) {
+					g.craftGrid[idx] = core.Stack{Item: item, Count: 1}
+				}
+			}
+		}
 	}
 	g.recipeBookOpen = false
 	return true

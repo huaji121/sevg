@@ -73,7 +73,8 @@ type Game struct {
 	mobs           *entity.Manager
 	inv            core.Inventory
 	inventoryTab   int
-	craftGrid      [4]core.Stack
+	craftGrid      [9]core.Stack
+	craftSize      int
 	recipeBookOpen bool
 	time           float64
 	saveAt         string
@@ -228,12 +229,29 @@ func Run(opts Options) error {
 	return nil
 }
 
+func (g *Game) openInventory() {
+	g.craftSize = 2
+	g.recipeBookOpen = false
+	g.setState(StateInventory)
+}
+
+func (g *Game) openCraftingTable() {
+	if g.state != StatePlaying {
+		return
+	}
+	g.craftSize = 3
+	g.recipeBookOpen = false
+	g.inventoryTab = 0
+	g.setState(StateInventory)
+}
+
 func (g *Game) setState(s State) {
 	if g.state == StateInventory && s != StateInventory {
 		if g.mode != ModeCreative {
 			g.returnCraftGrid()
 		}
 		g.recipeBookOpen = false
+		g.craftSize = 2
 	}
 	if s != StatePlaying && g.chatOpen {
 		g.chatOpen = false
@@ -409,7 +427,7 @@ func (g *Game) onKey(k sdl.Keycode) {
 		case sdl.K_ESCAPE:
 			g.setState(StatePaused)
 		case sdl.K_E:
-			g.setState(StateInventory)
+			g.openInventory()
 		case sdl.K_SPACE:
 			if g.mode == ModeCreative {
 				if g.spaceTapTimer > 0 {

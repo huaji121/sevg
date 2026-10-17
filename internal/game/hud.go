@@ -306,7 +306,7 @@ func (g *Game) drawSurvivalInventory(w, h float32) {
 		g.drawCursorStack()
 		return
 	}
-	for i := 0; i < 4; i++ {
+	for i := 0; i < g.craftGridN()*g.craftGridN(); i++ {
 		if g.craftSlotRect(i).Contains(g.mouseX, g.mouseY) && !g.craftGrid[i].Empty() {
 			g.drawItemTooltip(i18n.ItemName(g.craftGrid[i].Item))
 		}

@@ -10,20 +10,45 @@ import (
 )
 
 type recipe struct {
-	Inputs []core.Stack
-	Output core.Stack
+	Pattern []string
+	Key     map[rune]core.ItemID
+	Inputs  []core.Stack
+	Output  core.Stack
+}
+
+func shaped(out core.Stack, pattern []string, key map[rune]core.ItemID) recipe {
+	r := recipe{Pattern: pattern, Key: key, Output: out}
+	counts := make(map[core.ItemID]int)
+	var order []core.ItemID
+	for _, row := range pattern {
+		for _, ch := range row {
+			item, ok := key[ch]
+			if !ok {
+				continue
+			}
+			if counts[item] == 0 {
+				order = append(order, item)
+			}
+			counts[item]++
+		}
+	}
+	for _, item := range order {
+		r.Inputs = append(r.Inputs, core.Stack{Item: item, Count: counts[item]})
+	}
+	return r
 }
 
 var recipes = []recipe{
-	{Inputs: []core.Stack{{Item: core.ItemLog, Count: 1}}, Output: core.Stack{Item: core.ItemPlanks, Count: 4}},
-	{Inputs: []core.Stack{{Item: core.ItemPlanks, Count: 2}}, Output: core.Stack{Item: core.ItemStick, Count: 4}},
-	{Inputs: []core.Stack{{Item: core.ItemCobble, Count: 4}}, Output: core.Stack{Item: core.ItemStoneBrick, Count: 4}},
-	{Inputs: []core.Stack{{Item: core.ItemSand, Count: 4}}, Output: core.Stack{Item: core.ItemGlass, Count: 1}},
-	{Inputs: []core.Stack{{Item: core.ItemCobble, Count: 3}, {Item: core.ItemStick, Count: 2}}, Output: core.Stack{Item: core.ItemStonePickaxe, Count: 1}},
-	{Inputs: []core.Stack{{Item: core.ItemPlanks, Count: 2}, {Item: core.ItemStick, Count: 1}}, Output: core.Stack{Item: core.ItemWoodSword, Count: 1}},
-	{Inputs: []core.Stack{{Item: core.ItemIronIngot, Count: 2}, {Item: core.ItemStick, Count: 1}}, Output: core.Stack{Item: core.ItemIronSword, Count: 1}},
-	{Inputs: []core.Stack{{Item: core.ItemIronIngot, Count: 3}, {Item: core.ItemStick, Count: 2}}, Output: core.Stack{Item: core.ItemIronPickaxe, Count: 1}},
-	{Inputs: []core.Stack{{Item: core.ItemCoal, Count: 1}, {Item: core.ItemStick, Count: 1}}, Output: core.Stack{Item: core.ItemTorch, Count: 4}},
+	shaped(core.Stack{Item: core.ItemPlanks, Count: 4}, []string{"L"}, map[rune]core.ItemID{'L': core.ItemLog}),
+	shaped(core.Stack{Item: core.ItemStick, Count: 4}, []string{"P", "P"}, map[rune]core.ItemID{'P': core.ItemPlanks}),
+	shaped(core.Stack{Item: core.ItemCraftingTable, Count: 1}, []string{"PP", "PP"}, map[rune]core.ItemID{'P': core.ItemPlanks}),
+	shaped(core.Stack{Item: core.ItemStoneBrick, Count: 4}, []string{"CC", "CC"}, map[rune]core.ItemID{'C': core.ItemCobble}),
+	shaped(core.Stack{Item: core.ItemGlass, Count: 1}, []string{"SS", "SS"}, map[rune]core.ItemID{'S': core.ItemSand}),
+	shaped(core.Stack{Item: core.ItemTorch, Count: 4}, []string{"C", "S"}, map[rune]core.ItemID{'C': core.ItemCoal, 'S': core.ItemStick}),
+	shaped(core.Stack{Item: core.ItemWoodSword, Count: 1}, []string{"P", "P", "S"}, map[rune]core.ItemID{'P': core.ItemPlanks, 'S': core.ItemStick}),
+	shaped(core.Stack{Item: core.ItemIronSword, Count: 1}, []string{"I", "I", "S"}, map[rune]core.ItemID{'I': core.ItemIronIngot, 'S': core.ItemStick}),
+	shaped(core.Stack{Item: core.ItemStonePickaxe, Count: 1}, []string{"CCC", " S ", " S "}, map[rune]core.ItemID{'C': core.ItemCobble, 'S': core.ItemStick}),
+	shaped(core.Stack{Item: core.ItemIronPickaxe, Count: 1}, []string{"III", " S ", " S "}, map[rune]core.ItemID{'I': core.ItemIronIngot, 'S': core.ItemStick}),
 }
 
 func (g *Game) handleActions(dt float32) {
@@ -175,6 +200,11 @@ func (g *Game) selectedDamage() float32 {
 }
 
 func (g *Game) useItem(hit world.RayHit) {
+	if hit.Block == core.CraftingTable {
+		g.openCraftingTable()
+		g.placeCool = 0.25
+		return
+	}
 	s := g.inv.SelectedStack()
 	if s.Empty() {
 		return
@@ -412,7 +442,7 @@ func (g *Game) handleUIClick(right bool) {
 				g.takeCraftOutput()
 				return
 			}
-			for i := 0; i < 4; i++ {
+			for i := 0; i < g.craftGridN()*g.craftGridN(); i++ {
 				if g.craftSlotRect(i).Contains(g.mouseX, g.mouseY) {
 					g.clickStack(&g.craftGrid[i], right)
 					return

@@ -163,7 +163,8 @@ func (g *Game) startWorld(load bool) error {
 	g.world = w
 	g.player = p
 	g.inv = inv
-	g.craftGrid = [4]core.Stack{}
+	g.craftGrid = [9]core.Stack{}
+	g.craftSize = 2
 	g.recipeBookOpen = false
 	g.mobs = entity.NewManager(seed)
 	g.time = timeOfDay
