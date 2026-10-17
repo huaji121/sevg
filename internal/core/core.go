@@ -154,7 +154,7 @@ var BlockDefs = [BlockCount]BlockDef{
 	Sand:       {Name: "Sand", Solid: true, Opaque: true, Hardness: 0.5, Tiles: [6]uint8{TileSand, TileSand, TileSand, TileSand, TileSand, TileSand}},
 	Water:      {Name: "Water", Liquid: true, Opaque: false, Hardness: -1, Tiles: [6]uint8{TileWater, TileWater, TileWater, TileWater, TileWater, TileWater}},
 	Log:        {Name: "Oak Log", Solid: true, Opaque: true, Hardness: 1.2, Tiles: [6]uint8{TileLogSide, TileLogSide, TileLogTop, TileLogTop, TileLogSide, TileLogSide}},
-	Leaves:     {Name: "Leaves", Solid: true, Opaque: true, Hardness: 0.25, Tiles: [6]uint8{TileLeaves, TileLeaves, TileLeaves, TileLeaves, TileLeaves, TileLeaves}, Drop: ItemNone},
+	Leaves:     {Name: "Leaves", Solid: true, Opaque: false, Hardness: 0.25, Tiles: [6]uint8{TileLeaves, TileLeaves, TileLeaves, TileLeaves, TileLeaves, TileLeaves}, Drop: ItemNone},
 	Planks:     {Name: "Oak Planks", Solid: true, Opaque: true, Hardness: 1.0, Tiles: [6]uint8{TilePlanks, TilePlanks, TilePlanks, TilePlanks, TilePlanks, TilePlanks}},
 	CoalOre:    {Name: "Coal Ore", Solid: true, Opaque: true, Hardness: 2.2, Tiles: [6]uint8{TileCoalOre, TileCoalOre, TileCoalOre, TileCoalOre, TileCoalOre, TileCoalOre}, Drop: ItemCoal},
 	IronOre:    {Name: "Iron Ore", Solid: true, Opaque: true, Hardness: 2.8, Tiles: [6]uint8{TileIronOre, TileIronOre, TileIronOre, TileIronOre, TileIronOre, TileIronOre}, Drop: ItemIronIngot},

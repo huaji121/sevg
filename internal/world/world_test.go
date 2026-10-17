@@ -120,3 +120,54 @@ func TestSafeSpawnClear(t *testing.T) {
 		t.Fatalf("spawn has no ground at %d,%d,%d", x, y-1, z)
 	}
 }
+func TestLeavesDoNotOccludeNeighborFaces(t *testing.T) {
+	// Leaf textures contain transparent holes, so a solid block face next
+	// to leaves must still be emitted.
+	if !faceVisible(core.Stone, core.Leaves) {
+		t.Fatal("stone face next to leaves was culled")
+	}
+	if faceVisible(core.Leaves, core.Stone) {
+		t.Fatal("leaf face against solid stone should stay hidden")
+	}
+	if faceVisible(core.Leaves, core.Leaves) {
+		t.Fatal("interior leaf faces should stay hidden")
+	}
+	if !faceVisible(core.Leaves, core.Air) {
+		t.Fatal("outer leaf face should be visible")
+	}
+}
+func TestMeshEmitsSolidFaceAgainstLeaves(t *testing.T) {
+	w := New(11)
+	cp := ChunkPos{}
+	w.EnsureChunk(cp)
+	for x := 7; x <= 9; x++ {
+		for y := 69; y <= 72; y++ {
+			for z := 7; z <= 10; z++ {
+				w.SetBlock(x, y, z, core.Air)
+			}
+		}
+	}
+	w.SetBlock(8, 70, 8, core.Stone)
+	w.SetBlock(8, 70, 9, core.Leaves)
+	mesh, ok := w.Mesh(cp)
+	if !ok {
+		t.Fatal("mesh failed")
+	}
+	count := 0
+	for i := 0; i+3 < len(mesh.Opaque.Vertices); i += 4 {
+		all := true
+		for j := 0; j < 4; j++ {
+			v := mesh.Opaque.Vertices[i+j]
+			if v.Z < 8.999 || v.Z > 9.001 || v.X < 8 || v.X > 9 || v.Y < 70 || v.Y > 71 {
+				all = false
+				break
+			}
+		}
+		if all {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("expected the stone +Z face adjacent to leaves, got %d matching quads", count)
+	}
+}
