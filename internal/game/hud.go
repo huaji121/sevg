@@ -49,9 +49,14 @@ func (g *Game) drawUI() {
 			toastY = 18
 		}
 		tw := g.canv.TextWidth(g.toast, 1.5) + 32
+		const toastH = float32(40)
 		x := w/2 - tw/2
-		g.canv.Panel(x, toastY, tw, 34, ui.RGBA(20, 25, 30, 230), ui.RGBA(255, 196, 82, 220))
-		g.canv.TextCentered(w/2, toastY+9, g.toast, 1.5, ui.TextColor)
+		g.canv.Panel(x, toastY, tw, toastH, ui.RGBA(20, 25, 30, 230), ui.RGBA(255, 196, 82, 220))
+		textY := toastY + (toastH-g.canv.LineHeight*1.5)/2
+		if textY < toastY+2 {
+			textY = toastY + 2
+		}
+		g.canv.TextCentered(w/2, textY, g.toast, 1.5, ui.TextColor)
 	}
 }
 
