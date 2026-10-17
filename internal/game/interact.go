@@ -33,7 +33,7 @@ func (g *Game) handleActions(dt float32) {
 	mobFirst := mobHit && (!blockHit.Hit || mobDist < blockHit.Distance)
 
 	if blockHit.Hit {
-		g.breakPos = blockHit.Pos
+		g.targetPos = blockHit.Pos
 		g.targetValid = true
 	} else {
 		g.targetValid = false
@@ -90,8 +90,9 @@ func (g *Game) mineBlock(dt float32, hit world.RayHit) {
 		g.breakProgress = 0
 		return
 	}
-	if !g.breakActive || g.breakPos != hit.Pos {
+	if !g.breakActive || g.breakPos != hit.Pos || g.breakBlock != hit.Block {
 		g.breakPos = hit.Pos
+		g.breakBlock = hit.Block
 		g.breakProgress = 0
 		g.breakActive = true
 	}

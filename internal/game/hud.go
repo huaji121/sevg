@@ -226,7 +226,7 @@ func (g *Game) drawDebug(w float32) {
 		biome = i18n.BiomeName(b)
 	}
 	if g.breakActive {
-		target = i18n.T("hud.target_pos", g.breakPos[0], g.breakPos[1], g.breakPos[2])
+		target = i18n.T("hud.target_pos", g.targetPos[0], g.targetPos[1], g.targetPos[2])
 	}
 	lines := []string{
 		i18n.T("hud.debug_title"),
@@ -586,7 +586,7 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 	}
 	g.appendBreakOverlay(&transparent)
 	if g.player != nil && g.targetValid {
-		x, y, z := g.breakPos[0], g.breakPos[1], g.breakPos[2]
+		x, y, z := g.targetPos[0], g.targetPos[1], g.targetPos[2]
 		min := mathx.V3(float32(x)-0.003, float32(y)-0.003, float32(z)-0.003)
 		max := mathx.V3(float32(x)+1.003, float32(y)+1.003, float32(z)+1.003)
 		appendOutline(&opaque, min, max, [4]float32{1, 0.88, 0.35, 1})

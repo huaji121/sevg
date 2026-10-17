@@ -135,3 +135,41 @@ func TestDoubleSpaceTogglesCreativeFlight(t *testing.T) {
 		t.Fatal("double space did not disable flight")
 	}
 }
+func TestMiningProgressResetsWhenTargetChanges(t *testing.T) {
+	g := newTestGame(t)
+	g.mode = ModeSurvival
+	g.world.SetBlock(2, 70, 0, core.Stone)
+	g.world.SetBlock(3, 70, 0, core.Stone)
+	first := world.RayHit{Hit: true, Block: core.Stone, Pos: [3]int{2, 70, 0}}
+	second := world.RayHit{Hit: true, Block: core.Stone, Pos: [3]int{3, 70, 0}}
+	g.mineBlock(0.2, first)
+	before := g.breakProgress
+	if before <= 0 || g.breakPos != first.Pos {
+		t.Fatalf("first target progress=%f pos=%v", before, g.breakPos)
+	}
+	g.mineBlock(0.05, second)
+	if g.breakPos != second.Pos {
+		t.Fatalf("target did not move: %v", g.breakPos)
+	}
+	if g.breakProgress >= before {
+		t.Fatalf("progress was not reset: before=%f after=%f", before, g.breakProgress)
+	}
+}
+
+func TestMiningProgressResetsWhenBlockChanges(t *testing.T) {
+	g := newTestGame(t)
+	g.mode = ModeSurvival
+	g.world.SetBlock(2, 70, 0, core.Stone)
+	hit := world.RayHit{Hit: true, Block: core.Stone, Pos: [3]int{2, 70, 0}}
+	g.mineBlock(0.2, hit)
+	before := g.breakProgress
+	g.world.SetBlock(2, 70, 0, core.Dirt)
+	hit.Block = core.Dirt
+	g.mineBlock(0.05, hit)
+	if g.breakBlock != core.Dirt {
+		t.Fatalf("break block did not update: %v", g.breakBlock)
+	}
+	if g.breakProgress >= before {
+		t.Fatalf("progress survived block replacement: before=%f after=%f", before, g.breakProgress)
+	}
+}

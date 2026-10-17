@@ -74,6 +74,8 @@ type Game struct {
 	heldStack      core.Stack
 
 	breakPos      [3]int
+	targetPos     [3]int
+	breakBlock    core.BlockID
 	breakProgress float32
 	breakActive   bool
 	targetValid   bool
