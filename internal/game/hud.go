@@ -291,7 +291,7 @@ func (g *Game) drawSurvivalInventory(w, h float32) {
 	c.Text(p.X+24, p.Y+49, i18n.T("inventory.hint"), 0.9, ui.MutedColor)
 	closeR := g.invCloseRect()
 	c.Rect(closeR.X, closeR.Y, closeR.W, closeR.H, ui.RGBA(180, 60, 60, 230))
-	c.TextCentered(closeR.X+closeR.W/2, closeR.Y+3, "X", 1.5, ui.TextColor)
+	c.TextCentered(closeR.X+closeR.W/2, closeR.Y+(closeR.H-c.LineHeight*1.5)/2, "X", 1.5, ui.TextColor)
 
 	for vis := 0; vis < core.InventorySlots; vis++ {
 		r := g.invSlotRect(vis)
@@ -372,7 +372,7 @@ func (g *Game) drawDead(w, h float32) {
 	}
 	c.Rect(r.X, r.Y, r.W, r.H, bg)
 	c.Border(r.X, r.Y, r.W, r.H, 2, ui.RGBA(90, 105, 115, 220))
-	c.TextCentered(r.X+r.W/2, r.Y+10, i18n.T("death.title_screen"), 1.4, ui.TextColor)
+	c.TextCentered(r.X+r.W/2, r.Y+(r.H-c.LineHeight*1.4)/2, i18n.T("death.title_screen"), 1.4, ui.TextColor)
 }
 
 func (g *Game) drawButton(r ui.Rect, label string, enabled bool) {
@@ -397,7 +397,11 @@ func (g *Game) drawButtonScale(r ui.Rect, label string, enabled bool, scale floa
 	c.Rect(r.X+4, r.Y+4, r.W, r.H, [4]float32{0, 0, 0, 0.35})
 	c.Rect(r.X, r.Y, r.W, r.H, bg)
 	c.Border(r.X, r.Y, r.W, r.H, 2, border)
-	c.TextCentered(r.X+r.W/2, r.Y+r.H/2-8*scale/1.8, label, scale, text)
+	labelY := r.Y + (r.H-c.LineHeight*scale)/2
+	if labelY < r.Y+2 {
+		labelY = r.Y + 2
+	}
+	c.TextCentered(r.X+r.W/2, labelY, label, scale, text)
 }
 
 func (g *Game) drawInventorySlot(r ui.Rect, st core.Stack, bg, border [4]float32, number int) {

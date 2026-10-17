@@ -75,7 +75,7 @@ func (g *Game) drawCreativeInventory(w, h float32) {
 
 	closeR := g.creativeCloseRect()
 	c.Rect(closeR.X, closeR.Y, closeR.W, closeR.H, ui.RGBA(180, 60, 60, 230))
-	c.TextCentered(closeR.X+closeR.W/2, closeR.Y+3, "X", 1.5, ui.TextColor)
+	c.TextCentered(closeR.X+closeR.W/2, closeR.Y+(closeR.H-c.LineHeight*1.5)/2, "X", 1.5, ui.TextColor)
 
 	for idx := 0; idx < creativeCols*creativeRows; idx++ {
 		r := g.creativeItemRect(idx)
@@ -150,6 +150,6 @@ func (g *Game) drawInventoryTabs() {
 		}
 		c.Rect(r.X, r.Y, r.W, r.H, bg)
 		c.Border(r.X, r.Y, r.W, r.H, 2, bd)
-		c.TextCentered(r.X+r.W/2, r.Y+6, labels[i], 1.0, col)
+		c.TextCentered(r.X+r.W/2, r.Y+(r.H-c.LineHeight)/2, labels[i], 1.0, col)
 	}
 }
