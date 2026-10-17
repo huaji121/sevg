@@ -57,15 +57,16 @@ type Game struct {
 	gfx  *render.Renderer
 	canv *ui.Canvas
 
-	state  State
-	mode   GameMode
-	seed   int64
-	world  *world.World
-	player *player.Player
-	mobs   *entity.Manager
-	inv    core.Inventory
-	time   float64
-	saveAt string
+	state        State
+	mode         GameMode
+	seed         int64
+	world        *world.World
+	player       *player.Player
+	mobs         *entity.Manager
+	inv          core.Inventory
+	inventoryTab int
+	time         float64
+	saveAt       string
 
 	mouseX, mouseY float32
 	mouseLeft      bool
@@ -397,10 +398,14 @@ func (g *Game) onKey(k sdl.Keycode) {
 			g.inv.Select(int(k - sdl.K_1))
 		}
 	case StateInventory:
-		if k == sdl.K_L {
+		if k >= sdl.K_1 && k <= sdl.K_9 {
+			g.inv.Select(int(k - sdl.K_1))
+		} else if k == sdl.K_L {
 			g.toggleLanguage()
 		} else if k == sdl.K_E || k == sdl.K_ESCAPE {
-			if !g.heldStack.Empty() {
+			if g.mode == ModeCreative {
+				g.heldStack = core.Stack{}
+			} else if !g.heldStack.Empty() {
 				left := g.inv.Add(g.heldStack.Item, g.heldStack.Count)
 				if left > 0 && g.mobs != nil {
 					g.mobs.Drop(g.heldStack.Item, left, g.player.Body.Pos, mathx.Vec3{Y: 3})

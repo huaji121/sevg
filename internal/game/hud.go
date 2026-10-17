@@ -258,6 +258,18 @@ func (g *Game) drawDebug(w float32) {
 }
 
 func (g *Game) drawInventory(w, h float32) {
+	if g.mode == ModeCreative && g.inventoryTab == 1 {
+		g.drawCreativeInventory(w, h)
+		g.drawInventoryTabs()
+		return
+	}
+	g.drawSurvivalInventory(w, h)
+	if g.mode == ModeCreative {
+		g.drawInventoryTabs()
+	}
+}
+
+func (g *Game) drawSurvivalInventory(w, h float32) {
 	c := g.canv
 	c.Rect(0, 0, w, h, [4]float32{0, 0, 0, 0.48})
 	p := g.invPanelRect()
@@ -277,12 +289,7 @@ func (g *Game) drawInventory(w, h float32) {
 		if selected {
 			bd = ui.Accent
 		}
-		c.Rect(r.X, r.Y, r.W, r.H, bg)
-		c.Border(r.X, r.Y, r.W, r.H, 2, bd)
-		st := g.inv.Slots[idx]
-		if !st.Empty() {
-			g.drawItemIcon(r.X+6, r.Y+6, r.W-12, st, 1)
-		}
+		g.drawInventorySlot(r, g.inv.Slots[idx], bg, bd, 0)
 	}
 
 	// Crafting column.
@@ -324,10 +331,7 @@ func (g *Game) drawInventory(w, h float32) {
 			}
 		}
 	}
-	// Cursor stack.
-	if !g.heldStack.Empty() {
-		g.drawItemIcon(g.mouseX-20, g.mouseY-20, 40, g.heldStack, 1)
-	}
+	g.drawCursorStack()
 }
 
 func (g *Game) drawPause(w, h float32) {
@@ -381,6 +385,24 @@ func (g *Game) drawButtonScale(r ui.Rect, label string, enabled bool, scale floa
 	c.Rect(r.X, r.Y, r.W, r.H, bg)
 	c.Border(r.X, r.Y, r.W, r.H, 2, border)
 	c.TextCentered(r.X+r.W/2, r.Y+r.H/2-8*scale/1.8, label, scale, text)
+}
+
+func (g *Game) drawInventorySlot(r ui.Rect, st core.Stack, bg, border [4]float32, number int) {
+	c := g.canv
+	c.Rect(r.X, r.Y, r.W, r.H, bg)
+	c.Border(r.X, r.Y, r.W, r.H, 2, border)
+	if !st.Empty() {
+		g.drawItemIcon(r.X+6, r.Y+6, r.W-12, st, 1)
+	}
+	if number > 0 {
+		c.Text(r.X+3, r.Y+1, fmt.Sprint(number), 0.8, ui.MutedColor)
+	}
+}
+
+func (g *Game) drawCursorStack() {
+	if !g.heldStack.Empty() {
+		g.drawItemIcon(g.mouseX-20, g.mouseY-20, 40, g.heldStack, 1)
+	}
 }
 
 func (g *Game) drawItemIcon(x, y, size float32, st core.Stack, alpha float32) {

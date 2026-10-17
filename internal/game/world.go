@@ -114,6 +114,9 @@ func (g *Game) startWorld(load bool) error {
 		p.Body.Pos.Y = 64
 	}
 	p.Creative = g.mode == ModeCreative
+	if g.mode == ModeCreative {
+		g.inventoryTab = 1
+	}
 	if p.Creative {
 		p.Health = p.MaxHP
 	} else {

@@ -308,6 +308,36 @@ func (g *Game) handleUIClick(right bool) {
 			g.quitToTitle()
 		}
 	case StateInventory:
+		if g.mode == ModeCreative {
+			invTab, creativeTab := g.inventoryTabRects()
+			if invTab.Contains(g.mouseX, g.mouseY) {
+				g.inventoryTab = 0
+				return
+			}
+			if creativeTab.Contains(g.mouseX, g.mouseY) {
+				g.inventoryTab = 1
+				return
+			}
+		}
+		if g.mode == ModeCreative && g.inventoryTab == 1 {
+			if g.creativeCloseRect().Contains(g.mouseX, g.mouseY) {
+				g.heldStack = core.Stack{}
+				g.setState(StatePlaying)
+				return
+			}
+			for i := 0; i < 9; i++ {
+				if g.creativeHotbarRect(i).Contains(g.mouseX, g.mouseY) {
+					// Same slot interaction as the survival inventory:
+					// pick up, place, merge, split, or swap.
+					g.clickSlot(i, right)
+					return
+				}
+			}
+			if item := g.creativeItemAt(g.mouseX, g.mouseY); item != core.ItemNone {
+				g.giveCreativeItem(item)
+			}
+			return
+		}
 		if g.invCloseRect().Contains(g.mouseX, g.mouseY) {
 			if !g.heldStack.Empty() {
 				left := g.inv.Add(g.heldStack.Item, g.heldStack.Count)

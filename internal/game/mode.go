@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"sevg/internal/core"
+
 	"sevg/internal/i18n"
 )
 
@@ -33,6 +35,12 @@ func (g *Game) setGameMode(mode GameMode) bool {
 	g.breakProgress = 0
 	g.breakCool = 0
 	g.spaceTapTimer = 0
+	g.heldStack = core.Stack{}
+	if mode == ModeCreative {
+		g.inventoryTab = 1
+	} else {
+		g.inventoryTab = 0
+	}
 	return true
 }
 
