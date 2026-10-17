@@ -23,19 +23,26 @@ type chatLine struct {
 const chatMaxMessages = 100
 
 func (g *Game) openChat() {
-	if g.chatOpen || g.state != StatePlaying || g.Win == nil {
+	g.openChatWith("")
+}
+
+func (g *Game) openChatWith(prefix string) {
+	if g.chatOpen || g.state != StatePlaying {
 		return
 	}
 	g.chatOpen = true
-	g.chatInput = g.chatInput[:0]
-	g.chatCaret = 0
+	g.chatInput = []rune(prefix)
+	g.chatCaret = len(g.chatInput)
 	g.chatComposition = ""
+	g.chatSuppressSlash = prefix == "/"
 	g.mouseLeft = false
 	g.mouseRight = false
 	g.breakActive = false
-	_ = g.Win.SetRelativeMouseMode(false)
-	_ = sdl.ShowCursor()
-	_ = g.Win.StartTextInput()
+	if g.Win != nil {
+		_ = g.Win.SetRelativeMouseMode(false)
+		_ = sdl.ShowCursor()
+		_ = g.Win.StartTextInput()
+	}
 	g.updateChatInputArea()
 }
 
@@ -47,6 +54,7 @@ func (g *Game) closeChat() {
 	g.chatInput = g.chatInput[:0]
 	g.chatCaret = 0
 	g.chatComposition = ""
+	g.chatSuppressSlash = false
 	if g.Win != nil {
 		_ = g.Win.StopTextInput()
 	}
@@ -106,6 +114,12 @@ func (g *Game) onChatKey(k sdl.Keycode) {
 func (g *Game) chatInsert(text string) {
 	if !g.chatOpen {
 		return
+	}
+	if g.chatSuppressSlash {
+		g.chatSuppressSlash = false
+		if text == "/" {
+			return
+		}
 	}
 	text = strings.ReplaceAll(text, "", "")
 	if text == "" {

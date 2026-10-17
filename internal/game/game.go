@@ -82,11 +82,12 @@ type Game struct {
 	breakCool     float32
 	spaceTapTimer float32
 
-	chatOpen        bool
-	chatInput       []rune
-	chatCaret       int
-	chatComposition string
-	chatMessages    []chatMessage
+	chatOpen          bool
+	chatInput         []rune
+	chatCaret         int
+	chatComposition   string
+	chatSuppressSlash bool
+	chatMessages      []chatMessage
 
 	toast      string
 	toastTime  float32
@@ -201,6 +202,7 @@ func (g *Game) setState(s State) {
 		g.chatInput = g.chatInput[:0]
 		g.chatCaret = 0
 		g.chatComposition = ""
+		g.chatSuppressSlash = false
 		if g.Win != nil {
 			_ = g.Win.StopTextInput()
 		}
@@ -322,6 +324,10 @@ func (g *Game) poll() {
 func (g *Game) onKey(k sdl.Keycode) {
 	if g.chatOpen {
 		g.onChatKey(k)
+		return
+	}
+	if g.state == StatePlaying && k == sdl.K_SLASH {
+		g.openChatWith("/")
 		return
 	}
 	if g.state == StatePlaying && (k == sdl.K_T || k == sdl.K_RETURN || k == sdl.K_KP_ENTER) {

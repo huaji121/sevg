@@ -58,3 +58,22 @@ func TestGamemodeCommand(t *testing.T) {
 		t.Fatal("survival mode was not applied")
 	}
 }
+func TestSlashOpensChatWithCommandPrefix(t *testing.T) {
+	g := newTestGame(t)
+	g.state = StatePlaying
+	g.onKey(sdl.K_SLASH)
+	if !g.chatOpen || string(g.chatInput) != "/" || g.chatCaret != 1 {
+		t.Fatalf("slash open state: open=%v input=%q caret=%d", g.chatOpen, string(g.chatInput), g.chatCaret)
+	}
+	// The same key press may also produce a TEXT_INPUT event; it must not
+	// create a second slash.
+	g.chatInsert("/")
+	if string(g.chatInput) != "/" {
+		t.Fatalf("duplicate slash: %q", string(g.chatInput))
+	}
+	g.chatInsert("gamemode 1")
+	g.sendChat()
+	if g.mode != ModeCreative {
+		t.Fatal("slash command did not switch mode")
+	}
+}
