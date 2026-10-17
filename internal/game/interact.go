@@ -52,6 +52,7 @@ func (g *Game) handleActions(dt float32) {
 					dmg = 1000
 				}
 				g.mobs.DamageMob(mob, dmg, g.player.Body.Pos)
+				g.playSound("hit")
 				g.attackCool = 0.32
 			}
 		} else if blockHit.Hit {
@@ -81,6 +82,7 @@ func (g *Game) mineBlock(dt float32, hit world.RayHit) {
 			return
 		}
 		g.spawnBlockParticles(b, hit.Pos, hit.Normal, 18)
+		g.playSound(breakSound(b))
 		g.world.SetBlock(x, y, z, core.Air)
 		g.breakCool = 0.12
 		g.breakActive = false
@@ -126,6 +128,7 @@ func (g *Game) mineBlock(dt float32, hit world.RayHit) {
 		return
 	}
 	g.spawnBlockParticles(b, hit.Pos, hit.Normal, 18)
+	g.playSound(breakSound(b))
 	g.world.SetBlock(x, y, z, core.Air)
 	drop := dropForBlock(b)
 	if drop != core.ItemNone {
@@ -181,6 +184,7 @@ func (g *Game) useItem(hit world.RayHit) {
 			return
 		}
 		g.player.Heal(def.Food)
+		g.playSound("eat")
 		g.inv.TakeSelected(1)
 		g.placeCool = 0.35
 		g.notify(i18n.T("toast.ate", i18n.ItemName(s.Item)), 1.2)
@@ -221,6 +225,7 @@ func (g *Game) useItem(hit world.RayHit) {
 		}
 	}
 	if g.world.SetBlock(x, y, z, def.Block) {
+		g.playSound("place")
 		if g.mode != ModeCreative {
 			g.inv.TakeSelected(1)
 		}
@@ -451,5 +456,20 @@ func (g *Game) craft(index int) {
 	if left > 0 {
 		g.mobs.Drop(r.Output.Item, left, g.player.Body.Pos, mathx.Vec3{Y: 3})
 	}
+	g.playSound("craft")
 	g.notify(i18n.T("toast.crafted", i18n.ItemName(r.Output.Item)), 1.2)
+}
+func breakSound(b core.BlockID) string {
+	switch b {
+	case core.Glass, core.Ice:
+		return "break_glass"
+	case core.Log, core.Planks:
+		return "break_wood"
+	case core.Grass, core.Leaves, core.Flower, core.TallGrass, core.Torch:
+		return "break_grass"
+	case core.Dirt, core.Sand, core.Snow, core.SnowyGrass, core.Gravel:
+		return "break_dirt"
+	default:
+		return "break_stone"
+	}
 }

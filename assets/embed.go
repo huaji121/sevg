@@ -7,3 +7,8 @@ import "embed"
 //
 //go:embed textures/blocks/*.png textures/items/*.png
 var Textures embed.FS
+
+// Sounds contains the embedded sound effects.
+//
+//go:embed sounds/*.wav
+var Sounds embed.FS

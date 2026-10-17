@@ -9,6 +9,7 @@ import (
 	"github.com/Zyko0/go-sdl3/bin/binsdl"
 	"github.com/Zyko0/go-sdl3/sdl"
 
+	"sevg/internal/audio"
 	"sevg/internal/core"
 	"sevg/internal/entity"
 	"sevg/internal/i18n"
@@ -52,10 +53,11 @@ type genResult struct {
 }
 
 type Game struct {
-	opts Options
-	Win  *sdl.Window
-	gfx  *render.Renderer
-	canv *ui.Canvas
+	opts  Options
+	Win   *sdl.Window
+	gfx   *render.Renderer
+	canv  *ui.Canvas
+	audio *audio.Engine
 
 	state        State
 	mode         GameMode
@@ -86,6 +88,7 @@ type Game struct {
 	pickCool      float32
 	breakCool     float32
 	spaceTapTimer float32
+	stepTimer     float32
 
 	chatOpen          bool
 	chatInput         []rune
@@ -181,6 +184,10 @@ func Run(opts Options) error {
 		lastTime: time.Now(),
 	}
 	g.seed = opts.Seed
+	if err := sdl.InitSubSystem(sdl.INIT_AUDIO); err == nil {
+		g.audio = audio.Open()
+	}
+	defer func() { g.audio.Close() }()
 	if g.seed == 0 {
 		g.seed = time.Now().UnixNano()
 	}
@@ -267,6 +274,7 @@ func (g *Game) run() {
 			// idle title animation
 		}
 		g.updateStreaming(float32(dt))
+		g.audio.Update()
 		g.drawUI()
 		g.renderFrame()
 		if g.opts.SmokeFrames > 0 && g.frame >= g.opts.SmokeFrames {
@@ -493,7 +501,16 @@ func (g *Game) updatePlaying(dt float32) {
 	}
 	g.ageChat(dt)
 	g.player.Update(dt, g.world, in)
+	if g.player.HurtPulse {
+		g.playSound("hurt")
+		g.player.HurtPulse = false
+	}
+	g.updateFootsteps(dt)
 	g.mobs.Update(dt, g.world, g.player.Body.Pos, &g.inv)
+	if g.mobs.PickupEvents > 0 {
+		g.playSound("pickup")
+		g.mobs.PickupEvents = 0
+	}
 	g.updateParticles(dt)
 	g.time += float64(dt) / 600.0
 	if g.time >= 1 {
@@ -612,6 +629,7 @@ func (g *Game) notify(s string, secs float32) {
 }
 
 func (g *Game) shutdown() {
+	g.audio.Close()
 	if g.world != nil && g.opts.SmokeFrames == 0 {
 		_ = g.saveGame()
 	}
@@ -670,4 +688,25 @@ func clampF(v, lo, hi float32) float32 {
 }
 func lerp3(a, b [3]float32, t float32) [3]float32 {
 	return [3]float32{a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, a[2] + (b[2]-a[2])*t}
+}
+func (g *Game) playSound(name string) {
+	if g.audio != nil {
+		g.audio.Play(name)
+	}
+}
+func (g *Game) updateFootsteps(dt float32) {
+	if g.player == nil || g.chatOpen || g.player.Flying || !g.player.Body.OnGround {
+		g.stepTimer = 0
+		return
+	}
+	speed := float32(math.Hypot(float64(g.player.Body.Vel.X), float64(g.player.Body.Vel.Z)))
+	if speed < 0.8 {
+		g.stepTimer = 0
+		return
+	}
+	g.stepTimer -= dt * speed
+	if g.stepTimer <= 0 {
+		g.playSound("step")
+		g.stepTimer = 1.5
+	}
 }

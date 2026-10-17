@@ -16,15 +16,16 @@ type Input struct {
 }
 
 type Player struct {
-	Body     physics.Body
-	Yaw      float32
-	Pitch    float32
-	Health   float32
-	MaxHP    float32
-	Flying   bool
-	Creative bool
-	InWater  bool
-	Spawning mathx.Vec3
+	Body      physics.Body
+	Yaw       float32
+	Pitch     float32
+	Health    float32
+	MaxHP     float32
+	Flying    bool
+	Creative  bool
+	HurtPulse bool
+	InWater   bool
+	Spawning  mathx.Vec3
 
 	fallStart    float32
 	falling      bool
@@ -74,6 +75,7 @@ func (p *Player) Damage(amount float32) bool {
 	}
 	p.Health -= amount
 	p.hurtCooldown = 0.4
+	p.HurtPulse = true
 	if p.Health < 0 {
 		p.Health = 0
 	}

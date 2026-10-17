@@ -166,11 +166,12 @@ func (d *ItemDrop) Transparent() bool {
 }
 
 type Manager struct {
-	Mobs       []*Mob
-	Items      []*ItemDrop
-	rng        *rand.Rand
-	nextID     int
-	spawnTimer float32
+	Mobs         []*Mob
+	Items        []*ItemDrop
+	PickupEvents int
+	rng          *rand.Rand
+	nextID       int
+	spawnTimer   float32
 }
 
 func NewManager(seed int64) *Manager {
@@ -322,7 +323,11 @@ func (m *Manager) Update(dt float32, w *world.World, playerPos mathx.Vec3, inv *
 		if d.Age > 0.45 {
 			delta := d.Body.Pos.Add(mathx.Vec3{Y: 0.2}).Sub(playerPos)
 			if delta.Length() < 2.2 {
+				before := d.Count
 				left := inv.Add(d.Item, d.Count)
+				if left < before {
+					m.PickupEvents++
+				}
 				if left <= 0 {
 					d.Dead = true
 				} else {
