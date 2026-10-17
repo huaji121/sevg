@@ -88,3 +88,29 @@ func TestChatScroll(t *testing.T) {
 		t.Fatalf("chat scroll: %d", g.chatScroll)
 	}
 }
+func TestChatArrowKeysMoveCaret(t *testing.T) {
+	g := newTestGame(t)
+	g.chatOpen = true
+	g.chatInsert("abcd")
+	g.onChatKey(sdl.K_LEFT)
+	g.onChatKey(sdl.K_LEFT)
+	if g.chatCaret != 2 {
+		t.Fatalf("left caret = %d", g.chatCaret)
+	}
+	g.chatInsert("X")
+	if string(g.chatInput) != "abXcd" || g.chatCaret != 3 {
+		t.Fatalf("mid insertion = %q caret %d", string(g.chatInput), g.chatCaret)
+	}
+	g.onChatKey(sdl.K_HOME)
+	if g.chatCaret != 0 {
+		t.Fatalf("home caret = %d", g.chatCaret)
+	}
+	g.onChatKey(sdl.K_RIGHT)
+	if g.chatCaret != 1 {
+		t.Fatalf("right caret = %d", g.chatCaret)
+	}
+	g.onChatKey(sdl.K_END)
+	if g.chatCaret != 5 {
+		t.Fatalf("end caret = %d", g.chatCaret)
+	}
+}

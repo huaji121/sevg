@@ -307,6 +307,12 @@ func (g *Game) poll() {
 		case sdl.EVENT_KEY_DOWN:
 			ke := e.KeyboardEvent()
 			if ke.Repeat {
+				if g.chatOpen {
+					switch ke.Key {
+					case sdl.K_LEFT, sdl.K_RIGHT, sdl.K_BACKSPACE, sdl.K_DELETE:
+						g.onChatKey(ke.Key)
+					}
+				}
 				continue
 			}
 			g.onKey(ke.Key)

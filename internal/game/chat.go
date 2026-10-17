@@ -269,28 +269,40 @@ func (g *Game) drawChat(w, h float32) {
 		inputY := y + ph - 40
 		c.Rect(x+12, inputY-6, pw-24, 1, [4]float32{1, 1, 1, 0.20})
 		prompt := "> "
-		input := string(g.chatInput)
 		comp := g.chatComposition
 		maxWidth := pw - 32
-		visible := input
-		for len(visible) > 0 && c.TextWidth(prompt+visible+comp, 1.2) > maxWidth {
-			_, size := decodeFirstRune(visible)
-			visible = visible[size:]
+		caret := g.chatCaret
+		if caret < 0 {
+			caret = 0
 		}
-		if input == "" && comp == "" {
+		if caret > len(g.chatInput) {
+			caret = len(g.chatInput)
+		}
+		textStart := 0
+		for textStart < len(g.chatInput) && c.TextWidth(prompt+string(g.chatInput[textStart:])+comp, 1.2) > maxWidth {
+			textStart++
+		}
+		if caret < textStart {
+			textStart = caret
+		}
+		pre := string(g.chatInput[textStart:caret])
+		post := string(g.chatInput[caret:])
+		if len(g.chatInput) == 0 && comp == "" {
 			c.Text(x+16, inputY, prompt, 1.2, ui.MutedColor)
 			c.Text(x+16+c.TextWidth(prompt, 1.2), inputY, i18n.T("chat.placeholder"), 1.2, ui.MutedColor)
 		} else {
 			c.Text(x+16, inputY, prompt, 1.2, ui.MutedColor)
 			tx := x + 16 + c.TextWidth(prompt, 1.2)
-			c.Text(tx, inputY, visible, 1.2, ui.TextColor)
+			c.Text(tx, inputY, pre, 1.2, ui.TextColor)
+			tx += c.TextWidth(pre, 1.2)
 			if comp != "" {
-				c.Text(tx+c.TextWidth(visible, 1.2), inputY, comp, 1.2, ui.RGBA(255, 214, 120, 255))
+				c.Text(tx, inputY, comp, 1.2, ui.RGBA(255, 214, 120, 255))
+				tx += c.TextWidth(comp, 1.2)
 			}
-		}
-		if g.frame/30%2 == 0 {
-			cx := x + 16 + c.TextWidth(prompt+visible+comp, 1.2) + 1
-			c.Rect(cx, inputY+2, 2, 22, [4]float32{1, 1, 1, 0.9})
+			c.Text(tx, inputY, post, 1.2, ui.TextColor)
+			if g.frame/30%2 == 0 {
+				c.Rect(tx+1, inputY+2, 2, 22, [4]float32{1, 1, 1, 0.9})
+			}
 		}
 		return
 	}
@@ -319,15 +331,6 @@ func (g *Game) drawChat(w, h float32) {
 		c.Rect(16, yy-2, tw+12, lineH, [4]float32{0, 0, 0, 0.30 * alpha})
 		c.Text(22, yy, lines[i].text, scale, [4]float32{1, 1, 1, alpha})
 	}
-}
-
-func decodeFirstRune(s string) (rune, int) {
-	for i, r := range s {
-		if i == 0 {
-			return r, len(string(r))
-		}
-	}
-	return 0, 0
 }
 
 func minF(a, b float32) float32 {
