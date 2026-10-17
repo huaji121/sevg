@@ -114,3 +114,15 @@ func TestChatArrowKeysMoveCaret(t *testing.T) {
 		t.Fatalf("end caret = %d", g.chatCaret)
 	}
 }
+func TestToastCommand(t *testing.T) {
+	g := newTestGame(t)
+	g.chatOpen = true
+	g.chatInput = []rune("/toast 1.5 hello world")
+	g.sendChat()
+	if g.toast != "hello world" {
+		t.Fatalf("toast = %q", g.toast)
+	}
+	if g.toastTime != 1.5 {
+		t.Fatalf("toast duration = %f", g.toastTime)
+	}
+}

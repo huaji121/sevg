@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"sevg/internal/core"
@@ -72,6 +73,26 @@ func (g *Game) executeCommand(cmd string) {
 		}
 		g.setGameMode(mode)
 		g.systemChat(i18n.T("chat.gamemode_changed", g.modeName()))
+	case "toast":
+		if len(fields) < 2 {
+			g.systemChat(i18n.T("chat.toast_usage"))
+			return
+		}
+		msgParts := fields[1:]
+		duration := float32(2.5)
+		if len(msgParts) >= 2 {
+			if v, err := strconv.ParseFloat(msgParts[0], 32); err == nil && v > 0 {
+				duration = float32(v)
+				if duration < 0.5 {
+					duration = 0.5
+				}
+				if duration > 30 {
+					duration = 30
+				}
+				msgParts = msgParts[1:]
+			}
+		}
+		g.notify(strings.Join(msgParts, " "), duration)
 	case "time":
 		if len(fields) != 3 || strings.ToLower(fields[1]) != "set" {
 			g.systemChat(i18n.T("chat.time_usage"))
