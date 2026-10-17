@@ -105,8 +105,7 @@ type Game struct {
 	chatScroll        int
 	chatMessages      []chatMessage
 
-	toast      string
-	toastTime  float32
+	toasts     []toastEntry
 	helpTime   float32
 	debug      bool
 	fullscreen bool
@@ -280,9 +279,7 @@ func (g *Game) run() {
 			break
 		}
 		g.refreshMouse()
-		if g.toastTime > 0 {
-			g.toastTime -= float32(dt)
-		}
+		g.updateToasts(float32(dt))
 		if g.helpTime > 0 {
 			g.helpTime -= float32(dt)
 		}
@@ -662,11 +659,6 @@ func (g *Game) toggleLanguage() {
 		_ = g.Win.SetTitle(i18n.T("window.title"))
 	}
 	g.notify(i18n.T("toast.language", i18n.LocaleName(next)), 2)
-}
-
-func (g *Game) notify(s string, secs float32) {
-	g.toast = s
-	g.toastTime = secs
 }
 
 func (g *Game) shutdown() {

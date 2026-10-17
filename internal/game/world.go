@@ -166,7 +166,7 @@ func (g *Game) startWorld(load bool) error {
 	g.mobs = entity.NewManager(seed)
 	g.time = timeOfDay
 	g.helpTime = 18
-	g.toastTime = 0
+	g.toasts = nil
 	g.saveTimer = 0
 	g.breakProgress = 0
 	g.breakActive = false

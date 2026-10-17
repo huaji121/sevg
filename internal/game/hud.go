@@ -43,17 +43,7 @@ func (g *Game) drawUI() {
 			g.drawDead(w, h)
 		}
 	}
-	if g.toastTime > 0 && g.toast != "" {
-		toastY := float32(58)
-		if g.state != StatePlaying {
-			toastY = 18
-		}
-		tw := g.canv.TextWidth(g.toast, 1.5) + 32
-		const toastH = float32(40)
-		x := w/2 - tw/2
-		g.canv.Panel(x, toastY, tw, toastH, ui.RGBA(20, 25, 30, 230), ui.RGBA(255, 196, 82, 220))
-		g.drawCenteredLabel(ui.Rect{X: x, Y: toastY, W: tw, H: toastH}, g.toast, 1.5, ui.TextColor)
-	}
+	g.drawToasts(w, h)
 }
 
 func (g *Game) drawMenu(w, h float32) {

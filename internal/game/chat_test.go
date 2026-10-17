@@ -119,10 +119,26 @@ func TestToastCommand(t *testing.T) {
 	g.chatOpen = true
 	g.chatInput = []rune("/toast 1.5 hello world")
 	g.sendChat()
-	if g.toast != "hello world" {
-		t.Fatalf("toast = %q", g.toast)
+	if len(g.toasts) != 1 || g.toasts[0].text != "hello world" {
+		t.Fatalf("toasts = %+v", g.toasts)
 	}
-	if g.toastTime != 1.5 {
-		t.Fatalf("toast duration = %f", g.toastTime)
+	if g.toasts[0].duration != 1.5 {
+		t.Fatalf("toast duration = %f", g.toasts[0].duration)
+	}
+}
+func TestToastStackNewestFirstAndExpires(t *testing.T) {
+	g := newTestGame(t)
+	g.notify("old", 2)
+	g.notify("new", 3)
+	if len(g.toasts) != 2 || g.toasts[0].text != "new" || g.toasts[1].text != "old" {
+		t.Fatalf("toast order = %+v", g.toasts)
+	}
+	g.updateToasts(2.1)
+	if len(g.toasts) != 1 || g.toasts[0].text != "new" {
+		t.Fatalf("toast expiry = %+v", g.toasts)
+	}
+	g.updateToasts(1)
+	if len(g.toasts) != 0 {
+		t.Fatalf("toasts did not expire: %+v", g.toasts)
 	}
 }
