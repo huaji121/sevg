@@ -18,7 +18,7 @@ func TestBlockShadersUseSkyAndBlockLight(t *testing.T) {
 	if !strings.Contains(string(vs), "vSky = aSky") || !strings.Contains(string(vs), "vBlock = aBlock") {
 		t.Fatal("block vertex shader does not pass sky/block light varyings")
 	}
-	if !strings.Contains(string(fs), "uSun.rgb * vSky") || !strings.Contains(string(fs), "* vBlock") {
-		t.Fatal("block fragment shader does not combine sky/block light")
+	if !strings.Contains(string(fs), "uSun.rgb * vSky") || !strings.Contains(string(fs), "max(vBlock, dyn)") {
+		t.Fatal("block fragment shader does not combine sky/block and dynamic light")
 	}
 }

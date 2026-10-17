@@ -807,7 +807,7 @@ func (g *Game) updateHeldLight(dt float32) {
 	}
 	pos := g.player.Body.Pos
 	x := int(math.Floor(float64(pos.X)))
-	y := int(math.Floor(float64(pos.Y + 1)))
+	y := int(math.Floor(float64(pos.Y)))
 	z := int(math.Floor(float64(pos.Z)))
 	changed := !g.dynInited || x != g.dynX || y != g.dynY || z != g.dynZ || level != g.dynLevel
 	needsRefresh := g.world.DynamicLightNeedsRefresh()

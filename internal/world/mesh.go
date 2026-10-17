@@ -8,11 +8,12 @@ const (
 )
 
 type Vertex struct {
-	X, Y, Z float32
-	U, V    float32
-	Light   float32
-	Sky     float32
-	Block   float32
+	X, Y, Z    float32
+	U, V       float32
+	Light      float32
+	Sky        float32
+	Block      float32
+	NX, NY, NZ float32
 }
 
 type MeshData struct {
@@ -318,6 +319,7 @@ func addFace(m *MeshData, at func(int, int, int) core.BlockID, solid func(int, i
 		m.Vertices = append(m.Vertices, Vertex{
 			X: float32(ox+bx) + c[0], Y: float32(by) + c[1]*height, Z: float32(oz+bz) + c[2],
 			U: uu, V: vv, Light: light, Sky: sky, Block: blk,
+			NX: float32(f.normal[0]), NY: float32(f.normal[1]), NZ: float32(f.normal[2]),
 		})
 	}
 	m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)
@@ -336,6 +338,7 @@ func addWaterStep(m *MeshData, skyAt, blockAt func(int, int, int) uint8, bx, by,
 			X: float32(ox+bx) + c[0], Y: float32(by) + low + c[1]*(high-low), Z: float32(oz+bz) + c[2],
 			U: u0 + (u1-u0)*f.uv[i][0], V: v0 + (v1-v0)*f.uv[i][1],
 			Light: f.light * 0.92, Sky: sky, Block: blk,
+			NX: float32(f.normal[0]), NY: float32(f.normal[1]), NZ: float32(f.normal[2]),
 		})
 	}
 	m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)

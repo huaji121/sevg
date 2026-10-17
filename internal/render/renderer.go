@@ -255,6 +255,7 @@ func (r *Renderer) createResources() error {
 		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT, Location: 2, Offset: 20},
 		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT, Location: 3, Offset: 24},
 		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT, Location: 4, Offset: 28},
+		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT3, Location: 5, Offset: 32},
 	}
 	blockLayout.VertexBufferDescriptions[0].Pitch = blockVertexSize
 	r.blockOpaque, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, false, true, true)
@@ -365,7 +366,7 @@ func (r *Renderer) createResources() error {
 	return err
 }
 
-const blockVertexSize = 32
+const blockVertexSize = 44
 
 func vertexLayout(formatA, formatB sdl.GPUVertexElementFormat) sdl.GPUVertexInputState {
 	return sdl.GPUVertexInputState{

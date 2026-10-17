@@ -5,6 +5,7 @@ layout(location = 2) in float vDist;
 layout(location = 3) in float vSky;
 layout(location = 4) in float vBlock;
 layout(location = 5) in vec3 vWorld;
+layout(location = 6) in vec3 vNormal;
 
 layout(set = 2, binding = 0) uniform sampler2D uTex;
 layout(set = 2, binding = 1) uniform sampler2DArray uDynTex;
@@ -23,13 +24,25 @@ layout(location = 0) out vec4 oColor;
 void main() {
     vec4 tex = texture(uTex, vUV);
     if (tex.a < 0.035) discard;
-    // Keep unlit caves readable instead of clipping to pure black.
-    vec3 light = vec3(0.13, 0.14, 0.17) + u.uSun.rgb * vSky + vec3(1.0, 0.72, 0.42) * vBlock;
-    // Player-held torch: a sampled 3D light volume, so all chunks update in
-    // the same frame instead of being remeshed one at a time.
+    // Player-held torch: a sampled 2D-array light volume, so all chunks
+    // update in the same frame instead of being remeshed one at a time.
     float dyn = 0.0;
     if (u.uDyn.w > 0.5) {
-        vec3 lp = (vWorld - u.uDyn.xyz) / u.uDyn.w;
+        vec3 n = vNormal;
+        if (length(n) < 0.001) {
+            n = cross(dFdx(vWorld), dFdy(vWorld));
+        }
+        float nl = length(n);
+        vec3 samplePos = vWorld;
+        if (nl > 0.00001) {
+            n /= nl;
+            vec3 viewDir = normalize(u.uCam.xyz - vWorld);
+            if (dot(n, viewDir) < 0.0) n = -n;
+            // Sample the air cell just outside the surface, matching the
+            // per-vertex block-light lookup instead of averaging the solid.
+            samplePos += n * 0.55;
+        }
+        vec3 lp = (samplePos - u.uDyn.xyz) / u.uDyn.w;
         if (all(greaterThanEqual(lp, vec3(0.0))) && all(lessThanEqual(lp, vec3(1.0)))) {
             float layer = clamp(lp.z, 0.0, 1.0) * (u.uDyn.w - 1.0);
             float l0 = floor(layer);
@@ -39,8 +52,12 @@ void main() {
             dyn = mix(d0, d1, f);
         }
     }
-    light += vec3(1.0, 0.72, 0.42) * dyn;
-    vec3 col = tex.rgb * vLight * light;
+    // Sky/ambient keep vertex AO, but static and held torch light use the
+    // same unoccluded contribution. This prevents held light from showing
+    // block-shaped AO that a placed torch does not have.
+    vec3 ambient = vec3(0.13, 0.14, 0.17) + u.uSun.rgb * vSky;
+    vec3 torch = vec3(1.0, 0.72, 0.42) * max(vBlock, dyn);
+    vec3 col = tex.rgb * (vLight * ambient + torch);
     float fog = clamp((vDist - u.uFogParams.x) / max(u.uFogParams.y - u.uFogParams.x, 0.001), 0.0, 1.0);
     col = mix(col, u.uFogColor.rgb, fog * 0.92);
     oColor = vec4(col, tex.a);
