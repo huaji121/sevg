@@ -239,9 +239,11 @@ drained:
 		g.requestChunks(center)
 	}
 
-	// Remesh a few dirty chunks per frame, closest first.
+	// Remesh one dirty chunk per frame, closest first. Uploading a chunk
+	// creates GPU buffers and submits a copy pass, so doing several in one
+	// frame produces visible hitches while streaming.
 	dirty := g.world.DirtyChunks(center)
-	budget := 3
+	budget := 1
 	for _, cp := range dirty {
 		if cheb(cp, center) > g.opts.RenderDist+1 {
 			continue

@@ -226,7 +226,7 @@ func (g *Game) drawDebug(w float32) {
 	}
 	lines := []string{
 		i18n.T("hud.debug_title"),
-		i18n.T("hud.fps", g.fps),
+		i18n.T("hud.fps", g.fps, g.frameMs),
 		i18n.T("hud.pos", g.player.Body.Pos.X, g.player.Body.Pos.Y, g.player.Body.Pos.Z),
 		i18n.T("hud.chunk", worldChunkX(g.player.Body.Pos.X), worldChunkZ(g.player.Body.Pos.Z)),
 		i18n.T("hud.biome", biome),

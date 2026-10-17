@@ -123,6 +123,9 @@ func New(win *sdl.Window, w, h int, fontAtlas ui.FontAtlas) (*Renderer, error) {
 		dev.Destroy()
 		return nil, fmt.Errorf("claim window: %w", err)
 	}
+	if err := dev.SetSwapchainParameters(win, sdl.GPU_SWAPCHAINCOMPOSITION_SDR, sdl.GPU_PRESENTMODE_VSYNC); err != nil {
+		fmt.Printf("vsync unavailable: %v\n", err)
+	}
 	r := &Renderer{
 		Dev: dev, Win: win, W: w, H: h,
 		fontAtlas:  fontAtlas,

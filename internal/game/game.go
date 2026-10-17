@@ -78,9 +78,12 @@ type Game struct {
 	debug      bool
 	fullscreen bool
 
-	fps   float64
-	frame int
-	quit  bool
+	fps        float64
+	frameMs    float64
+	fpsFrames  int
+	fpsElapsed float64
+	frame      int
+	quit       bool
 
 	saveTimer float32
 	unloadT   float32
@@ -193,15 +196,22 @@ func (g *Game) setState(s State) {
 func (g *Game) run() {
 	for !g.quit {
 		now := time.Now()
-		dt := now.Sub(g.lastTime).Seconds()
+		rawDt := now.Sub(g.lastTime).Seconds()
 		g.lastTime = now
+		if rawDt <= 0 {
+			rawDt = 1.0 / 1000
+		}
+		g.fpsFrames++
+		g.fpsElapsed += rawDt
+		if g.fpsElapsed >= 0.5 {
+			g.fps = float64(g.fpsFrames) / g.fpsElapsed
+			g.frameMs = 1000 * g.fpsElapsed / float64(g.fpsFrames)
+			g.fpsFrames, g.fpsElapsed = 0, 0
+		}
+		dt := rawDt
 		if dt > 0.1 {
 			dt = 0.1
 		}
-		if dt <= 0 {
-			dt = 1.0 / 1000
-		}
-		g.fps = g.fps*0.92 + (1/dt)*0.08
 		g.frame++
 
 		g.poll()
