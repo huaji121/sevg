@@ -80,6 +80,7 @@ func (g *Game) mineBlock(dt float32, hit world.RayHit) {
 		if g.world.GetBlock(x, y, z) != b {
 			return
 		}
+		g.spawnBlockParticles(b, hit.Pos, hit.Normal, 18)
 		g.world.SetBlock(x, y, z, core.Air)
 		g.breakCool = 0.12
 		g.breakActive = false
@@ -105,6 +106,11 @@ func (g *Game) mineBlock(dt float32, hit world.RayHit) {
 	if seconds < 0.055 {
 		seconds = 0.055
 	}
+	g.particleTimer -= dt
+	if g.particleTimer <= 0 {
+		g.spawnBlockParticles(hit.Block, hit.Pos, hit.Normal, 1)
+		g.particleTimer = 0.085
+	}
 	g.breakProgress += dt / seconds
 	if g.breakProgress < 1 {
 		return
@@ -119,6 +125,7 @@ func (g *Game) mineBlock(dt float32, hit world.RayHit) {
 	if g.world.GetBlock(x, y, z) != b {
 		return
 	}
+	g.spawnBlockParticles(b, hit.Pos, hit.Normal, 18)
 	g.world.SetBlock(x, y, z, core.Air)
 	drop := dropForBlock(b)
 	if drop != core.ItemNone {

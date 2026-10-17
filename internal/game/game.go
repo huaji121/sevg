@@ -78,6 +78,8 @@ type Game struct {
 	breakBlock    core.BlockID
 	breakProgress float32
 	breakActive   bool
+	particles     []breakParticle
+	particleTimer float32
 	targetValid   bool
 	attackCool    float32
 	placeCool     float32
@@ -492,6 +494,7 @@ func (g *Game) updatePlaying(dt float32) {
 	g.ageChat(dt)
 	g.player.Update(dt, g.world, in)
 	g.mobs.Update(dt, g.world, g.player.Body.Pos, &g.inv)
+	g.updateParticles(dt)
 	g.time += float64(dt) / 600.0
 	if g.time >= 1 {
 		g.time -= 1
