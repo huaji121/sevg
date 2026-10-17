@@ -3,6 +3,7 @@ package render
 import (
 	"fmt"
 	"image/png"
+	"sync"
 
 	"sevg/assets"
 	"sevg/internal/core"
@@ -24,7 +25,17 @@ var blockTextureFiles = [core.TileTileCount]string{
 
 // BuildAtlas assembles the embedded tile textures into the runtime atlas and
 // fills the gutters by clamping to the nearest tile edge.
+var (
+	atlasOnce sync.Once
+	atlasData []byte
+)
+
 func BuildAtlas() []byte {
+	atlasOnce.Do(func() { atlasData = buildAtlas() })
+	return atlasData
+}
+
+func buildAtlas() []byte {
 	const size = core.AtlasW * core.AtlasH
 	img := make([]byte, size*4)
 	for tile, name := range blockTextureFiles {

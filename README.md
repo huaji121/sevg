@@ -92,7 +92,7 @@ SEVG 的目标不是复刻完整的 Minecraft，而是提供一个 **结构清�
 - 聊天指令：`/gamemode 0` 生存模式，`/gamemode 1` 创造模式
 - 按 `/` 直接打开指令聊天，和 Minecraft 一致
 - 生命条、快捷栏、物品名称、准星、挖掘进度
-- 背包/快捷栏物品图标来自 `assets/textures/items/`，方块、植物、工具和材料均可在 PNG 中替换
+- 方块预览图由游戏从方块贴图实时生成；工具、食物、材料等纯贴图物品使用 `assets/textures/items/` 中的 PNG
 - F3 调试信息
 - 多语言标题、暂停、背包、提示与调试文本
 - 水下屏幕染色
@@ -253,9 +253,9 @@ py run.py -seed 12345 -renderdist 8
 │   ├── i18n/                   # 多语言文本、方块/物品/群系名称
 │   ├── ui/                     # CJK 系统字体图集与 2D 画布
 │   └── game/                   # 游戏循环、输入、HUD、菜单、存档、流式调度、语言切换
-├── assets/textures/            # 可编辑的方块与物品贴图素材
+├── assets/textures/            # 可编辑贴图素材
 │   ├── blocks/                 # 16 × 16 方块、裂纹、调色板贴图
-│   └── items/                  # 40 × 40 物品图标
+│   └── items/                  # 40 × 40 纯贴图物品图标（工具、食物、材料）
 ├── cmd/atlasdump/              # 可选：导出材质图集 PNG
 ├── docs/                       # 截图
 ├── build.py / run.py / test.py # Python 开发脚本

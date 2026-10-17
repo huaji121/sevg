@@ -7,7 +7,11 @@ import (
 )
 
 func TestBuildItemIcons(t *testing.T) {
-	icons := buildItemIcons()
+	atlas := make([]byte, core.AtlasW*core.AtlasH*4)
+	for i := 0; i < len(atlas); i += 4 {
+		atlas[i], atlas[i+1], atlas[i+2], atlas[i+3] = 255, 255, 255, 255
+	}
+	icons := buildItemIcons(atlas)
 	items := []core.ItemID{
 		core.ItemPlanks, core.ItemGlass, core.ItemTallGrass,
 		core.ItemStonePickaxe, core.ItemWoodSword, core.ItemApple,
@@ -35,7 +39,11 @@ func TestBuildItemIcons(t *testing.T) {
 }
 
 func TestFontAtlasPacksIconsAndSpaces(t *testing.T) {
-	fa := BuildFontAtlas([]rune("A中"))
+	atlas := make([]byte, core.AtlasW*core.AtlasH*4)
+	for i := 0; i < len(atlas); i += 4 {
+		atlas[i], atlas[i+1], atlas[i+2], atlas[i+3] = 255, 255, 255, 255
+	}
+	fa := BuildFontAtlas([]rune("A中"), atlas)
 	if _, ok := fa.Icons[core.ItemPlanks]; !ok {
 		t.Fatal("plank icon was not packed into the font atlas")
 	}
