@@ -370,6 +370,10 @@ func (g *Game) handleUIClick(right bool) {
 			g.applyVideoChange(4, 0)
 			return
 		}
+		if l.vsync.Contains(g.mouseX, g.mouseY) {
+			g.applyVideoChange(5, 0)
+			return
+		}
 		for i := 0; i < 3; i++ {
 			if l.minus[i].Contains(g.mouseX, g.mouseY) {
 				g.applyVideoChange(i, -1)

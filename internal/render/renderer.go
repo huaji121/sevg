@@ -92,6 +92,7 @@ type Renderer struct {
 
 	swapFormat  sdl.GPUTextureFormat
 	depthFormat sdl.GPUTextureFormat
+	VSync       bool
 	depth       *sdl.GPUTexture
 
 	atlasTex  *sdl.GPUTexture
@@ -140,6 +141,7 @@ func New(win *sdl.Window, w, h int, fontAtlas ui.FontAtlas) (*Renderer, error) {
 		Dev: dev, Win: win, W: w, H: h,
 		fontAtlas:  fontAtlas,
 		swapFormat: dev.SwapchainTextureFormat(win),
+		VSync:      true,
 		chunks:     make(map[[2]int]*gpuChunk),
 	}
 	if err := r.initDepthFormat(); err != nil {
@@ -1112,4 +1114,24 @@ func uiVertBytes(c *ui.Canvas) []byte {
 		return nil
 	}
 	return unsafe.Slice((*byte)(unsafe.Pointer(&c.Verts[0])), len(c.Verts)*32)
+}
+
+// SetVSync switches the swapchain between vertical sync and an immediate /
+// mailbox present mode. Turning it off allows the game to render above the
+// monitor refresh rate.
+func (r *Renderer) SetVSync(on bool) error {
+	modes := []sdl.GPUPresentMode{sdl.GPU_PRESENTMODE_IMMEDIATE, sdl.GPU_PRESENTMODE_MAILBOX}
+	if on {
+		modes = []sdl.GPUPresentMode{sdl.GPU_PRESENTMODE_VSYNC}
+	}
+	var lastErr error
+	for _, m := range modes {
+		if err := r.Dev.SetSwapchainParameters(r.Win, sdl.GPU_SWAPCHAINCOMPOSITION_SDR, m); err == nil {
+			r.VSync = on
+			return nil
+		} else {
+			lastErr = err
+		}
+	}
+	return lastErr
 }

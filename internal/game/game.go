@@ -32,6 +32,7 @@ type Options struct {
 	FOV            int
 	Fullscreen     bool
 	SmoothLighting bool
+	VSync          bool
 }
 
 type State int
@@ -187,6 +188,11 @@ func Run(opts Options) error {
 	gfx, err := render.New(win, opts.Width, opts.Height, fontAtlas)
 	if err != nil {
 		return err
+	}
+	if !opts.VSync {
+		if err := gfx.SetVSync(false); err != nil {
+			fmt.Println("disable vsync:", err)
+		}
 	}
 	g := &Game{
 		opts:       opts,
