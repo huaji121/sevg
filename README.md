@@ -101,6 +101,7 @@ SEVG 的目标不是复刻完整的 Minecraft，而是提供一个 **结构清�
 ### 环境
 
 - Go **1.27+**（开发环境为 Go 1.27.2）
+- Python **3.10+**（仅用于开发脚本，游戏本身不需要 Python）
 - 64 位 Windows / Linux / macOS
 - 支持 **Vulkan** 的 GPU 与驱动（当前渲染器只打包了 SPIR-V 着色器）
 - 不需要 CGo、GCC 或手动安装 SDL3
@@ -110,7 +111,7 @@ SDL3 通过 `github.com/Zyko0/go-sdl3/bin/binsdl` 内嵌并在运行时释放；
 ```powershell
 go mod tidy
 go build -o sevg.exe .
-.sevg.exe
+.\sevg.exe
 ```
 
 或者直接：
@@ -119,12 +120,18 @@ go build -o sevg.exe .
 go run .
 ```
 
-快捷脚本：
+快捷脚本（Windows 使用 `py`；Linux/macOS 使用 `python3`）：
 
 ```powershell
-.uild.ps1
-.un.ps1
-.	est.ps1
+py build.py
+py run.py
+py test.py
+```
+
+也可以给脚本传游戏参数：
+
+```powershell
+py run.py -seed 12345 -renderdist 8
 ```
 
 ### 命令行参数
@@ -142,9 +149,9 @@ go run .
 示例：
 
 ```powershell
-.sevg.exe -seed 12345 -renderdist 8
-.sevg.exe -continue -save mysave.gob
-.sevg.exe -smoke 120 -seed 1
+.\sevg.exe -seed 12345 -renderdist 8
+.\sevg.exe -continue -save mysave.gob
+.\sevg.exe -smoke 120 -seed 1
 ```
 
 ---
@@ -199,8 +206,9 @@ go run .
 │   └── game/                   # 游戏循环、输入、HUD、菜单、存档、流式调度
 ├── cmd/atlasdump/              # 可选：导出材质图集 PNG
 ├── docs/                       # 截图
-├── build.ps1 / run.ps1 / test.ps1
-└── shaders.ps1                 # 重新编译 GLSL → SPIR-V
+├── build.py / run.py / test.py # Python 开发脚本
+├── shaders.py                  # 重新编译 GLSL → SPIR-V
+└── dev.py                      # 脚本共用的 Go/glslang 查找逻辑
 ```
 
 ---
@@ -225,10 +233,10 @@ go run .
 预编译的 `.spv` 已提交并嵌入二进制。修改 GLSL 后重新生成：
 
 ```powershell
-.shaders.ps1
+py shaders.py
 ```
 
-需要 [glslang](https://github.com/KhronosGroup/glslang/releases) 的 `glslang.exe`。脚本会优先使用 `PATH`，其次使用 `.tools/glslang/bin/glslang.exe`。
+需要 [glslang](https://github.com/KhronosGroup/glslang/releases) 的 `glslang.exe`。脚本会优先使用 `PATH` / `GLSLANG`，其次使用 `.tools/glslang/bin/` 下的 `glslang`。
 
 ---
 
@@ -284,7 +292,7 @@ go test ./...
 冒烟测试：
 
 ```powershell
-.sevg.exe -smoke 120 -seed 12345
+.\sevg.exe -smoke 120 -seed 12345
 ```
 
 ---

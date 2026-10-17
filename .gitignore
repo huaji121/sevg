@@ -20,6 +20,10 @@ interact*.png
 # Local shader toolchain (optional)
 .tools/
 
+# Python
+__pycache__/
+*.pyc
+
 # Editor/OS
 .vscode/
 .idea/
