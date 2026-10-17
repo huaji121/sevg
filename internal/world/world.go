@@ -9,13 +9,21 @@ import (
 )
 
 type Chunk struct {
-	Pos    ChunkPos
-	Blocks []core.BlockID
-	Dirty  bool
+	Pos        ChunkPos
+	Blocks     []core.BlockID
+	SkyLight   []uint8
+	BlockLight []uint8
+	Dirty      bool
 }
 
 func NewChunk(pos ChunkPos) *Chunk {
-	return &Chunk{Pos: pos, Blocks: make([]core.BlockID, ChunkArea), Dirty: true}
+	return &Chunk{
+		Pos:        pos,
+		Blocks:     make([]core.BlockID, ChunkArea),
+		SkyLight:   make([]uint8, ChunkArea),
+		BlockLight: make([]uint8, ChunkArea),
+		Dirty:      true,
+	}
 }
 
 func (c *Chunk) GetLocal(x, y, z int) core.BlockID {
@@ -23,6 +31,39 @@ func (c *Chunk) GetLocal(x, y, z int) core.BlockID {
 		return core.Air
 	}
 	return c.Blocks[index(x, y, z)]
+}
+
+// RebuildSkyLight recomputes direct vertical sky light for this chunk. It is
+// intentionally column based: roofs and caves are dark, while the surface is
+// fully lit. Leaves and water attenuate the column.
+func (c *Chunk) RebuildSkyLight() {
+	for x := 0; x < ChunkSize; x++ {
+		for z := 0; z < ChunkSize; z++ {
+			level := 15
+			for y := ChunkHeight - 1; y >= 0; y-- {
+				i := index(x, y, z)
+				b := c.Blocks[i]
+				if b.Opaque() {
+					level = 0
+					c.SkyLight[i] = 0
+					continue
+				}
+				switch b {
+				case core.Water:
+					if level > 0 {
+						level--
+					}
+				case core.Leaves:
+					if level > 1 {
+						level -= 2
+					} else {
+						level = 0
+					}
+				}
+				c.SkyLight[i] = uint8(level)
+			}
+		}
+	}
 }
 
 func (c *Chunk) SetLocal(x, y, z int, b core.BlockID) bool {
@@ -45,11 +86,12 @@ type EditRecord struct {
 }
 
 type World struct {
-	mu     sync.RWMutex
-	Seed   int64
-	Gen    *Generator
-	chunks map[[2]int]*Chunk
-	edits  map[[2]int]map[int]core.BlockID
+	mu           sync.RWMutex
+	Seed         int64
+	Gen          *Generator
+	chunks       map[[2]int]*Chunk
+	edits        map[[2]int]map[int]core.BlockID
+	lightSources int
 }
 
 func New(seed int64) *World {
@@ -85,6 +127,19 @@ func (w *World) ensureLocked(pos ChunkPos) (*Chunk, bool) {
 	}
 	c.Dirty = true
 	w.chunks[key] = c
+	c.RebuildSkyLight()
+	needLight := w.lightSources > 0
+	if !needLight {
+		for _, b := range c.Blocks {
+			if b.Def().Light > 0 {
+				needLight = true
+				break
+			}
+		}
+	}
+	if needLight {
+		w.rebuildBlockLightLocked()
+	}
 	for _, n := range []ChunkPos{{pos.X + 1, pos.Z}, {pos.X - 1, pos.Z}, {pos.X, pos.Z + 1}, {pos.X, pos.Z - 1}} {
 		if nc := w.chunks[n.Key()]; nc != nil {
 			nc.Dirty = true
@@ -145,6 +200,8 @@ func (w *World) SetBlock(wx, wy, wz int, b core.BlockID) bool {
 	if !c.SetLocal(lx, wy, lz, b) {
 		return false
 	}
+	c.RebuildSkyLight()
+	w.rebuildBlockLightLocked()
 	key := cp.Key()
 	if w.edits[key] == nil {
 		w.edits[key] = make(map[int]core.BlockID)
@@ -401,4 +458,90 @@ func sortByDistance(ps []ChunkPos, center ChunkPos) {
 			ps[j-1], ps[j] = ps[j], ps[j-1]
 		}
 	}
+}
+
+type lightNode struct {
+	x, y, z int
+	level   uint8
+}
+
+// rebuildBlockLightLocked clears and rebuilds block light across every loaded
+// chunk. Light sources are sparse, so a single BFS is cheap even with many
+// loaded chunks.
+func (w *World) rebuildBlockLightLocked() {
+	for _, c := range w.chunks {
+		clear(c.BlockLight)
+	}
+	queue := make([]lightNode, 0, 64)
+	sources := 0
+	for _, c := range w.chunks {
+		for i, b := range c.Blocks {
+			l := b.Def().Light
+			if l == 0 {
+				continue
+			}
+			c.BlockLight[i] = l
+			x := i % ChunkSize
+			y := i / (ChunkSize * ChunkSize)
+			z := (i / ChunkSize) % ChunkSize
+			sources++
+			queue = append(queue, lightNode{
+				x: c.Pos.X*ChunkSize + x, y: y, z: c.Pos.Z*ChunkSize + z, level: l,
+			})
+		}
+	}
+	w.lightSources = sources
+	dirs := [6][3]int{{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}
+	for head := 0; head < len(queue); head++ {
+		n := queue[head]
+		next := n.level - 1
+		if next == 0 {
+			continue
+		}
+		for _, d := range dirs {
+			x, y, z := n.x+d[0], n.y+d[1], n.z+d[2]
+			if y < 0 || y >= ChunkHeight {
+				continue
+			}
+			cp := ChunkOf(x, z)
+			c := w.chunks[cp.Key()]
+			if c == nil {
+				continue
+			}
+			i := index(Mod(x, ChunkSize), y, Mod(z, ChunkSize))
+			if c.Blocks[i].Opaque() || next <= c.BlockLight[i] {
+				continue
+			}
+			c.BlockLight[i] = next
+			queue = append(queue, lightNode{x: x, y: y, z: z, level: next})
+		}
+	}
+}
+
+func (w *World) SkyLightAt(wx, wy, wz int) uint8 {
+	if wy < 0 || wy >= ChunkHeight {
+		return 0
+	}
+	cp := ChunkOf(wx, wz)
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	c := w.chunks[cp.Key()]
+	if c == nil {
+		return 15
+	}
+	return c.SkyLight[index(Mod(wx, ChunkSize), wy, Mod(wz, ChunkSize))]
+}
+
+func (w *World) BlockLightAt(wx, wy, wz int) uint8 {
+	if wy < 0 || wy >= ChunkHeight {
+		return 0
+	}
+	cp := ChunkOf(wx, wz)
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	c := w.chunks[cp.Key()]
+	if c == nil {
+		return 0
+	}
+	return c.BlockLight[index(Mod(wx, ChunkSize), wy, Mod(wz, ChunkSize))]
 }

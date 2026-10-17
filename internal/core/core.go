@@ -31,6 +31,7 @@ const (
 	Ice
 	Obsidian
 	Wool
+	Torch
 	BlockCount
 )
 
@@ -63,6 +64,7 @@ const (
 	TileIce
 	TileObsidian
 	TileWool
+	TileTorch
 	TileCrack0
 	TileCrack1
 	TileCrack2
@@ -132,6 +134,7 @@ const (
 	ItemIronSword
 	ItemIronPickaxe
 	ItemWool
+	ItemTorch
 	ItemCount
 )
 
@@ -150,6 +153,7 @@ type BlockDef struct {
 	Opaque   bool
 	Liquid   bool
 	Cross    bool
+	Light    uint8
 	Hardness float32
 	Tiles    [6]uint8 // +X, -X, +Y, -Y, +Z, -Z
 	Drop     ItemID
@@ -181,6 +185,7 @@ var BlockDefs = [BlockCount]BlockDef{
 	Ice:        {Name: "Ice", Solid: true, Opaque: false, Hardness: 0.5, Tiles: [6]uint8{TileIce, TileIce, TileIce, TileIce, TileIce, TileIce}, Drop: ItemNone},
 	Obsidian:   {Name: "Obsidian", Solid: true, Opaque: true, Hardness: 8.0, Tiles: [6]uint8{TileObsidian, TileObsidian, TileObsidian, TileObsidian, TileObsidian, TileObsidian}},
 	Wool:       {Name: "Wool", Solid: true, Opaque: true, Hardness: 0.6, Tiles: [6]uint8{TileWool, TileWool, TileWool, TileWool, TileWool, TileWool}},
+	Torch:      {Name: "Torch", Cross: true, Light: 14, Hardness: 0.05, Tiles: [6]uint8{TileTorch, TileTorch, TileTorch, TileTorch, TileTorch, TileTorch}, Drop: ItemTorch},
 }
 
 func (b BlockID) Valid() bool { return b < BlockCount }
@@ -249,6 +254,7 @@ var ItemDefs = [ItemCount]ItemDef{
 	ItemIronSword:    {Name: "Iron Sword", Kind: KindTool, MaxStack: 1, Color: [3]float32{0.82, 0.82, 0.86}, Damage: 7, Mining: 1.2},
 	ItemIronPickaxe:  {Name: "Iron Pickaxe", Kind: KindTool, MaxStack: 1, Color: [3]float32{0.84, 0.84, 0.88}, Damage: 3, Mining: 4.0},
 	ItemWool:         {Name: "Wool", Kind: KindBlock, Block: Wool, MaxStack: 99, Color: [3]float32{0.92, 0.92, 0.90}},
+	ItemTorch:        {Name: "Torch", Kind: KindBlock, Block: Torch, MaxStack: 99, Color: [3]float32{0.95, 0.58, 0.18}},
 }
 
 func init() {
@@ -295,6 +301,8 @@ func init() {
 			blockItems[id] = ItemObsidian
 		case Wool:
 			blockItems[id] = ItemWool
+		case Torch:
+			blockItems[id] = ItemTorch
 		}
 	}
 	// Flowers and tall grass are picked up and placeable.

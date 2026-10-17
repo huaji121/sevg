@@ -26,7 +26,9 @@ var translations = map[string]map[string]string{
 		"chat.system":           "系统",
 		"chat.gamemode_changed": "游戏模式：%s",
 		"chat.gamemode_usage":   "用法：/gamemode 0|1（0 生存，1 创造）",
-		"chat.command_help":     "指令：/gamemode 0|1",
+		"chat.command_help":     "指令：/gamemode 0|1 · /time set day|noon|night|midnight",
+		"chat.time_usage":       "用法：/time set day|noon|night|midnight",
+		"chat.time_set":         "时间设为 %s",
 		"chat.command_unknown":  "未知指令：%s",
 		"chat.you":              "你",
 		"chat.placeholder":      "输入消息…",
@@ -107,6 +109,7 @@ var translations = map[string]map[string]string{
 		"hud.target":      "目标 %s",
 		"hud.mode":        "模式：%s",
 		"hud.fly":         "飞行 %s",
+		"hud.light":       "亮度：天空 %d / 方块 %d",
 		"hud.target_none": "-",
 		"hud.target_pos":  "%d %d %d",
 
@@ -136,7 +139,9 @@ var translations = map[string]map[string]string{
 		"chat.system":           "SYSTEM",
 		"chat.gamemode_changed": "Game mode: %s",
 		"chat.gamemode_usage":   "Usage: /gamemode 0|1 (0 survival, 1 creative)",
-		"chat.command_help":     "Commands: /gamemode 0|1",
+		"chat.command_help":     "Commands: /gamemode 0|1 - /time set day|noon|night|midnight",
+		"chat.time_usage":       "Usage: /time set day|noon|night|midnight",
+		"chat.time_set":         "Time set to %s",
 		"chat.command_unknown":  "Unknown command: %s",
 		"chat.you":              "You",
 		"chat.placeholder":      "Type a message...",
@@ -217,6 +222,7 @@ var translations = map[string]map[string]string{
 		"hud.target":      "TARGET %s",
 		"hud.mode":        "MODE: %s",
 		"hud.fly":         "FLY %s",
+		"hud.light":       "LIGHT sky %d / block %d",
 		"hud.target_none": "-",
 		"hud.target_pos":  "%d %d %d",
 
@@ -247,7 +253,7 @@ var zhBlockNames = map[core.BlockID]string{
 	core.Snow: "雪", core.SnowyGrass: "积雪草方块", core.Cactus: "仙人掌", core.Glass: "玻璃",
 	core.Bedrock: "基岩", core.Gravel: "沙砾", core.Flower: "花", core.TallGrass: "高草",
 	core.Brick: "砖块", core.StoneBrick: "石砖", core.Ice: "冰", core.Obsidian: "黑曜石",
-	core.Wool: "羊毛",
+	core.Wool: "羊毛", core.Torch: "火把",
 }
 
 var zhItemNames = map[core.ItemID]string{
@@ -259,7 +265,7 @@ var zhItemNames = map[core.ItemID]string{
 	core.ItemStoneBrick: "石砖", core.ItemIce: "冰", core.ItemObsidian: "黑曜石",
 	core.ItemStick: "木棍", core.ItemApple: "苹果", core.ItemCoal: "煤炭",
 	core.ItemIronIngot: "铁锭", core.ItemWoodSword: "木剑", core.ItemStonePickaxe: "石镐",
-	core.ItemIronSword: "铁剑", core.ItemIronPickaxe: "铁镐", core.ItemWool: "羊毛",
+	core.ItemIronSword: "铁剑", core.ItemIronPickaxe: "铁镐", core.ItemWool: "羊毛", core.ItemTorch: "火把",
 }
 
 var zhBiomeNames = map[world.Biome]string{

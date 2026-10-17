@@ -218,15 +218,23 @@ func (g *Game) drawHUD(w, h float32) {
 func (g *Game) drawDebug(w float32) {
 	c := g.canv
 	px, py := float32(24), float32(86)
-	c.Panel(px, py, 380, 276, ui.RGBA(8, 12, 16, 220), ui.RGBA(80, 100, 110, 180))
+	c.Panel(px, py, 380, 300, ui.RGBA(8, 12, 16, 220), ui.RGBA(80, 100, 110, 180))
 	biome := i18n.T("common.unknown")
 	target := i18n.T("hud.target_none")
 	if g.player != nil && g.world != nil {
 		_, b := g.world.Gen.HeightAt(int(g.player.Body.Pos.X), int(g.player.Body.Pos.Z))
 		biome = i18n.BiomeName(b)
 	}
-	if g.breakActive {
+	if g.targetValid {
 		target = i18n.T("hud.target_pos", g.targetPos[0], g.targetPos[1], g.targetPos[2])
+	}
+	sky, block := uint8(0), uint8(0)
+	if g.player != nil && g.world != nil {
+		x := int(math.Floor(float64(g.player.Body.Pos.X)))
+		y := int(math.Floor(float64(g.player.Body.Pos.Y)))
+		z := int(math.Floor(float64(g.player.Body.Pos.Z)))
+		sky = g.world.SkyLightAt(x, y, z)
+		block = g.world.BlockLightAt(x, y, z)
 	}
 	lines := []string{
 		i18n.T("hud.debug_title"),
@@ -240,6 +248,7 @@ func (g *Game) drawDebug(w float32) {
 		i18n.T("hud.chunk_stats", g.world.Loaded(), len(g.meshed)),
 		i18n.T("hud.mob_stats", g.mobs.MobCount(), g.mobs.ItemCount()),
 		i18n.T("hud.target", target),
+		i18n.T("hud.light", sky, block),
 		i18n.T("hud.fly", onOff(g.player.Flying)),
 	}
 	for i, line := range lines {
@@ -310,8 +319,8 @@ func (g *Game) drawSurvivalInventory(w, h float32) {
 		// Output count badge.
 		c.Text(r.X+r.W-30, r.Y+3, fmt.Sprintf("x%d", rec.Output.Count), 1.0, ui.Accent)
 	}
-	c.Text(cx, p.Y+402, i18n.T("inventory.tip1"), 0.85, ui.MutedColor)
-	c.Text(cx, p.Y+420, i18n.T("inventory.tip2"), 0.85, ui.MutedColor)
+	c.Text(cx, p.Y+424, i18n.T("inventory.tip1"), 0.85, ui.MutedColor)
+	c.Text(cx, p.Y+442, i18n.T("inventory.tip2"), 0.85, ui.MutedColor)
 
 	// Tooltip for the hovered inventory slot.
 	for vis := 0; vis < core.InventorySlots; vis++ {
@@ -519,7 +528,7 @@ func (g *Game) recipeRects() []ui.Rect {
 	y := p.Y + 70
 	out := make([]ui.Rect, len(recipes))
 	for i := range out {
-		out[i] = ui.Rect{X: x, Y: y + float32(i)*40, W: 240, H: 36}
+		out[i] = ui.Rect{X: x, Y: y + float32(i)*38, W: 240, H: 34}
 	}
 	return out
 }
@@ -757,7 +766,7 @@ func addIconQuad(m *world.MeshData, a, b, c, d mathx.Vec3, uv [4][2]float32, lig
 	for i, p := range [4]mathx.Vec3{a, b, c, d} {
 		m.Vertices = append(m.Vertices, world.Vertex{
 			X: p.X, Y: p.Y, Z: p.Z,
-			U: uv[i][0], V: uv[i][1], Light: light,
+			U: uv[i][0], V: uv[i][1], Light: light, Sky: 1,
 		})
 	}
 	m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)
@@ -788,7 +797,7 @@ func appendPlant(m *world.MeshData, c mathx.Vec3, width, height float32, block c
 			m.Vertices = append(m.Vertices, world.Vertex{
 				X: q[i].X, Y: q[i].Y, Z: q[i].Z,
 				U: u0 + (u1-u0)*uvs[i][0], V: v0 + (v1-v0)*uvs[i][1],
-				Light: 0.92,
+				Light: 0.92, Sky: 1,
 			})
 		}
 		m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)
@@ -866,7 +875,7 @@ func appendBoxFaces(m *world.MeshData, min, max mathx.Vec3, tileAt func(int) uin
 				X: x, Y: y, Z: z,
 				U:     u0 + (u1-u0)*f.uv[i][0],
 				V:     v0 + (v1-v0)*f.uv[i][1],
-				Light: f.light,
+				Light: f.light, Sky: 1,
 			})
 		}
 		m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)

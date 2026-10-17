@@ -23,6 +23,7 @@ var recipes = []recipe{
 	{Inputs: []core.Stack{{Item: core.ItemPlanks, Count: 2}, {Item: core.ItemStick, Count: 1}}, Output: core.Stack{Item: core.ItemWoodSword, Count: 1}},
 	{Inputs: []core.Stack{{Item: core.ItemIronIngot, Count: 2}, {Item: core.ItemStick, Count: 1}}, Output: core.Stack{Item: core.ItemIronSword, Count: 1}},
 	{Inputs: []core.Stack{{Item: core.ItemIronIngot, Count: 3}, {Item: core.ItemStick, Count: 2}}, Output: core.Stack{Item: core.ItemIronPickaxe, Count: 1}},
+	{Inputs: []core.Stack{{Item: core.ItemCoal, Count: 1}, {Item: core.ItemStick, Count: 1}}, Output: core.Stack{Item: core.ItemTorch, Count: 4}},
 }
 
 func (g *Game) handleActions(dt float32) {

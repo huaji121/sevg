@@ -16,7 +16,7 @@ var blockTextureFiles = [core.TileTileCount]string{
 	"log_side", "log_top", "leaves", "planks", "coal_ore", "iron_ore",
 	"snow", "snow_side", "cactus_side", "cactus_top", "glass", "bedrock",
 	"gravel", "flower", "tall_grass", "brick", "stone_brick", "ice",
-	"obsidian", "wool",
+	"obsidian", "wool", "torch",
 	"crack_0", "crack_1", "crack_2", "crack_3", "crack_4",
 	"crack_5", "crack_6", "crack_7", "crack_8", "crack_9",
 	"white", "pig_skin", "dark", "red", "gold", "gray", "black", "brown",

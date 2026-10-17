@@ -579,7 +579,7 @@ func (g *Game) sky() render.WorldUniforms {
 	warm := clampF(1-absF(sunH)*3.5, 0, 1)
 	sunset := [3]float32{0.92, 0.42, 0.20}
 	sky = lerp3(sky, sunset, warm*0.45)
-	sunTint := lerp3([3]float32{0.32, 0.38, 0.58}, [3]float32{1.0, 0.97, 0.90}, day)
+	sunTint := lerp3([3]float32{0.10, 0.13, 0.24}, [3]float32{1.0, 0.97, 0.90}, day)
 	sunTint = lerp3(sunTint, [3]float32{1.0, 0.72, 0.50}, warm*0.35)
 	fogEnd := float32(g.opts.RenderDist*16) - 8
 	if fogEnd < 48 {

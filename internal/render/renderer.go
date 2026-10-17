@@ -210,8 +210,10 @@ func (r *Renderer) createResources() error {
 		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT3, Location: 0, Offset: 0},
 		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT2, Location: 1, Offset: 12},
 		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT, Location: 2, Offset: 20},
+		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT, Location: 3, Offset: 24},
+		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT, Location: 4, Offset: 28},
 	}
-	blockLayout.VertexBufferDescriptions[0].Pitch = 24
+	blockLayout.VertexBufferDescriptions[0].Pitch = blockVertexSize
 	r.blockOpaque, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, false, true, true)
 	if err != nil {
 		r.Dev.ReleaseShader(blockVS)
@@ -319,6 +321,8 @@ func (r *Renderer) createResources() error {
 	r.staging, err = r.Dev.CreateTransferBuffer(&sdl.GPUTransferBufferCreateInfo{Usage: sdl.GPU_TRANSFERBUFFERUSAGE_UPLOAD, Size: r.stagingCap})
 	return err
 }
+
+const blockVertexSize = 32
 
 func vertexLayout(formatA, formatB sdl.GPUVertexElementFormat) sdl.GPUVertexInputState {
 	return sdl.GPUVertexInputState{
@@ -493,7 +497,7 @@ func (r *Renderer) uploadMesh(old gpuMesh, md world.MeshData) (gpuMesh, error) {
 	if len(md.Vertices) == 0 || len(md.Indices) == 0 {
 		return gpuMesh{}, nil
 	}
-	vb, err := r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: uint32(len(md.Vertices) * 24)})
+	vb, err := r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: uint32(len(md.Vertices) * blockVertexSize)})
 	if err != nil {
 		return gpuMesh{}, err
 	}
@@ -502,7 +506,7 @@ func (r *Renderer) uploadMesh(old gpuMesh, md world.MeshData) (gpuMesh, error) {
 		r.Dev.ReleaseBuffer(vb)
 		return gpuMesh{}, err
 	}
-	size := len(md.Vertices)*24 + len(md.Indices)*4
+	size := len(md.Vertices)*blockVertexSize + len(md.Indices)*4
 	tb, err := r.Dev.CreateTransferBuffer(&sdl.GPUTransferBufferCreateInfo{Usage: sdl.GPU_TRANSFERBUFFERUSAGE_UPLOAD, Size: uint32(size)})
 	if err != nil {
 		r.Dev.ReleaseBuffer(vb)
@@ -517,7 +521,7 @@ func (r *Renderer) uploadMesh(old gpuMesh, md world.MeshData) (gpuMesh, error) {
 		return gpuMesh{}, err
 	}
 	mem := mappedBytes(ptr, size)
-	vbytes := unsafe.Slice((*byte)(unsafe.Pointer(&md.Vertices[0])), len(md.Vertices)*24)
+	vbytes := unsafe.Slice((*byte)(unsafe.Pointer(&md.Vertices[0])), len(md.Vertices)*blockVertexSize)
 	copy(mem, vbytes)
 	ibytes := unsafe.Slice((*byte)(unsafe.Pointer(&md.Indices[0])), len(md.Indices)*4)
 	copy(mem[len(vbytes):], ibytes)
@@ -1026,7 +1030,7 @@ func meshVertBytes(m world.MeshData) []byte {
 	if len(m.Vertices) == 0 {
 		return nil
 	}
-	return unsafe.Slice((*byte)(unsafe.Pointer(&m.Vertices[0])), len(m.Vertices)*24)
+	return unsafe.Slice((*byte)(unsafe.Pointer(&m.Vertices[0])), len(m.Vertices)*blockVertexSize)
 }
 
 func meshIndexBytes(m world.MeshData) []byte {

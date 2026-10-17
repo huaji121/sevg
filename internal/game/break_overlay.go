@@ -27,6 +27,15 @@ func (g *Game) appendBreakOverlay(m *world.MeshData) {
 	}
 	tile := uint8(core.TileCrack0 + stage)
 	u0, v0, u1, v1 := world.TileUV(tile)
+	var lightSky, lightBlock uint8
+	for _, n := range crackNormals {
+		if v := g.world.SkyLightAt(x+n[0], y+n[1], z+n[2]); v > lightSky {
+			lightSky = v
+		}
+		if v := g.world.BlockLightAt(x+n[0], y+n[1], z+n[2]); v > lightBlock {
+			lightBlock = v
+		}
+	}
 	const offset = 0.004
 
 	for fi, f := range entityFaces {
@@ -45,6 +54,7 @@ func (g *Game) appendBreakOverlay(m *world.MeshData) {
 				U:     u0 + (u1-u0)*f.uv[i][0],
 				V:     v0 + (v1-v0)*f.uv[i][1],
 				Light: 1,
+				Sky:   float32(lightSky) / 15, Block: float32(lightBlock) / 15,
 			})
 		}
 		m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)

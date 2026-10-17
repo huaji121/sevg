@@ -72,6 +72,25 @@ func (g *Game) executeCommand(cmd string) {
 		}
 		g.setGameMode(mode)
 		g.systemChat(i18n.T("chat.gamemode_changed", g.modeName()))
+	case "time":
+		if len(fields) != 3 || strings.ToLower(fields[1]) != "set" {
+			g.systemChat(i18n.T("chat.time_usage"))
+			return
+		}
+		switch strings.ToLower(fields[2]) {
+		case "day":
+			g.time = 0.25
+		case "noon":
+			g.time = 0.5
+		case "night":
+			g.time = 0.75
+		case "midnight":
+			g.time = 0
+		default:
+			g.systemChat(i18n.T("chat.time_usage"))
+			return
+		}
+		g.systemChat(i18n.T("chat.time_set", g.timeString()))
 	case "help":
 		g.systemChat(i18n.T("chat.command_help"))
 	default:

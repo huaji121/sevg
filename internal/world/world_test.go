@@ -171,3 +171,43 @@ func TestMeshEmitsSolidFaceAgainstLeaves(t *testing.T) {
 		t.Fatalf("expected the stone +Z face adjacent to leaves, got %d matching quads", count)
 	}
 }
+func TestSkyAndTorchLight(t *testing.T) {
+	w := New(123)
+	if _, ok := w.EnsureChunk(ChunkPos{0, 0}); !ok {
+		t.Fatal("chunk was not created")
+	}
+	w.SetBlock(8, 120, 8, core.Stone)
+	if got := w.SkyLightAt(8, 119, 8); got != 0 {
+		t.Fatalf("sky light under roof = %d, want 0", got)
+	}
+	if got := w.SkyLightAt(8, 121, 8); got != 15 {
+		t.Fatalf("sky light above roof = %d, want 15", got)
+	}
+	if core.Torch.Def().Light != 14 || core.ItemForBlock(core.Torch) != core.ItemTorch {
+		t.Fatal("torch is not registered as a 14-level light source item")
+	}
+	w.SetBlock(8, 110, 8, core.Torch)
+	if got := w.BlockLightAt(8, 110, 8); got != 14 {
+		t.Fatalf("torch light = %d, want 14", got)
+	}
+	if got := w.BlockLightAt(9, 110, 8); got != 13 {
+		t.Fatalf("torch neighbor light = %d, want 13", got)
+	}
+	if got := w.BlockLightAt(10, 110, 8); got != 12 {
+		t.Fatalf("torch distance light = %d, want 12", got)
+	}
+	mesh, ok := w.Mesh(ChunkPos{0, 0})
+	if !ok {
+		t.Fatal("missing mesh")
+	}
+	lit := false
+	for _, v := range mesh.Opaque.Vertices {
+		if v.Block > 0 {
+			lit = true
+			break
+		}
+	}
+	if !lit {
+		t.Fatal("torch light was not baked into the chunk mesh")
+	}
+}
