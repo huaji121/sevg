@@ -21,16 +21,17 @@ import (
 )
 
 type Options struct {
-	Width, Height int
-	Seed          int64
-	RenderDist    int
-	SavePath      string
-	SmokeFrames   int
-	Continue      bool
-	Language      string
-	FPSLimit      int
-	FOV           int
-	Fullscreen    bool
+	Width, Height  int
+	Seed           int64
+	RenderDist     int
+	SavePath       string
+	SmokeFrames    int
+	Continue       bool
+	Language       string
+	FPSLimit       int
+	FOV            int
+	Fullscreen     bool
+	SmoothLighting bool
 }
 
 type State int

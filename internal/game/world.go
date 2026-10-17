@@ -113,6 +113,7 @@ func (g *Game) startWorld(load bool) error {
 	if p.Body.Pos.Y < 1 {
 		p.Body.Pos.Y = 64
 	}
+	w.SmoothLighting = g.opts.SmoothLighting
 	p.Creative = g.mode == ModeCreative
 	if g.mode == ModeCreative {
 		g.inventoryTab = 1

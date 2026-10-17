@@ -336,6 +336,10 @@ func (g *Game) handleUIClick(right bool) {
 			g.applyVideoChange(3, 0)
 			return
 		}
+		if l.smooth.Contains(g.mouseX, g.mouseY) {
+			g.applyVideoChange(4, 0)
+			return
+		}
 		for i := 0; i < 3; i++ {
 			if l.minus[i].Contains(g.mouseX, g.mouseY) {
 				g.applyVideoChange(i, -1)

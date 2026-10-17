@@ -13,10 +13,11 @@ import (
 const settingsPath = "settings.json"
 
 type videoSettings struct {
-	RenderDist int  `json:"render_distance"`
-	FPSLimit   int  `json:"fps_limit"`
-	FOV        int  `json:"fov"`
-	Fullscreen bool `json:"fullscreen"`
+	RenderDist     int   `json:"render_distance"`
+	FPSLimit       int   `json:"fps_limit"`
+	FOV            int   `json:"fov"`
+	Fullscreen     bool  `json:"fullscreen"`
+	SmoothLighting *bool `json:"smooth_lighting,omitempty"`
 }
 
 var fpsOptions = []int{0, 30, 60, 75, 120, 144, 240}
@@ -38,6 +39,9 @@ func loadVideoSettings(opts *Options) {
 		opts.FOV = s.FOV
 	}
 	opts.Fullscreen = s.Fullscreen
+	if s.SmoothLighting != nil {
+		opts.SmoothLighting = *s.SmoothLighting
+	}
 }
 
 func saveVideoSettings(opts Options) {
@@ -45,10 +49,11 @@ func saveVideoSettings(opts Options) {
 		return
 	}
 	s := videoSettings{
-		RenderDist: opts.RenderDist,
-		FPSLimit:   opts.FPSLimit,
-		FOV:        opts.FOV,
-		Fullscreen: opts.Fullscreen,
+		RenderDist:     opts.RenderDist,
+		FPSLimit:       opts.FPSLimit,
+		FOV:            opts.FOV,
+		Fullscreen:     opts.Fullscreen,
+		SmoothLighting: &opts.SmoothLighting,
 	}
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
@@ -132,6 +137,11 @@ func (g *Game) applyVideoChange(kind, delta int) {
 	case 3:
 		g.setFullscreen(!g.fullscreen)
 		return
+	case 4:
+		g.opts.SmoothLighting = !g.opts.SmoothLighting
+		if g.world != nil {
+			g.world.SetSmoothLighting(g.opts.SmoothLighting)
+		}
 	}
 	saveVideoSettings(g.opts)
 }
@@ -147,11 +157,12 @@ func (g *Game) setFullscreen(on bool) {
 
 type settingsLayout struct {
 	panel  ui.Rect
-	rows   [4]ui.Rect
-	minus  [4]ui.Rect
-	plus   [4]ui.Rect
-	values [4]ui.Rect
+	rows   [5]ui.Rect
+	minus  [5]ui.Rect
+	plus   [5]ui.Rect
+	values [5]ui.Rect
 	full   ui.Rect
+	smooth ui.Rect
 	back   ui.Rect
 }
 
@@ -168,17 +179,18 @@ func (g *Game) settingsRects() settingsLayout {
 	l := settingsLayout{panel: p}
 	rowX := p.X + 28
 	rowW := p.W - 56
-	rowY := p.Y + 92
-	rowH := float32(58)
-	gap := float32(14)
-	for i := 0; i < 4; i++ {
+	rowY := p.Y + 88
+	rowH := float32(50)
+	gap := float32(10)
+	for i := 0; i < 5; i++ {
 		l.rows[i] = ui.Rect{X: rowX, Y: rowY + float32(i)*(rowH+gap), W: rowW, H: rowH}
-		l.minus[i] = ui.Rect{X: p.X + p.W - 250, Y: l.rows[i].Y + 11, W: 38, H: 36}
-		l.plus[i] = ui.Rect{X: p.X + p.W - 72, Y: l.rows[i].Y + 11, W: 38, H: 36}
-		l.values[i] = ui.Rect{X: l.minus[i].X + 44, Y: l.rows[i].Y + 2, W: 130, H: 54}
+		l.minus[i] = ui.Rect{X: p.X + p.W - 250, Y: l.rows[i].Y + 9, W: 38, H: 32}
+		l.plus[i] = ui.Rect{X: p.X + p.W - 72, Y: l.rows[i].Y + 9, W: 38, H: 32}
+		l.values[i] = ui.Rect{X: l.minus[i].X + 44, Y: l.rows[i].Y + 2, W: 130, H: 46}
 	}
-	l.values[3] = ui.Rect{X: p.X + p.W - 246, Y: l.rows[3].Y + 11, W: 212, H: 36}
-	l.full = l.values[3]
+	l.values[3] = ui.Rect{X: p.X + p.W - 246, Y: l.rows[3].Y + 9, W: 212, H: 32}
+	l.values[4] = ui.Rect{X: p.X + p.W - 246, Y: l.rows[4].Y + 9, W: 212, H: 32}
+	l.full, l.smooth = l.values[3], l.values[4]
 	l.back = ui.Rect{X: p.X + p.W/2 - 110, Y: p.Y + p.H - 62, W: 220, H: 42}
 	return l
 }
@@ -197,14 +209,16 @@ func (g *Game) drawSettings(w, h float32) {
 		i18n.T("settings.fps_limit"),
 		i18n.T("settings.fov"),
 		i18n.T("settings.fullscreen"),
+		i18n.T("settings.smooth_lighting"),
 	}
 	values := []string{
 		fmt.Sprintf("%d", g.opts.RenderDist),
 		fpsLimitLabel(g.opts.FPSLimit),
 		fmt.Sprintf("%d", g.opts.FOV),
 		onOffLabel(g.fullscreen),
+		onOffLabel(g.opts.SmoothLighting),
 	}
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 5; i++ {
 		r := l.rows[i]
 		c.Rect(r.X, r.Y, r.W, r.H, ui.RGBA(12, 16, 20, 225))
 		c.Border(r.X, r.Y, r.W, r.H, 1, ui.RGBA(65, 78, 86, 180))
@@ -213,8 +227,10 @@ func (g *Game) drawSettings(w, h float32) {
 			c.TextCentered(l.values[i].X+l.values[i].W/2, r.Y+16, values[i], 1.2, ui.Accent)
 			g.drawButtonScale(l.minus[i], "-", true, 1.3)
 			g.drawButtonScale(l.plus[i], "+", true, 1.3)
-		} else {
+		} else if i == 3 {
 			g.drawButtonScale(l.full, values[i], true, 1.2)
+		} else {
+			g.drawButtonScale(l.smooth, values[i], true, 1.2)
 		}
 	}
 	g.drawButtonScale(l.back, i18n.T("settings.back"), true, 1.2)

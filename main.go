@@ -21,6 +21,7 @@ func main() {
 	flag.IntVar(&opts.FPSLimit, "fps", 0, "frame rate limit (0 = unlimited)")
 	flag.IntVar(&opts.FOV, "fov", 72, "field of view")
 	flag.BoolVar(&opts.Fullscreen, "fullscreen", false, "start in fullscreen")
+	flag.BoolVar(&opts.SmoothLighting, "smoothlighting", true, "smooth vertex lighting")
 	flag.Parse()
 
 	if err := game.Run(opts); err != nil {

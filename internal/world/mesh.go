@@ -209,7 +209,7 @@ func (w *World) Mesh(pos ChunkPos) (ChunkMesh, bool) {
 					if !faceVisible(b, nb) {
 						continue
 					}
-					addFace(target, at, solidAO, atSky, atBlock, x, y, z, pos.X*ChunkSize, pos.Z*ChunkSize, b, height, fi)
+					addFace(target, at, solidAO, atSky, atBlock, x, y, z, pos.X*ChunkSize, pos.Z*ChunkSize, b, height, w.SmoothLighting, fi)
 				}
 			}
 		}
@@ -236,7 +236,7 @@ func faceVisible(cur, nb core.BlockID) bool {
 	return true
 }
 
-func addFace(m *MeshData, at func(int, int, int) core.BlockID, solid func(int, int, int) bool, skyAt, blockAt func(int, int, int) uint8, bx, by, bz, ox, oz int, b core.BlockID, height float32, fi int) {
+func addFace(m *MeshData, at func(int, int, int) core.BlockID, solid func(int, int, int) bool, skyAt, blockAt func(int, int, int) uint8, bx, by, bz, ox, oz int, b core.BlockID, height float32, smooth bool, fi int) {
 	f := &faces[fi]
 	u0, v0, u1, v1 := tileUV(b.Tile(fi))
 	base := uint32(len(m.Vertices))
@@ -272,6 +272,31 @@ func addFace(m *MeshData, at func(int, int, int) core.BlockID, solid func(int, i
 		light := f.light * (0.58 + float32(ao)*0.14)
 		sky := float32(skyAt(sx, sy, sz)) / 15
 		blk := float32(blockAt(sx, sy, sz)) / 15
+		if smooth {
+			// Minecraft-style smooth lighting: average the light of the
+			// exposed front cell and the open side/corner cells around this
+			// vertex.
+			skySum := float32(skyAt(sx, sy, sz))
+			blkSum := float32(blockAt(sx, sy, sz))
+			nSamples := float32(1)
+			if !s1 {
+				skySum += float32(skyAt(p1[0], p1[1], p1[2]))
+				blkSum += float32(blockAt(p1[0], p1[1], p1[2]))
+				nSamples++
+			}
+			if !s2 {
+				skySum += float32(skyAt(p2[0], p2[1], p2[2]))
+				blkSum += float32(blockAt(p2[0], p2[1], p2[2]))
+				nSamples++
+			}
+			if !s1 && !s2 && !cc {
+				skySum += float32(skyAt(pc[0], pc[1], pc[2]))
+				blkSum += float32(blockAt(pc[0], pc[1], pc[2]))
+				nSamples++
+			}
+			sky = skySum / (15 * nSamples)
+			blk = blkSum / (15 * nSamples)
+		}
 		uu := u0 + (u1-u0)*f.uv[i][0]
 		vv := v0 + (v1-v0)*f.uv[i][1]
 		m.Vertices = append(m.Vertices, Vertex{

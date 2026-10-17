@@ -246,3 +246,15 @@ func TestWaterFlowsAndRetracts(t *testing.T) {
 		}
 	}
 }
+func TestSmoothLightingDefaultsOnAndMarksChunksDirty(t *testing.T) {
+	w := New(7)
+	c, _ := w.EnsureChunk(ChunkPos{0, 0})
+	if !w.SmoothLighting {
+		t.Fatal("smooth lighting should default on")
+	}
+	c.Dirty = false
+	w.SetSmoothLighting(false)
+	if w.SmoothLighting || !c.Dirty {
+		t.Fatal("toggling smooth lighting did not mark the chunk dirty")
+	}
+}

@@ -88,22 +88,24 @@ type EditRecord struct {
 }
 
 type World struct {
-	mu           sync.RWMutex
-	Seed         int64
-	Gen          *Generator
-	chunks       map[[2]int]*Chunk
-	edits        map[[2]int]map[int]core.BlockID
-	fluidQueue   map[[3]int]bool
-	lightSources int
+	mu             sync.RWMutex
+	Seed           int64
+	Gen            *Generator
+	SmoothLighting bool
+	chunks         map[[2]int]*Chunk
+	edits          map[[2]int]map[int]core.BlockID
+	fluidQueue     map[[3]int]bool
+	lightSources   int
 }
 
 func New(seed int64) *World {
 	return &World{
-		Seed:       seed,
-		Gen:        NewGenerator(seed),
-		chunks:     make(map[[2]int]*Chunk),
-		edits:      make(map[[2]int]map[int]core.BlockID),
-		fluidQueue: make(map[[3]int]bool),
+		Seed:           seed,
+		Gen:            NewGenerator(seed),
+		SmoothLighting: true,
+		chunks:         make(map[[2]int]*Chunk),
+		edits:          make(map[[2]int]map[int]core.BlockID),
+		fluidQueue:     make(map[[3]int]bool),
 	}
 }
 
@@ -237,6 +239,18 @@ func (w *World) SetBlock(wx, wy, wz int, b core.BlockID) bool {
 
 func (w *World) markDirtyLocked(p ChunkPos) {
 	if c := w.chunks[p.Key()]; c != nil {
+		c.Dirty = true
+	}
+}
+
+func (w *World) SetSmoothLighting(on bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.SmoothLighting == on {
+		return
+	}
+	w.SmoothLighting = on
+	for _, c := range w.chunks {
 		c.Dirty = true
 	}
 }
