@@ -51,7 +51,10 @@ func TestCraftPlanks(t *testing.T) {
 	g := newTestGame(t)
 	g.inv = core.Inventory{}
 	g.inv.Add(core.ItemLog, 2)
-	g.craft(0)
+	if !g.fillCraftingRecipe(0) {
+		t.Fatal("recipe fill failed")
+	}
+	g.takeCraftOutput()
 	if got := g.inv.Count(core.ItemPlanks); got != 4 {
 		t.Fatalf("planks %d", got)
 	}

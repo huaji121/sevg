@@ -64,17 +64,19 @@ type Game struct {
 	canv  *ui.Canvas
 	audio *audio.Engine
 
-	state        State
-	settingsBack State
-	mode         GameMode
-	seed         int64
-	world        *world.World
-	player       *player.Player
-	mobs         *entity.Manager
-	inv          core.Inventory
-	inventoryTab int
-	time         float64
-	saveAt       string
+	state          State
+	settingsBack   State
+	mode           GameMode
+	seed           int64
+	world          *world.World
+	player         *player.Player
+	mobs           *entity.Manager
+	inv            core.Inventory
+	inventoryTab   int
+	craftGrid      [4]core.Stack
+	recipeBookOpen bool
+	time           float64
+	saveAt         string
 
 	mouseX, mouseY float32
 	mouseLeft      bool
@@ -227,6 +229,12 @@ func Run(opts Options) error {
 }
 
 func (g *Game) setState(s State) {
+	if g.state == StateInventory && s != StateInventory {
+		if g.mode != ModeCreative {
+			g.returnCraftGrid()
+		}
+		g.recipeBookOpen = false
+	}
 	if s != StatePlaying && g.chatOpen {
 		g.chatOpen = false
 		g.chatInput = g.chatInput[:0]
@@ -437,7 +445,11 @@ func (g *Game) onKey(k sdl.Keycode) {
 			g.inv.Select(int(k - sdl.K_1))
 		}
 	case StateInventory:
-		if k >= sdl.K_1 && k <= sdl.K_9 {
+		if k == sdl.K_R && g.mode != ModeCreative {
+			g.recipeBookOpen = !g.recipeBookOpen
+		} else if (k == sdl.K_E || k == sdl.K_ESCAPE) && g.recipeBookOpen {
+			g.recipeBookOpen = false
+		} else if k >= sdl.K_1 && k <= sdl.K_9 {
 			g.inv.Select(int(k - sdl.K_1))
 		} else if k == sdl.K_L {
 			g.toggleLanguage()
@@ -662,6 +674,9 @@ func (g *Game) toggleLanguage() {
 }
 
 func (g *Game) shutdown() {
+	if g.world != nil && g.player != nil {
+		g.returnCraftGrid()
+	}
 	g.audio.Close()
 	if g.world != nil && g.opts.SmokeFrames == 0 {
 		_ = g.saveGame()

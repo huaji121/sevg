@@ -281,9 +281,11 @@ func (g *Game) drawSurvivalInventory(w, h float32) {
 	c.Panel(p.X, p.Y, p.W, p.H, ui.RGBA(24, 28, 32, 245), ui.RGBA(255, 196, 82, 220))
 	c.Text(p.X+24, p.Y+14, i18n.T("inventory.title"), 2, ui.TextColor)
 	c.Text(p.X+24, p.Y+49, i18n.T("inventory.hint"), 0.9, ui.MutedColor)
-	closeR := g.invCloseRect()
-	c.Rect(closeR.X, closeR.Y, closeR.W, closeR.H, ui.RGBA(180, 60, 60, 230))
-	g.drawCenteredLabel(closeR, "X", 1.5, ui.TextColor)
+	if !g.recipeBookOpen {
+		closeR := g.invCloseRect()
+		c.Rect(closeR.X, closeR.Y, closeR.W, closeR.H, ui.RGBA(180, 60, 60, 230))
+		g.drawCenteredLabel(closeR, "X", 1.5, ui.TextColor)
+	}
 
 	for vis := 0; vis < core.InventorySlots; vis++ {
 		r := g.invSlotRect(vis)
@@ -297,32 +299,23 @@ func (g *Game) drawSurvivalInventory(w, h float32) {
 		g.drawInventorySlot(r, g.inv.Slots[idx], bg, bd, 0)
 	}
 
-	// Crafting column.
-	cx := p.X + 474
-	c.Text(cx, p.Y+14, i18n.T("inventory.crafting"), 1.8, ui.Accent)
-	c.Text(cx, p.Y+47, i18n.T("inventory.handmade"), 0.8, ui.MutedColor)
-	for i, r := range g.recipeRects() {
-		rec := recipes[i]
-		ok := g.canCraft(rec)
-		bg := ui.RGBA(40, 46, 52, 230)
-		bd := ui.RGBA(90, 105, 115, 230)
-		if ok {
-			bg = ui.RGBA(44, 64, 48, 240)
-			bd = ui.RGBA(115, 200, 120, 230)
-		}
-		if r.Contains(g.mouseX, g.mouseY) && ok {
-			bg = ui.RGBA(60, 84, 60, 245)
-			bd = ui.Good
-		}
-		c.Rect(r.X, r.Y, r.W, r.H, bg)
-		c.Border(r.X, r.Y, r.W, r.H, 2, bd)
-		c.Text(r.X+8, r.Y+2, i18n.ItemName(rec.Output.Item), 1.0, ui.TextColor)
-		c.Text(r.X+8, r.Y+20, recipeInputs(rec), 0.72, ui.MutedColor)
-		// Output count badge.
-		c.Text(r.X+r.W-30, r.Y+3, fmt.Sprintf("x%d", rec.Output.Count), 1.0, ui.Accent)
+	g.drawCraftingColumn(c, p)
+
+	if g.recipeBookOpen {
+		g.drawRecipeBook(w, h)
+		g.drawCursorStack()
+		return
 	}
-	c.Text(cx, p.Y+424, i18n.T("inventory.tip1"), 0.85, ui.MutedColor)
-	c.Text(cx, p.Y+442, i18n.T("inventory.tip2"), 0.85, ui.MutedColor)
+	for i := 0; i < 4; i++ {
+		if g.craftSlotRect(i).Contains(g.mouseX, g.mouseY) && !g.craftGrid[i].Empty() {
+			g.drawItemTooltip(i18n.ItemName(g.craftGrid[i].Item))
+		}
+	}
+	if g.craftOutputRect().Contains(g.mouseX, g.mouseY) {
+		if r, ok := g.matchedGridRecipe(); ok {
+			g.drawItemTooltip(i18n.ItemName(r.Output.Item))
+		}
+	}
 
 	// Tooltip for the hovered inventory slot.
 	for vis := 0; vis < core.InventorySlots; vis++ {
@@ -519,17 +512,6 @@ func (g *Game) invSlotRect(vis int) ui.Rect {
 func (g *Game) invCloseRect() ui.Rect {
 	p := g.invPanelRect()
 	return ui.Rect{X: p.X + p.W - 38, Y: p.Y + 12, W: 26, H: 26}
-}
-
-func (g *Game) recipeRects() []ui.Rect {
-	p := g.invPanelRect()
-	x := p.X + 474
-	y := p.Y + 70
-	out := make([]ui.Rect, len(recipes))
-	for i := range out {
-		out[i] = ui.Rect{X: x, Y: y + float32(i)*38, W: 240, H: 34}
-	}
-	return out
 }
 
 func visualToSlot(vis int) int {

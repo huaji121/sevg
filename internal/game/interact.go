@@ -390,6 +390,35 @@ func (g *Game) handleUIClick(right bool) {
 			}
 			return
 		}
+		if g.mode != ModeCreative && g.recipeBookOpen {
+			if g.recipeBookCloseRect().Contains(g.mouseX, g.mouseY) || g.invCloseRect().Contains(g.mouseX, g.mouseY) {
+				g.recipeBookOpen = false
+				return
+			}
+			for i, r := range g.recipeBookRowRects() {
+				if r.Contains(g.mouseX, g.mouseY) {
+					g.fillCraftingRecipe(i)
+					return
+				}
+			}
+			return
+		}
+		if g.mode != ModeCreative {
+			if g.recipeBookButtonRect().Contains(g.mouseX, g.mouseY) {
+				g.recipeBookOpen = true
+				return
+			}
+			if g.craftOutputRect().Contains(g.mouseX, g.mouseY) {
+				g.takeCraftOutput()
+				return
+			}
+			for i := 0; i < 4; i++ {
+				if g.craftSlotRect(i).Contains(g.mouseX, g.mouseY) {
+					g.clickStack(&g.craftGrid[i], right)
+					return
+				}
+			}
+		}
 		if g.invCloseRect().Contains(g.mouseX, g.mouseY) {
 			if !g.heldStack.Empty() {
 				left := g.inv.Add(g.heldStack.Item, g.heldStack.Count)
@@ -407,12 +436,6 @@ func (g *Game) handleUIClick(right bool) {
 				return
 			}
 		}
-		for i, r := range g.recipeRects() {
-			if r.Contains(g.mouseX, g.mouseY) {
-				g.craft(i)
-				return
-			}
-		}
 	}
 }
 
@@ -420,7 +443,10 @@ func (g *Game) clickSlot(idx int, right bool) {
 	if idx < 0 || idx >= core.InventorySlots {
 		return
 	}
-	slot := &g.inv.Slots[idx]
+	g.clickStack(&g.inv.Slots[idx], right)
+}
+
+func (g *Game) clickStack(slot *core.Stack, right bool) {
 	if !right {
 		switch {
 		case g.heldStack.Empty() && !slot.Empty():
