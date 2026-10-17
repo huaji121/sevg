@@ -19,6 +19,16 @@ func (g *Game) drawUI() {
 	switch g.state {
 	case StateMenu:
 		g.drawMenu(w, h)
+	case StateSettings:
+		if g.player == nil {
+			g.drawMenu(w, h)
+		} else {
+			g.drawHUD(w, h)
+			if g.settingsBack == StatePaused {
+				g.drawPause(w, h)
+			}
+		}
+		g.drawSettings(w, h)
 	default:
 		g.drawHUD(w, h)
 		if g.state == StatePlaying {
@@ -77,7 +87,7 @@ func (g *Game) drawMenu(w, h float32) {
 	g.canv.TextCentered(w/2, h*0.39, i18n.T("menu.tagline"), 1, ui.MutedColor)
 
 	rects := g.menuRects()
-	labels := []string{i18n.T("menu.new"), i18n.T("menu.continue"), i18n.T("menu.quit")}
+	labels := []string{i18n.T("menu.new"), i18n.T("menu.continue"), i18n.T("menu.settings"), i18n.T("menu.quit")}
 	for i, r := range rects {
 		enabled := i != 1 || g.saveExists()
 		g.drawButton(r, labels[i], enabled)
@@ -341,11 +351,11 @@ func (g *Game) drawPause(w, h float32) {
 	c := g.canv
 	c.Rect(0, 0, w, h, [4]float32{0, 0, 0, 0.55})
 	c.TextShadowCentered(w/2, h*0.13, i18n.T("pause.title"), 4.5, ui.TextColor)
-	labels := []string{i18n.T("pause.resume"), i18n.T("pause.save"), i18n.T("pause.title_screen"), i18n.T("pause.quit")}
+	labels := []string{i18n.T("pause.resume"), i18n.T("pause.settings"), i18n.T("pause.save"), i18n.T("pause.title_screen"), i18n.T("pause.quit")}
 	for i, r := range g.pauseRects() {
 		g.drawButton(r, labels[i], true)
 	}
-	c.TextCentered(w/2, h*0.72, i18n.T("pause.hint"), 1.2, ui.MutedColor)
+	c.TextCentered(w/2, h*0.83, i18n.T("pause.hint"), 1.2, ui.MutedColor)
 }
 
 func (g *Game) drawDead(w, h float32) {
@@ -459,7 +469,7 @@ func (g *Game) menuRects() []ui.Rect {
 	bw, bh := float32(360), float32(54)
 	x := (w - bw) / 2
 	y := h*0.50 + 20
-	out := make([]ui.Rect, 3)
+	out := make([]ui.Rect, 4)
 	for i := range out {
 		out[i] = ui.Rect{X: x, Y: y + float32(i)*(bh+12), W: bw, H: bh}
 	}
@@ -473,10 +483,10 @@ func (g *Game) menuLangRect() ui.Rect {
 
 func (g *Game) pauseRects() []ui.Rect {
 	w, h := float32(g.gfx.W), float32(g.gfx.H)
-	bw, bh := float32(360), float32(50)
+	bw, bh := float32(360), float32(46)
 	x := (w - bw) / 2
-	y := h * 0.34
-	out := make([]ui.Rect, 4)
+	y := h * 0.30
+	out := make([]ui.Rect, 5)
 	for i := range out {
 		out[i] = ui.Rect{X: x, Y: y + float32(i)*(bh+12), W: bw, H: bh}
 	}

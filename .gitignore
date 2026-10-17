@@ -34,3 +34,5 @@ Thumbs.db
 
 # Documentation images are source assets
 !/docs/*.png
+# User video settings
+settings.json

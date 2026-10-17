@@ -294,6 +294,8 @@ func (g *Game) handleUIClick(right bool) {
 					}
 				}
 			case 2:
+				g.openSettings(StateMenu)
+			case 3:
 				g.quit = true
 			}
 		}
@@ -310,13 +312,38 @@ func (g *Game) handleUIClick(right bool) {
 			case 0:
 				g.setState(StatePlaying)
 			case 1:
+				g.openSettings(StatePaused)
+			case 2:
 				if err := g.saveGame(); err == nil {
 					g.notify(i18n.T("toast.saved"), 1.5)
 				}
-			case 2:
-				g.quitToTitle()
 			case 3:
+				g.quitToTitle()
+			case 4:
 				g.quit = true
+			}
+		}
+	case StateSettings:
+		if right {
+			return
+		}
+		l := g.settingsRects()
+		if l.back.Contains(g.mouseX, g.mouseY) {
+			g.setState(g.settingsBack)
+			return
+		}
+		if l.full.Contains(g.mouseX, g.mouseY) {
+			g.applyVideoChange(3, 0)
+			return
+		}
+		for i := 0; i < 3; i++ {
+			if l.minus[i].Contains(g.mouseX, g.mouseY) {
+				g.applyVideoChange(i, -1)
+				return
+			}
+			if l.plus[i].Contains(g.mouseX, g.mouseY) {
+				g.applyVideoChange(i, 1)
+				return
 			}
 		}
 	case StateDead:

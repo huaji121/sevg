@@ -18,6 +18,9 @@ func main() {
 	flag.IntVar(&opts.SmokeFrames, "smoke", 0, "render N frames then exit (testing)")
 	flag.BoolVar(&opts.Continue, "continue", false, "load the save game on startup")
 	flag.StringVar(&opts.Language, "lang", "zh-CN", "UI language: zh-CN or en-US")
+	flag.IntVar(&opts.FPSLimit, "fps", 0, "frame rate limit (0 = unlimited)")
+	flag.IntVar(&opts.FOV, "fov", 72, "field of view")
+	flag.BoolVar(&opts.Fullscreen, "fullscreen", false, "start in fullscreen")
 	flag.Parse()
 
 	if err := game.Run(opts); err != nil {

@@ -28,6 +28,9 @@ type Options struct {
 	SmokeFrames   int
 	Continue      bool
 	Language      string
+	FPSLimit      int
+	FOV           int
+	Fullscreen    bool
 }
 
 type State int
@@ -38,6 +41,7 @@ const (
 	StateInventory
 	StatePaused
 	StateDead
+	StateSettings
 )
 
 type GameMode int
@@ -60,6 +64,7 @@ type Game struct {
 	audio *audio.Engine
 
 	state        State
+	settingsBack State
 	mode         GameMode
 	seed         int64
 	world        *world.World
@@ -142,6 +147,13 @@ func Run(opts Options) error {
 	if opts.Language == "" {
 		opts.Language = i18n.ZH
 	}
+	if opts.FOV <= 0 {
+		opts.FOV = 72
+	}
+	if opts.SmokeFrames == 0 {
+		loadVideoSettings(&opts)
+	}
+	normalizeVideoOptions(&opts)
 	i18n.Set(opts.Language)
 	runes := append(i18n.AllRunes(), i18n.ChatRunes()...)
 	fontAtlas := ui.BuildFontAtlas(runes, render.BuildAtlas())
@@ -174,17 +186,21 @@ func Run(opts Options) error {
 		return err
 	}
 	g := &Game{
-		opts:     opts,
-		Win:      win,
-		gfx:      gfx,
-		canv:     ui.NewCanvas(opts.Width, opts.Height, fontAtlas),
-		state:    StateMenu,
-		saveAt:   opts.SavePath,
-		pending:  make(map[[2]int]bool),
-		meshed:   make(map[[2]int]bool),
-		lastTime: time.Now(),
+		opts:       opts,
+		Win:        win,
+		gfx:        gfx,
+		canv:       ui.NewCanvas(opts.Width, opts.Height, fontAtlas),
+		state:      StateMenu,
+		saveAt:     opts.SavePath,
+		pending:    make(map[[2]int]bool),
+		meshed:     make(map[[2]int]bool),
+		lastTime:   time.Now(),
+		fullscreen: opts.Fullscreen,
 	}
 	g.seed = opts.Seed
+	if g.opts.Fullscreen {
+		_ = win.SetFullscreen(true)
+	}
 	if err := sdl.InitSubSystem(sdl.INIT_AUDIO); err == nil {
 		g.audio = audio.Open()
 	}
@@ -238,7 +254,8 @@ func (g *Game) setState(s State) {
 
 func (g *Game) run() {
 	for !g.quit {
-		now := time.Now()
+		frameStart := time.Now()
+		now := frameStart
 		rawDt := now.Sub(g.lastTime).Seconds()
 		g.lastTime = now
 		if rawDt <= 0 {
@@ -280,6 +297,12 @@ func (g *Game) run() {
 		g.renderFrame()
 		if g.opts.SmokeFrames > 0 && g.frame >= g.opts.SmokeFrames {
 			g.quit = true
+		}
+		if g.opts.FPSLimit > 0 {
+			target := time.Second / time.Duration(g.opts.FPSLimit)
+			if elapsed := time.Since(frameStart); elapsed < target {
+				time.Sleep(target - elapsed)
+			}
 		}
 	}
 }
@@ -409,8 +432,7 @@ func (g *Game) onKey(k sdl.Keycode) {
 		case sdl.K_L:
 			g.toggleLanguage()
 		case sdl.K_F11:
-			g.fullscreen = !g.fullscreen
-			_ = g.Win.SetFullscreen(g.fullscreen)
+			g.setFullscreen(!g.fullscreen)
 		case sdl.K_Q:
 			g.dropSelected()
 		case sdl.K_1, sdl.K_2, sdl.K_3, sdl.K_4, sdl.K_5, sdl.K_6, sdl.K_7, sdl.K_8, sdl.K_9:
@@ -432,6 +454,12 @@ func (g *Game) onKey(k sdl.Keycode) {
 				g.heldStack = core.Stack{}
 			}
 			g.setState(StatePlaying)
+		}
+	case StateSettings:
+		if k == sdl.K_ESCAPE {
+			g.setState(g.settingsBack)
+		} else if k == sdl.K_F11 {
+			g.setFullscreen(!g.fullscreen)
 		}
 	case StatePaused:
 		if k == sdl.K_ESCAPE {
@@ -570,7 +598,7 @@ func (g *Game) renderFrame() {
 	dir := g.player.LookDir()
 	cam := render.Camera{
 		Pos: g.player.Eye(), Dir: dir, Up: mathx.V3(0, 1, 0),
-		Fov: mathx.Radians(72), Near: 0.06, Far: 500,
+		Fov: mathx.Radians(float32(g.opts.FOV)), Near: 0.06, Far: 500,
 		Aspect: float32(g.gfx.W) / float32(g.gfx.H),
 	}
 	sky := g.sky()

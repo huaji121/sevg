@@ -47,6 +47,7 @@ SEVG 的目标不是复刻完整的 Minecraft，而是提供一个 **结构清�
 - 沙子、沙砾失去支撑后会变成掉落的方块实体，落地后重新变成方块
 - 方块破坏进度使用 10 阶段裂纹贴图覆盖在方块表面，并飞散对应方块的完整模型碎屑；玻璃/冰使用透明混合通道
 - 软件混音音效：方块破坏/放置、脚步、受伤、拾取、合成、进食、攻击
+- 视频设置：视距、FPS 限制、视野 FOV、全屏，自动保存到 `settings.json`
 - 类似 Minecraft 的 0–15 天空光/方块光：洞穴和屋顶下变暗但保留最低环境光，火把提供暖色照明
 - `/time set day|noon|night|midnight` 调整昼夜时间
 - 右键放置方块 / 进食
@@ -211,6 +212,7 @@ py run.py -seed 12345 -renderdist 8
 | `T` / `Enter` | 打开聊天栏 |
 | `/` | 打开聊天栏并预填 `/` 指令前缀 |
 | `/time set ...` | 设置时间：day、noon、night、midnight |
+| `Esc` → 设置 | 打开视频设置界面 |
 | `Enter` | 发送聊天消息 |
 | `Ctrl+V` | 粘贴聊天内容 |
 | 滚轮 | 聊天栏打开时翻阅历史消息 |
@@ -265,6 +267,7 @@ py run.py -seed 12345 -renderdist 8
 │   ├── blocks/                 # 16 × 16 方块、裂纹、火把、调色板贴图
 │   └── items/                  # 40 × 40 纯贴图物品图标（工具、食物、材料）
 ├── assets/sounds/              # WAV 音效素材，嵌入二进制并由软件混音
+├── settings.json               # 运行时自动生成的视频设置
 ├── cmd/atlasdump/              # 可选：导出材质图集 PNG
 ├── docs/                       # 截图
 ├── build.py / run.py / test.py # Python 开发脚本
