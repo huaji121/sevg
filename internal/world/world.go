@@ -342,34 +342,6 @@ func (w *World) chunkInDynamicBounds(pos ChunkPos) bool {
 	return pos.X >= minX && pos.X <= maxX && pos.Z >= minZ && pos.Z <= maxZ
 }
 
-func (w *World) markDynamicBorderLocked(c *Chunk, idx int, dirty map[[2]int]bool) {
-	dirty[c.Pos.Key()] = true
-	lx := idx % ChunkSize
-	lz := (idx / ChunkSize) % ChunkSize
-	if lx == 0 {
-		w.markDirtyLocked(ChunkPos{X: c.Pos.X - 1, Z: c.Pos.Z})
-	}
-	if lx == ChunkSize-1 {
-		w.markDirtyLocked(ChunkPos{X: c.Pos.X + 1, Z: c.Pos.Z})
-	}
-	if lz == 0 {
-		w.markDirtyLocked(ChunkPos{X: c.Pos.X, Z: c.Pos.Z - 1})
-	}
-	if lz == ChunkSize-1 {
-		w.markDirtyLocked(ChunkPos{X: c.Pos.X, Z: c.Pos.Z + 1})
-	}
-	if (lx == 0 || lx == ChunkSize-1) && (lz == 0 || lz == ChunkSize-1) {
-		dx, dz := -1, -1
-		if lx == ChunkSize-1 {
-			dx = 1
-		}
-		if lz == ChunkSize-1 {
-			dz = 1
-		}
-		w.markDirtyLocked(ChunkPos{X: c.Pos.X + dx, Z: c.Pos.Z + dz})
-	}
-}
-
 // rebuildDynamicLightLocked recomputes only the player-held light layer within
 // the union of the old and new 14-block light volumes. Static block light is
 // untouched, so moving a held torch no longer scans or clears every chunk.
@@ -400,15 +372,9 @@ func (w *World) rebuildDynamicLightLocked(oldX, oldY, oldZ int, oldLevel uint8) 
 	if minX > maxX {
 		return
 	}
-	dirty := make(map[[2]int]bool)
 	for _, c := range w.chunks {
 		if c.Pos.X < minX || c.Pos.X > maxX || c.Pos.Z < minZ || c.Pos.Z > maxZ {
 			continue
-		}
-		for i, v := range c.DynLight {
-			if v != 0 {
-				w.markDynamicBorderLocked(c, i, dirty)
-			}
 		}
 		clear(c.DynLight)
 	}
@@ -419,7 +385,6 @@ func (w *World) rebuildDynamicLightLocked(oldX, oldY, oldZ int, oldLevel uint8) 
 			i := index(Mod(w.dynLightX, ChunkSize), w.dynLightY, Mod(w.dynLightZ, ChunkSize))
 			if !c.Blocks[i].Opaque() {
 				c.DynLight[i] = w.dynLightLevel
-				w.markDynamicBorderLocked(c, i, dirty)
 				queue = append(queue, lightNode{x: w.dynLightX, y: w.dynLightY, z: w.dynLightZ, level: w.dynLightLevel})
 			}
 		}
@@ -446,12 +411,8 @@ func (w *World) rebuildDynamicLightLocked(oldX, oldY, oldZ int, oldLevel uint8) 
 				continue
 			}
 			c.DynLight[i] = next
-			w.markDynamicBorderLocked(c, i, dirty)
 			queue = append(queue, lightNode{x: x, y: y, z: z, level: next})
 		}
-	}
-	for key := range dirty {
-		w.markDirtyLocked(ChunkPos{X: key[0], Z: key[1]})
 	}
 	w.dynNeedsRefresh = false
 }
@@ -472,6 +433,40 @@ func (w *World) RefreshDynamicLightIfNeeded() {
 		return
 	}
 	w.refreshDynamicLightLocked()
+}
+
+func (w *World) DynamicLightNeedsRefresh() bool {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.dynNeedsRefresh
+}
+
+// FillDynamicLightVolume copies the player-held dynamic light layer into a
+// cubic R8 texture. Values are 0..255 (15 levels scaled by 17).
+func (w *World) FillDynamicLightVolume(ox, oy, oz, size int, out []byte) {
+	if size <= 0 || len(out) < size*size*size {
+		return
+	}
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	for z := 0; z < size; z++ {
+		wz := oz + z
+		for y := 0; y < size; y++ {
+			wy := oy + y
+			row := (z*size + y) * size
+			if wy < 0 || wy >= ChunkHeight {
+				continue
+			}
+			for x := 0; x < size; x++ {
+				wx := ox + x
+				c := w.chunks[ChunkOf(wx, wz).Key()]
+				if c == nil {
+					continue
+				}
+				out[row+x] = c.DynLight[index(Mod(wx, ChunkSize), wy, Mod(wz, ChunkSize))] * 17
+			}
+		}
+	}
 }
 
 func (w *World) SetSmoothLighting(on bool) {

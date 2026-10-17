@@ -109,11 +109,15 @@ type Game struct {
 	chatScroll        int
 	chatMessages      []chatMessage
 
-	toasts     []toastEntry
-	heldLightT float32
-	helpTime   float32
-	debug      bool
-	fullscreen bool
+	toasts           []toastEntry
+	heldLightT       float32
+	dynLightData     []byte
+	dynX, dynY, dynZ int
+	dynLevel         uint8
+	dynInited        bool
+	helpTime         float32
+	debug            bool
+	fullscreen       bool
 
 	fps        float64
 	frameMs    float64
@@ -802,11 +806,30 @@ func (g *Game) updateHeldLight(dt float32) {
 		}
 	}
 	pos := g.player.Body.Pos
-	g.world.SetDynamicLight(
-		int(math.Floor(float64(pos.X))),
-		int(math.Floor(float64(pos.Y+1))),
-		int(math.Floor(float64(pos.Z))),
-		level,
-	)
+	x := int(math.Floor(float64(pos.X)))
+	y := int(math.Floor(float64(pos.Y + 1)))
+	z := int(math.Floor(float64(pos.Z)))
+	changed := !g.dynInited || x != g.dynX || y != g.dynY || z != g.dynZ || level != g.dynLevel
+	needsRefresh := g.world.DynamicLightNeedsRefresh()
+	if !changed && !needsRefresh {
+		return
+	}
+	g.dynInited = true
+	g.dynX, g.dynY, g.dynZ, g.dynLevel = x, y, z, level
+	g.world.SetDynamicLight(x, y, z, level)
 	g.world.RefreshDynamicLightIfNeeded()
+	if level == 0 {
+		g.gfx.ClearDynamicLight()
+		return
+	}
+	const size = 32
+	if cap(g.dynLightData) < size*size*size {
+		g.dynLightData = make([]byte, size*size*size)
+	}
+	g.dynLightData = g.dynLightData[:size*size*size]
+	clear(g.dynLightData)
+	g.world.FillDynamicLightVolume(x-size/2, y-size/2, z-size/2, size, g.dynLightData)
+	if err := g.gfx.SetDynamicLight([3]int{x - size/2, y - size/2, z - size/2}, g.dynLightData, size); err != nil {
+		fmt.Println("dynamic light upload:", err)
+	}
 }

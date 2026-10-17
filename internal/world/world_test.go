@@ -283,6 +283,7 @@ func TestDynamicLightFollowsAndCrossesChunks(t *testing.T) {
 	w := New(123)
 	w.EnsureChunk(ChunkPos{0, 0})
 	n, _ := w.EnsureChunk(ChunkPos{1, 0})
+	w.ClearDirty(ChunkPos{1, 0})
 	w.SetDynamicLight(14, 110, 8, 14)
 	if got := w.BlockLightAt(14, 110, 8); got != 14 {
 		t.Fatalf("dynamic source light = %d", got)
@@ -290,8 +291,8 @@ func TestDynamicLightFollowsAndCrossesChunks(t *testing.T) {
 	if got := w.BlockLightAt(16, 110, 8); got != 12 {
 		t.Fatalf("dynamic cross-chunk light = %d", got)
 	}
-	if !n.Dirty {
-		t.Fatal("neighbor chunk was not marked dirty by dynamic light")
+	if n.Dirty {
+		t.Fatal("dynamic light should not force a chunk remesh")
 	}
 	w.SetBlock(2, 110, 30, core.Air)
 	w.SetDynamicLight(2, 110, 30, 14)
@@ -319,23 +320,24 @@ func BenchmarkDynamicLightMove(b *testing.B) {
 		w.SetDynamicLight(8+i%8, 100, 8, 14)
 	}
 }
-func TestDynamicLightBakedIntoMesh(t *testing.T) {
+func TestDynamicLightVolume(t *testing.T) {
 	w := New(123)
 	w.EnsureChunk(ChunkPos{0, 0})
-	w.SetBlock(8, 110, 8, core.Air)
-	w.SetBlock(9, 110, 8, core.Stone)
 	w.SetDynamicLight(8, 110, 8, 14)
-	mesh, ok := w.Mesh(ChunkPos{0, 0})
-	if !ok {
-		t.Fatal("missing mesh")
-	}
-	for _, v := range mesh.Opaque.Vertices {
-		if v.Block > 0 {
-			return
+	out := make([]byte, 32*32*32)
+	w.FillDynamicLightVolume(0, 100, 0, 32, out)
+	lit := false
+	for _, v := range out {
+		if v > 0 {
+			lit = true
+			break
 		}
 	}
-	t.Fatal("dynamic light was not baked into the chunk mesh")
+	if !lit {
+		t.Fatal("dynamic light volume is empty")
+	}
 }
+
 func TestDeferredDynamicLightForNewChunk(t *testing.T) {
 	w := New(123)
 	w.EnsureChunk(ChunkPos{0, 0})
@@ -391,5 +393,14 @@ func TestNeighborsLoaded(t *testing.T) {
 	}
 	if !w.NeighborsLoaded(ChunkPos{0, 0}) {
 		t.Fatal("chunk with all neighbours reported missing")
+	}
+}
+func BenchmarkChunkMesh(b *testing.B) {
+	w := New(123)
+	pos := ChunkPos{0, 0}
+	w.EnsureChunk(pos)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w.Mesh(pos)
 	}
 }

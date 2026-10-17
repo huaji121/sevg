@@ -167,6 +167,9 @@ func (g *Game) startWorld(load bool) error {
 	g.craftSize = 2
 	g.recipeBookOpen = false
 	g.heldLightT = 0
+	g.dynInited = false
+	g.dynLevel = 0
+	g.gfx.ClearDynamicLight()
 	g.mobs = entity.NewManager(seed)
 	g.time = timeOfDay
 	g.helpTime = 18

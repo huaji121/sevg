@@ -58,6 +58,7 @@ type worldUBO struct {
 	FogParams [4]float32
 	Cam       [4]float32
 	Sun       [4]float32
+	Dyn       [4]float32
 }
 
 type uiUBO struct {
@@ -105,10 +106,14 @@ type Renderer struct {
 	VSync       bool
 	depth       *sdl.GPUTexture
 
-	atlasTex  *sdl.GPUTexture
-	uiTex     *sdl.GPUTexture
-	fontAtlas ui.FontAtlas
-	sampler   *sdl.GPUSampler
+	atlasTex   *sdl.GPUTexture
+	uiTex      *sdl.GPUTexture
+	fontAtlas  ui.FontAtlas
+	sampler    *sdl.GPUSampler
+	dynSampler *sdl.GPUSampler
+	dynTex     *sdl.GPUTexture
+	dynOrigin  [3]float32
+	dynSize    float32
 
 	blockOpaque *sdl.GPUGraphicsPipeline
 	blockTrans  *sdl.GPUGraphicsPipeline
@@ -209,12 +214,36 @@ func (r *Renderer) createResources() error {
 	if err != nil {
 		return err
 	}
+	r.dynSampler, err = r.Dev.CreateSampler(&sdl.GPUSamplerCreateInfo{
+		MinFilter:    sdl.GPU_FILTER_LINEAR,
+		MagFilter:    sdl.GPU_FILTER_LINEAR,
+		MipmapMode:   sdl.GPU_SAMPLERMIPMAPMODE_NEAREST,
+		AddressModeU: sdl.GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+		AddressModeV: sdl.GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+		AddressModeW: sdl.GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+	})
+	if err != nil {
+		return err
+	}
+	r.dynTex, err = r.Dev.CreateTexture(&sdl.GPUTextureCreateInfo{
+		Type:              sdl.GPU_TEXTURETYPE_2D_ARRAY,
+		Format:            sdl.GPU_TEXTUREFORMAT_R8_UNORM,
+		Usage:             sdl.GPU_TEXTUREUSAGE_SAMPLER,
+		Width:             32,
+		Height:            32,
+		LayerCountOrDepth: 32,
+		NumLevels:         1,
+		SampleCount:       sdl.GPU_SAMPLECOUNT_1,
+	})
+	if err != nil {
+		return err
+	}
 
 	blockVS, err := r.loadShader("block.vert", sdl.GPU_SHADERSTAGE_VERTEX, 0, 1)
 	if err != nil {
 		return err
 	}
-	blockFS, err := r.loadShader("block.frag", sdl.GPU_SHADERSTAGE_FRAGMENT, 1, 1)
+	blockFS, err := r.loadShader("block.frag", sdl.GPU_SHADERSTAGE_FRAGMENT, 2, 1)
 	if err != nil {
 		r.Dev.ReleaseShader(blockVS)
 		return err
@@ -682,6 +711,7 @@ func (r *Renderer) Render(f *Frame) error {
 		FogParams: [4]float32{f.World.FogStart, f.World.FogEnd, 0, 0},
 		Cam:       [4]float32{f.Camera.Pos.X, f.Camera.Pos.Y, f.Camera.Pos.Z, 0},
 		Sun:       [4]float32{f.World.SunTint[0], f.World.SunTint[1], f.World.SunTint[2], 1},
+		Dyn:       [4]float32{r.dynOrigin[0], r.dynOrigin[1], r.dynOrigin[2], r.dynSize},
 	}
 	color := sdl.GPUColorTargetInfo{
 		Texture:    sw.Texture,
@@ -703,7 +733,7 @@ func (r *Renderer) Render(f *Frame) error {
 	rp.BindGraphicsPipeline(r.blockOpaque)
 	cb.PushVertexUniformData(0, bytesOf(&wu))
 	cb.PushFragmentUniformData(0, bytesOf(&wu))
-	rp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}})
+	rp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}, {Texture: r.dynTex, Sampler: r.dynSampler}})
 	for _, gc := range r.chunks {
 		if !r.chunkVisible(gc, f.Camera, f.World.FogEnd) {
 			continue
@@ -720,7 +750,7 @@ func (r *Renderer) Render(f *Frame) error {
 		rp.DrawIndexedPrimitives(r.entICount, 1, 0, 0, 0)
 	}
 	if r.entIconICount > 0 && r.entIconVB != nil && r.entIconIB != nil {
-		rp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.uiTex, Sampler: r.sampler}})
+		rp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.uiTex, Sampler: r.sampler}, {Texture: r.dynTex, Sampler: r.dynSampler}})
 		rp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.entIconVB, Offset: 0}})
 		rp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.entIconIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
 		rp.DrawIndexedPrimitives(r.entIconICount, 1, 0, 0, 0)
@@ -730,7 +760,7 @@ func (r *Renderer) Render(f *Frame) error {
 	rp.BindGraphicsPipeline(r.blockTrans)
 	cb.PushVertexUniformData(0, bytesOf(&wu))
 	cb.PushFragmentUniformData(0, bytesOf(&wu))
-	rp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}})
+	rp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}, {Texture: r.dynTex, Sampler: r.dynSampler}})
 	trans := make([]*gpuChunk, 0, len(r.chunks))
 	for _, gc := range r.chunks {
 		if gc.transparent.count > 0 && r.chunkVisible(gc, f.Camera, f.World.FogEnd) {
@@ -773,7 +803,7 @@ func (r *Renderer) Render(f *Frame) error {
 		hvp.BindGraphicsPipeline(r.blockView)
 		cb.PushVertexUniformData(0, bytesOf(&wu))
 		cb.PushFragmentUniformData(0, bytesOf(&wu))
-		hvp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}})
+		hvp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}, {Texture: r.dynTex, Sampler: r.dynSampler}})
 		if r.heldICount > 0 && r.heldVB != nil && r.heldIB != nil {
 			hvp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.heldVB, Offset: 0}})
 			hvp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.heldIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
@@ -783,7 +813,7 @@ func (r *Renderer) Render(f *Frame) error {
 			// Glass/ice: transparent blend, no depth writes. Otherwise one
 			// cube face writes depth first and erases a neighbouring edge.
 			hvp.BindGraphicsPipeline(r.blockTrans)
-			hvp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}})
+			hvp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}, {Texture: r.dynTex, Sampler: r.dynSampler}})
 			hvp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.heldTransVB, Offset: 0}})
 			hvp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.heldTransIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
 			hvp.DrawIndexedPrimitives(r.heldTransICount, 1, 0, 0, 0)
@@ -793,7 +823,7 @@ func (r *Renderer) Render(f *Frame) error {
 			// texture has anti-aliased edge pixels; blending them against
 			// the world produced a translucent pixel fringe.
 			hvp.BindGraphicsPipeline(r.blockOpaque)
-			hvp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.uiTex, Sampler: r.sampler}})
+			hvp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.uiTex, Sampler: r.sampler}, {Texture: r.dynTex, Sampler: r.dynSampler}})
 			hvp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.heldIconVB, Offset: 0}})
 			hvp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.heldIconIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
 			hvp.DrawIndexedPrimitives(r.heldIconICount, 1, 0, 0, 0)
@@ -1165,6 +1195,12 @@ func (r *Renderer) Close() {
 	if r.sampler != nil {
 		r.Dev.ReleaseSampler(r.sampler)
 	}
+	if r.dynSampler != nil {
+		r.Dev.ReleaseSampler(r.dynSampler)
+	}
+	if r.dynTex != nil {
+		r.Dev.ReleaseTexture(r.dynTex)
+	}
 	r.Dev.ReleaseWindow(r.Win)
 	r.Dev.Destroy()
 }
@@ -1203,4 +1239,69 @@ func (r *Renderer) SetVSync(on bool) error {
 		}
 	}
 	return lastErr
+}
+
+// SetDynamicLight uploads a cubic R8 light volume centered on the player.
+// The block shaders sample it directly, so changing the light does not
+// rebuild or re-upload any chunk meshes.
+func (r *Renderer) SetDynamicLight(origin [3]int, data []byte, size int) error {
+	if size <= 0 || len(data) != size*size*size {
+		r.ClearDynamicLight()
+		return nil
+	}
+	if r.dynTex == nil {
+		return nil
+	}
+	tb, err := r.Dev.CreateTransferBuffer(&sdl.GPUTransferBufferCreateInfo{
+		Usage: sdl.GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+		Size:  uint32(len(data)),
+	})
+	if err != nil {
+		return err
+	}
+	ptr, err := r.Dev.MapTransferBuffer(tb, false)
+	if err != nil {
+		r.Dev.ReleaseTransferBuffer(tb)
+		return err
+	}
+	copy(mappedBytes(ptr, len(data)), data)
+	r.Dev.UnmapTransferBuffer(tb)
+	cb, err := r.Dev.AcquireCommandBuffer()
+	if err != nil {
+		r.Dev.ReleaseTransferBuffer(tb)
+		return err
+	}
+	cp := cb.BeginCopyPass()
+	for z := 0; z < size; z++ {
+		cp.UploadToGPUTexture(
+			&sdl.GPUTextureTransferInfo{
+				TransferBuffer: tb,
+				Offset:         uint32(z * size * size),
+				PixelsPerRow:   uint32(size),
+				RowsPerLayer:   uint32(size),
+			},
+			&sdl.GPUTextureRegion{
+				Texture: r.dynTex,
+				Layer:   uint32(z),
+				W:       uint32(size),
+				H:       uint32(size),
+				D:       1,
+			},
+			false,
+		)
+	}
+	cp.End()
+	if err := cb.Submit(); err != nil {
+		r.Dev.ReleaseTransferBuffer(tb)
+		return err
+	}
+	r.retireTransfer(tb)
+	r.dynOrigin = [3]float32{float32(origin[0]), float32(origin[1]), float32(origin[2])}
+	r.dynSize = float32(size)
+	return nil
+}
+
+func (r *Renderer) ClearDynamicLight() {
+	r.dynSize = 0
+	r.dynOrigin = [3]float32{}
 }
