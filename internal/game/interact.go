@@ -203,17 +203,21 @@ func (g *Game) useItem(hit world.RayHit) {
 			return
 		}
 	}
-	if g.player.IntersectsBlock(x, y, z) {
-		g.notify(i18n.T("toast.no_room"), 1.2)
-		return
-	}
-	for _, m := range g.mobs.Mobs {
-		if m.Dead {
-			continue
-		}
-		min, max := m.Bounds()
-		if max.X > float32(x) && min.X < float32(x+1) && max.Y > float32(y) && min.Y < float32(y+1) && max.Z > float32(z) && min.Z < float32(z+1) {
+	// Non-solid blocks such as flowers, tall grass and torches may be placed
+	// inside a player or mob. Only solid blocks need free body space.
+	if def.Block.Solid() {
+		if g.player.IntersectsBlock(x, y, z) {
+			g.notify(i18n.T("toast.no_room"), 1.2)
 			return
+		}
+		for _, m := range g.mobs.Mobs {
+			if m.Dead {
+				continue
+			}
+			min, max := m.Bounds()
+			if max.X > float32(x) && min.X < float32(x+1) && max.Y > float32(y) && min.Y < float32(y+1) && max.Z > float32(z) && min.Z < float32(z+1) {
+				return
+			}
 		}
 	}
 	if g.world.SetBlock(x, y, z, def.Block) {

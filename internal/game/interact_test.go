@@ -173,3 +173,38 @@ func TestMiningProgressResetsWhenBlockChanges(t *testing.T) {
 		t.Fatalf("progress survived block replacement: before=%f after=%f", before, g.breakProgress)
 	}
 }
+func TestPlacePassThroughBlockInsidePlayer(t *testing.T) {
+	g := newTestGame(t)
+	g.player.Body.Pos = mathx.Vec3{X: 12.5, Y: 72, Z: 12.5}
+	g.inv = core.Inventory{}
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{Item: core.ItemTorch, Count: 4}
+	g.world.SetBlock(12, 71, 12, core.Stone)
+	hit := world.RayHit{Hit: true, Block: core.Stone, Pos: [3]int{11, 72, 12}, Normal: mathx.Vec3{X: 1}}
+	if !g.player.IntersectsBlock(12, 72, 12) {
+		t.Fatal("test target is not inside the player")
+	}
+	g.useItem(hit)
+	if b := g.world.GetBlock(12, 72, 12); b != core.Torch {
+		t.Fatalf("pass-through block was not placed inside player: %v", b)
+	}
+	if got := g.inv.Count(core.ItemTorch); got != 3 {
+		t.Fatalf("torch count = %d", got)
+	}
+}
+
+func TestSolidBlockStillRequiresSpace(t *testing.T) {
+	g := newTestGame(t)
+	g.player.Body.Pos = mathx.Vec3{X: 12.5, Y: 72, Z: 12.5}
+	g.inv = core.Inventory{}
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{Item: core.ItemPlanks, Count: 4}
+	hit := world.RayHit{Hit: true, Block: core.Dirt, Pos: [3]int{11, 72, 12}, Normal: mathx.Vec3{X: 1}}
+	g.useItem(hit)
+	if b := g.world.GetBlock(12, 72, 12); b != core.Air {
+		t.Fatalf("solid block was placed inside player: %v", b)
+	}
+	if got := g.inv.Count(core.ItemPlanks); got != 4 {
+		t.Fatalf("planks count = %d", got)
+	}
+}
