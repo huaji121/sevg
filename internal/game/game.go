@@ -116,7 +116,7 @@ func Run(opts Options) error {
 		opts.Language = i18n.ZH
 	}
 	i18n.Set(opts.Language)
-	fontAtlas := ui.BuildFontAtlas(i18n.AllRunes())
+	fontAtlas := ui.BuildFontAtlas(i18n.AllRunes(), render.BuildAtlas())
 
 	var unload func()
 	if err := sdl.LoadLibrary(sdl.Path()); err != nil {

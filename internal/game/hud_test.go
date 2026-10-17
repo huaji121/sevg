@@ -78,7 +78,7 @@ func TestHeldItemMesh(t *testing.T) {
 		t.Fatal("empty hand should produce no mesh")
 	}
 	g.inv.Slots[0] = core.Stack{Item: core.ItemStonePickaxe, Count: 1}
-	if m = g.buildHeldMesh(); len(m.Vertices) == 0 {
-		t.Fatal("held pickaxe produced no mesh")
+	if m = g.buildHeldMesh(); len(m.Vertices) != 0 {
+		t.Fatal("tool should use the inventory icon, not the 3D held mesh")
 	}
 }

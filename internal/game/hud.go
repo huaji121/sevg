@@ -20,6 +20,9 @@ func (g *Game) drawUI() {
 	case StateMenu:
 		g.drawMenu(w, h)
 	default:
+		if g.state == StatePlaying {
+			g.drawHeldIcon(w, h)
+		}
 		g.drawHUD(w, h)
 		switch g.state {
 		case StateInventory:
@@ -377,19 +380,18 @@ func (g *Game) drawItemIcon(x, y, size float32, st core.Stack, alpha float32) {
 		return
 	}
 	c := g.canv
-	col3 := st.Item.Def().Color
-	base := [4]float32{col3[0], col3[1], col3[2], alpha}
-	light := [4]float32{clampF(col3[0]*1.28, 0, 1), clampF(col3[1]*1.28, 0, 1), clampF(col3[2]*1.28, 0, 1), alpha}
-	dark := [4]float32{col3[0] * 0.68, col3[1] * 0.68, col3[2] * 0.68, alpha}
-	c.Rect(x+2, y+3, size-4, size-5, [4]float32{0, 0, 0, 0.35 * alpha})
-	c.Rect(x+1, y+1, size-2, size-2, base)
-	c.Rect(x+1, y+1, size-2, (size-2)*0.28, light)
-	c.Rect(x+size*0.72, y+2, size*0.26, size-3, dark)
-	c.Border(x+1, y+1, size-2, size-2, 1.5, [4]float32{0, 0, 0, 0.35 * alpha})
-	name := i18n.ItemName(st.Item)
-	if name != "" {
-		letter := string([]rune(name)[0])
-		c.TextCentered(x+size/2, y+size/2-9, letter, 1.0, [4]float32{1, 1, 1, alpha})
+	if _, ok := c.Icons[st.Item]; !ok {
+		// Defensive fallback for items added without an icon.
+		col3 := st.Item.Def().Color
+		base := [4]float32{col3[0], col3[1], col3[2], alpha}
+		c.Rect(x+2, y+3, size-4, size-5, [4]float32{0, 0, 0, 0.35 * alpha})
+		c.Rect(x+1, y+1, size-2, size-2, base)
+		name := i18n.ItemName(st.Item)
+		if name != "" {
+			c.TextCentered(x+size/2, y+size/2-9, string([]rune(name)[0]), 1.0, [4]float32{1, 1, 1, alpha})
+		}
+	} else {
+		c.Icon(st.Item, x+1, y+1, size-2, size-2, alpha)
 	}
 	if st.Count > 1 {
 		cnt := fmt.Sprint(st.Count)
@@ -572,6 +574,35 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData) {
 	return opaque, transparent
 }
 
+// drawHeldIcon uses the same generated icon as the inventory for tools,
+// food and materials. It is drawn in the UI pass, before the HUD.
+func (g *Game) drawHeldIcon(w, h float32) {
+	if g.player == nil {
+		return
+	}
+	st := g.inv.SelectedStack()
+	if st.Empty() {
+		return
+	}
+	switch entity.VisualForItem(st.Item) {
+	case entity.DropVisualBlock, entity.DropVisualGlass, entity.DropVisualPlant:
+		return
+	}
+	size := w
+	if h < size {
+		size = h
+	}
+	size *= 0.22
+	cx := w - size*0.68
+	cy := h - size*0.72 + float32(math.Sin(float64(g.frame)*0.08))*2 + g.player.Bob*8
+	angle := float32(-0.14)
+	if g.breakActive {
+		angle += float32(math.Sin(float64(g.frame)*0.9)) * 0.16
+	}
+	g.canv.IconRotatedColored(st.Item, cx+4, cy+6, size, size, angle, [4]float32{0, 0, 0, 0.28})
+	g.canv.IconRotated(st.Item, cx, cy, size, size, angle, 1)
+}
+
 // buildHeldMesh creates a small first-person view model for the selected
 // item. It is built in camera space and drawn with depth testing disabled.
 func (g *Game) buildHeldMesh() world.MeshData {
@@ -593,21 +624,10 @@ func (g *Game) buildHeldMesh() world.MeshData {
 		appendBlockBox(&local, c.Sub(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), c.Add(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), def.Block)
 	case entity.DropVisualPlant:
 		appendPlant(&local, c, 0.30, 0.38, def.Block)
-	case entity.DropVisualSword:
-		blade := uint8(core.TileWood)
-		if st.Item == core.ItemIronSword {
-			blade = uint8(core.TileWhite)
-		}
-		appendSword(&local, c, blade)
-	case entity.DropVisualPickaxe:
-		head := uint8(core.TileGray)
-		if st.Item == core.ItemIronPickaxe {
-			head = uint8(core.TileWhite)
-		}
-		appendPickaxe(&local, c, head)
 	default:
-		col := [4]float32{def.Color[0], def.Color[1], def.Color[2], 1}
-		appendEntityBox(&local, c.Sub(mathx.Vec3{X: 0.13, Y: 0.13, Z: 0.13}), c.Add(mathx.Vec3{X: 0.13, Y: 0.13, Z: 0.13}), col)
+		// Tools, food and materials are drawn as the same icon used by
+		// the inventory, so their held and inventory appearances match.
+		return world.MeshData{}
 	}
 	if len(local.Indices) == 0 {
 		return world.MeshData{}

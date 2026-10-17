@@ -5,8 +5,11 @@ package ui
 import (
 	"fmt"
 	"image"
+	"math"
 	"os"
 	"sort"
+
+	"sevg/internal/core"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
@@ -32,21 +35,24 @@ type FontAtlas struct {
 	W, H       int
 	WhiteUV    [2]float32
 	Glyphs     map[rune]Glyph
+	Icons      map[core.ItemID]Glyph
 	LineHeight float32
 	Ascent     float32
 	Source     string
 }
 
 type placement struct {
-	r   rune
-	g   Glyph
-	img *image.Alpha
+	r     rune
+	item  core.ItemID
+	g     Glyph
+	alpha *image.Alpha
+	rgba  *image.RGBA
 }
 
 // BuildFontAtlas rasterizes all requested runes into one texture. It uses a
 // system CJK font when available (Microsoft YaHei, Noto Sans CJK, PingFang,
 // etc.) and falls back to the embedded 7x13 bitmap font.
-func BuildFontAtlas(runes []rune) FontAtlas {
+func BuildFontAtlas(runes []rune, blockAtlas []byte) FontAtlas {
 	face, source := loadFace()
 	if face != nil {
 		defer face.Close()
@@ -75,11 +81,19 @@ func BuildFontAtlas(runes []rune) FontAtlas {
 
 	placements := make([]placement, 0, len(chars))
 	for _, r := range chars {
-		g, img, ok := rasterGlyph(face, r)
+		g, alpha, ok := rasterGlyph(face, r)
 		if !ok {
 			continue
 		}
-		placements = append(placements, placement{r: r, g: g, img: img})
+		placements = append(placements, placement{r: r, g: g, alpha: alpha})
+	}
+	if len(blockAtlas) > 0 {
+		icons := buildItemIcons(blockAtlas)
+		for item := core.ItemID(1); item < core.ItemCount; item++ {
+			if img := icons[item]; img != nil {
+				placements = append(placements, placement{item: item, rgba: img})
+			}
+		}
 	}
 
 	// Reserve a 2x2 white block in the top-left corner for panels and bars.
@@ -87,15 +101,20 @@ func BuildFontAtlas(runes []rune) FontAtlas {
 	cursorX, cursorY, rowH := 4, 0, whiteSize
 	for i := range placements {
 		p := &placements[i]
-		if p.img == nil {
+		var w, h int
+		switch {
+		case p.alpha != nil:
+			w, h = p.alpha.Rect.Dx(), p.alpha.Rect.Dy()
+		case p.rgba != nil:
+			w, h = p.rgba.Rect.Dx(), p.rgba.Rect.Dy()
+		default:
 			continue
 		}
-		if cursorX+p.img.Rect.Dx() > atlasWidth {
+		if cursorX+w > atlasWidth {
 			cursorX = 0
 			cursorY += rowH + 1
 			rowH = 0
 		}
-		w, h := p.img.Rect.Dx(), p.img.Rect.Dy()
 		p.g.W = float32(w)
 		p.g.H = float32(h)
 		p.g.OffsetX = float32(cursorX)
@@ -111,10 +130,15 @@ func BuildFontAtlas(runes []rune) FontAtlas {
 	}
 	for i := range placements {
 		p := &placements[i]
-		if p.img == nil {
+		var w, h int
+		switch {
+		case p.alpha != nil:
+			w, h = p.alpha.Rect.Dx(), p.alpha.Rect.Dy()
+		case p.rgba != nil:
+			w, h = p.rgba.Rect.Dx(), p.rgba.Rect.Dy()
+		default:
 			continue
 		}
-		w, h := p.img.Rect.Dx(), p.img.Rect.Dy()
 		p.g.U0 = (p.g.OffsetX + 0.01) / atlasWidth
 		p.g.V0 = (p.g.OffsetY + 0.01) / float32(height)
 		p.g.U1 = (p.g.OffsetX + float32(w) - 0.01) / atlasWidth
@@ -129,36 +153,54 @@ func BuildFontAtlas(runes []rune) FontAtlas {
 		}
 	}
 	glyphs := make(map[rune]Glyph, len(placements))
-	for _, p := range placements {
-		if p.img == nil {
+	icons := make(map[core.ItemID]Glyph)
+	for i := range placements {
+		p := &placements[i]
+		px, py := int(p.g.OffsetX), int(p.g.OffsetY)
+		if p.alpha != nil {
+			w, h := p.alpha.Rect.Dx(), p.alpha.Rect.Dy()
+			for y := 0; y < h; y++ {
+				for x := 0; x < w; x++ {
+					a := p.alpha.AlphaAt(x, y).A
+					if a == 0 {
+						continue
+					}
+					i := ((py+y)*atlasWidth + (px + x)) * 4
+					pixels[i], pixels[i+1], pixels[i+2], pixels[i+3] = 255, 255, 255, a
+				}
+			}
+			// Restore the glyph's pixel offsets relative to the pen/line top.
+			bounds, _, _ := face.GlyphBounds(p.r)
+			p.g.OffsetX = float32(bounds.Min.X)/64 - cellPad
+			p.g.OffsetY = ascent + float32(bounds.Min.Y)/64 - cellPad
+			glyphs[p.r] = p.g
+			continue
+		}
+		if p.alpha == nil && p.rgba == nil {
 			if p.g.Advance > 0 {
 				glyphs[p.r] = p.g
 			}
 			continue
 		}
-		px, py := int(p.g.OffsetX), int(p.g.OffsetY)
-		w, h := p.img.Rect.Dx(), p.img.Rect.Dy()
-		for y := 0; y < h; y++ {
-			for x := 0; x < w; x++ {
-				a := p.img.AlphaAt(x, y).A
-				if a == 0 {
-					continue
+		if p.rgba != nil {
+			for y := 0; y < p.rgba.Rect.Dy(); y++ {
+				for x := 0; x < p.rgba.Rect.Dx(); x++ {
+					src := p.rgba.Pix[y*p.rgba.Stride+x*4:]
+					if src[3] == 0 {
+						continue
+					}
+					dst := ((py+y)*atlasWidth + (px + x)) * 4
+					copy(pixels[dst:dst+4], src[:4])
 				}
-				i := ((py+y)*atlasWidth + (px + x)) * 4
-				pixels[i], pixels[i+1], pixels[i+2], pixels[i+3] = 255, 255, 255, a
 			}
+			icons[p.item] = p.g
 		}
-		// Restore the glyph's pixel offsets relative to the pen/line top.
-		bounds, _, _ := face.GlyphBounds(p.r)
-		p.g.OffsetX = float32(bounds.Min.X)/64 - cellPad
-		p.g.OffsetY = ascent + float32(bounds.Min.Y)/64 - cellPad
-		glyphs[p.r] = p.g
 	}
 
 	whiteUV := [2]float32{1.0 / atlasWidth, 1.0 / float32(height)}
 	return FontAtlas{
 		Pixels: pixels, W: atlasWidth, H: height,
-		WhiteUV: whiteUV, Glyphs: glyphs,
+		WhiteUV: whiteUV, Glyphs: glyphs, Icons: icons,
 		LineHeight: lineHeight, Ascent: ascent, Source: source,
 	}
 }
@@ -256,11 +298,12 @@ type Canvas struct {
 	Verts      []Vertex
 	White      [2]float32
 	Glyphs     map[rune]Glyph
+	Icons      map[core.ItemID]Glyph
 	LineHeight float32
 }
 
 func NewCanvas(w, h int, atlas FontAtlas) *Canvas {
-	return &Canvas{W: w, H: h, White: atlas.WhiteUV, Glyphs: atlas.Glyphs, LineHeight: atlas.LineHeight}
+	return &Canvas{W: w, H: h, White: atlas.WhiteUV, Glyphs: atlas.Glyphs, Icons: atlas.Icons, LineHeight: atlas.LineHeight}
 }
 
 func (c *Canvas) Resize(w, h int) { c.W, c.H = w, h }
@@ -283,6 +326,44 @@ func (c *Canvas) quad(x, y, w, h float32, u0, v0, u1, v1 float32, col [4]float32
 
 func (c *Canvas) Rect(x, y, w, h float32, col [4]float32) {
 	c.quad(x, y, w, h, c.White[0], c.White[1], c.White[0], c.White[1], col)
+}
+
+// Icon draws an item preview from the UI atlas (font glyphs + item icons).
+func (c *Canvas) Icon(item core.ItemID, x, y, w, h float32, alpha float32) {
+	g, ok := c.Icons[item]
+	if !ok || alpha <= 0 {
+		return
+	}
+	c.quad(x, y, w, h, g.U0, g.V0, g.U1, g.V1, [4]float32{1, 1, 1, alpha})
+}
+
+// IconRotated draws a centered, rotated item icon.
+func (c *Canvas) IconRotated(item core.ItemID, cx, cy, w, h, angle, alpha float32) {
+	c.IconRotatedColored(item, cx, cy, w, h, angle, [4]float32{1, 1, 1, alpha})
+}
+
+// IconRotatedColored is IconRotated with a tint/shadow colour.
+func (c *Canvas) IconRotatedColored(item core.ItemID, cx, cy, w, h, angle float32, col [4]float32) {
+	g, ok := c.Icons[item]
+	if !ok || w <= 0 || h <= 0 || col[3] <= 0 {
+		return
+	}
+	cosA, sinA := float32(math.Cos(float64(angle))), float32(math.Sin(float64(angle)))
+	hw, hh := w/2, h/2
+	local := [4][2]float32{{-hw, -hh}, {hw, -hh}, {hw, hh}, {-hw, hh}}
+	uv := [4][2]float32{{g.U0, g.V0}, {g.U1, g.V0}, {g.U1, g.V1}, {g.U0, g.V1}}
+	var p [4][2]float32
+	for i, q := range local {
+		p[i][0] = cx + q[0]*cosA - q[1]*sinA
+		p[i][1] = cy + q[0]*sinA + q[1]*cosA
+	}
+	for _, idx := range [...]int{0, 1, 2, 0, 2, 3} {
+		c.Verts = append(c.Verts, Vertex{
+			X: p[idx][0], Y: p[idx][1],
+			U: uv[idx][0], V: uv[idx][1],
+			R: col[0], G: col[1], B: col[2], A: col[3],
+		})
+	}
 }
 
 func (c *Canvas) Border(x, y, w, h, t float32, col [4]float32) {
