@@ -3,6 +3,8 @@ package entity
 import (
 	"testing"
 
+	"sevg/internal/core"
+
 	"sevg/internal/mathx"
 	"sevg/internal/world"
 )
@@ -23,5 +25,19 @@ func TestPickMob(t *testing.T) {
 func TestRayAABBMiss(t *testing.T) {
 	if _, ok := world.RayAABB(mathx.Vec3{X: 0, Y: 0, Z: 0}, mathx.Vec3{Z: -1}, mathx.Vec3{X: 2, Y: -1, Z: -1}, mathx.Vec3{X: 3, Y: 1, Z: -2}); ok {
 		t.Fatal("expected miss")
+	}
+}
+func TestBlockDropsUseBlockTextures(t *testing.T) {
+	m := NewManager(1)
+	m.Drop(core.ItemPlanks, 1, mathx.Vec3{X: 0.5, Y: 64, Z: 0.5}, mathx.Vec3{})
+	boxes := m.Items[0].Boxes()
+	if len(boxes) != 1 || boxes[0].Block != core.Planks {
+		t.Fatalf("plank drop block = %v", boxes)
+	}
+
+	m.Drop(core.ItemApple, 1, mathx.Vec3{X: 0.5, Y: 64, Z: 0.5}, mathx.Vec3{})
+	boxes = m.Items[1].Boxes()
+	if len(boxes) != 1 || boxes[0].Block != core.Air {
+		t.Fatalf("apple drop should stay a palette cube: %v", boxes)
 	}
 }

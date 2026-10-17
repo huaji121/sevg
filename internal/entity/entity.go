@@ -28,6 +28,9 @@ type Box struct {
 	Center mathx.Vec3
 	Size   mathx.Vec3
 	Color  [4]float32
+	// Block, when non-air, makes this box use the real block atlas texture
+	// instead of a flat palette colour.
+	Block core.BlockID
 }
 
 type Mob struct {
@@ -103,14 +106,17 @@ type ItemDrop struct {
 }
 
 func (d *ItemDrop) Boxes() []Box {
-	d.Bob += 0 // animation is driven by Age in the caller
 	c := d.Body.Pos.Add(mathx.Vec3{Y: 0.18})
 	col := [4]float32{0.8, 0.8, 0.8, 1}
+	block := core.Air
 	if d.Item.Valid() {
-		c3 := d.Item.Def().Color
-		col = [4]float32{c3[0], c3[1], c3[2], 1}
+		def := d.Item.Def()
+		col = [4]float32{def.Color[0], def.Color[1], def.Color[2], 1}
+		if def.Kind == core.KindBlock {
+			block = def.Block
+		}
 	}
-	return []Box{{Center: c, Size: mathx.Vec3{X: 0.28, Y: 0.28, Z: 0.28}, Color: col}}
+	return []Box{{Center: c, Size: mathx.Vec3{X: 0.28, Y: 0.28, Z: 0.28}, Color: col, Block: block}}
 }
 
 type Manager struct {

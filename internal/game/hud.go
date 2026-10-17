@@ -536,7 +536,12 @@ func (g *Game) buildEntityMesh() world.MeshData {
 			for _, box := range d.Boxes() {
 				c := box.Center
 				c.Y += bob
-				appendEntityBox(&m, c.Sub(box.Size.Mul(0.5)), c.Add(box.Size.Mul(0.5)), box.Color)
+				min, max := c.Sub(box.Size.Mul(0.5)), c.Add(box.Size.Mul(0.5))
+				if box.Block != core.Air {
+					appendBlockBox(&m, min, max, box.Block)
+				} else {
+					appendEntityBox(&m, min, max, box.Color)
+				}
 			}
 		}
 	}
@@ -598,8 +603,18 @@ var entityFaces = [6]entityFace{
 
 func appendEntityBox(m *world.MeshData, min, max mathx.Vec3, col [4]float32) {
 	tile := tileForColor(col)
-	u0, v0, u1, v1 := world.TileUV(tile)
-	for _, f := range entityFaces {
+	appendBoxFaces(m, min, max, func(int) uint8 { return tile })
+}
+
+// appendBlockBox renders a dropped block with the same per-face atlas tiles
+// as a block placed in the world.
+func appendBlockBox(m *world.MeshData, min, max mathx.Vec3, block core.BlockID) {
+	appendBoxFaces(m, min, max, block.Tile)
+}
+
+func appendBoxFaces(m *world.MeshData, min, max mathx.Vec3, tileAt func(int) uint8) {
+	for fi, f := range entityFaces {
+		u0, v0, u1, v1 := world.TileUV(tileAt(fi))
 		base := uint32(len(m.Vertices))
 		for i := 0; i < 4; i++ {
 			p := f.corners[i]
