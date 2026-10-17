@@ -35,6 +35,7 @@ func (g *Game) openChatWith(prefix string) {
 	g.chatCaret = len(g.chatInput)
 	g.chatComposition = ""
 	g.chatSuppressSlash = prefix == "/"
+	g.chatScroll = 0
 	g.mouseLeft = false
 	g.mouseRight = false
 	g.breakActive = false
@@ -55,6 +56,7 @@ func (g *Game) closeChat() {
 	g.chatCaret = 0
 	g.chatComposition = ""
 	g.chatSuppressSlash = false
+	g.chatScroll = 0
 	if g.Win != nil {
 		_ = g.Win.StopTextInput()
 	}
@@ -195,6 +197,13 @@ func wrapChat(c *ui.Canvas, text string, maxWidth, scale float32) []string {
 	return out
 }
 
+func (g *Game) scrollChat(delta int) {
+	g.chatScroll += delta
+	if g.chatScroll < 0 {
+		g.chatScroll = 0
+	}
+}
+
 func (g *Game) drawChat(w, h float32) {
 	if g.state != StatePlaying || g.canv == nil {
 		return
@@ -230,13 +239,31 @@ func (g *Game) drawChat(w, h float32) {
 		if maxLines < 1 {
 			maxLines = 1
 		}
-		start := len(lines) - maxLines
+		maxScroll := len(lines) - maxLines
+		if maxScroll < 0 {
+			maxScroll = 0
+		}
+		if g.chatScroll > maxScroll {
+			g.chatScroll = maxScroll
+		}
+		start := len(lines) - maxLines - g.chatScroll
 		if start < 0 {
 			start = 0
 		}
-		for i := start; i < len(lines); i++ {
+		for i := start; i < len(lines) && i < start+maxLines; i++ {
 			yy := messageTop + float32(i-start)*lineH
 			c.Text(x+16, yy, lines[i].text, scale, ui.TextColor)
+		}
+		if maxScroll > 0 {
+			trackX := x + pw - 10
+			trackH := messageBottom - messageTop
+			c.Rect(trackX, messageTop, 3, trackH, [4]float32{1, 1, 1, 0.12})
+			thumbH := trackH * float32(maxLines) / float32(len(lines))
+			if thumbH < 20 {
+				thumbH = 20
+			}
+			thumbY := messageTop + (trackH-thumbH)*(1-float32(g.chatScroll)/float32(maxScroll))
+			c.Rect(trackX, thumbY, 3, thumbH, [4]float32{1, 1, 1, 0.45})
 		}
 
 		inputY := y + ph - 40

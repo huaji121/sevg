@@ -87,6 +87,7 @@ type Game struct {
 	chatCaret         int
 	chatComposition   string
 	chatSuppressSlash bool
+	chatScroll        int
 	chatMessages      []chatMessage
 
 	toast      string
@@ -203,6 +204,7 @@ func (g *Game) setState(s State) {
 		g.chatCaret = 0
 		g.chatComposition = ""
 		g.chatSuppressSlash = false
+		g.chatScroll = 0
 		if g.Win != nil {
 			_ = g.Win.StopTextInput()
 		}
@@ -310,6 +312,14 @@ func (g *Game) poll() {
 			g.onMouseUp(be.Button)
 		case sdl.EVENT_MOUSE_WHEEL:
 			we := e.MouseWheelEvent()
+			if g.chatOpen {
+				if we.Y > 0 {
+					g.scrollChat(3)
+				} else if we.Y < 0 {
+					g.scrollChat(-3)
+				}
+				continue
+			}
 			if g.state == StatePlaying && !g.chatOpen {
 				if we.Y < 0 {
 					g.inv.Scroll(1)

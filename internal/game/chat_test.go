@@ -77,3 +77,14 @@ func TestSlashOpensChatWithCommandPrefix(t *testing.T) {
 		t.Fatal("slash command did not switch mode")
 	}
 }
+func TestChatScroll(t *testing.T) {
+	g := newTestGame(t)
+	g.scrollChat(-5)
+	if g.chatScroll != 0 {
+		t.Fatalf("negative chat scroll: %d", g.chatScroll)
+	}
+	g.scrollChat(6)
+	if g.chatScroll != 6 {
+		t.Fatalf("chat scroll: %d", g.chatScroll)
+	}
+}
