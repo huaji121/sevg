@@ -51,3 +51,23 @@ func TestItemForBlock(t *testing.T) {
 		t.Fatal("wool item mismatch")
 	}
 }
+func TestBlockFaceTiles(t *testing.T) {
+	grass := BlockDefs[Grass]
+	if grass.Tiles[2] != TileGrassTop {
+		t.Fatalf("grass top tile = %d", grass.Tiles[2])
+	}
+	if grass.Tiles[3] != TileDirt {
+		t.Fatalf("grass bottom tile = %d", grass.Tiles[3])
+	}
+	for _, side := range []int{0, 1, 4, 5} {
+		if grass.Tiles[side] != TileGrassSide {
+			t.Fatalf("grass side %d tile = %d", side, grass.Tiles[side])
+		}
+	}
+	if Grass.Tile(2) != TileGrassTop || Grass.Tile(3) != TileDirt || Grass.Tile(4) != TileGrassSide {
+		t.Fatal("BlockID.Tile does not select the face tile")
+	}
+	if Log.Tile(2) != TileLogTop || Log.Tile(0) != TileLogSide {
+		t.Fatal("log face tiles are wrong")
+	}
+}

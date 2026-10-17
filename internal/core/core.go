@@ -180,14 +180,20 @@ func (b BlockID) Def() *BlockDef {
 	}
 	return &BlockDefs[b]
 }
-func (b BlockID) Name() string        { return b.Def().Name }
-func (b BlockID) IsAir() bool         { return b == Air }
-func (b BlockID) Solid() bool         { return b.Def().Solid }
-func (b BlockID) Opaque() bool        { return b.Def().Opaque }
-func (b BlockID) Liquid() bool        { return b.Def().Liquid }
-func (b BlockID) Cross() bool         { return b.Def().Cross }
-func (b BlockID) Hardness() float32   { return b.Def().Hardness }
-func (b BlockID) Tile(face int) uint8 { return b.Def().Tiles[face&5] }
+func (b BlockID) Name() string      { return b.Def().Name }
+func (b BlockID) IsAir() bool       { return b == Air }
+func (b BlockID) Solid() bool       { return b.Def().Solid }
+func (b BlockID) Opaque() bool      { return b.Def().Opaque }
+func (b BlockID) Liquid() bool      { return b.Def().Liquid }
+func (b BlockID) Cross() bool       { return b.Def().Cross }
+func (b BlockID) Hardness() float32 { return b.Def().Hardness }
+func (b BlockID) Tile(face int) uint8 {
+	d := b.Def()
+	if face < 0 || face >= len(d.Tiles) {
+		return d.Tiles[0]
+	}
+	return d.Tiles[face]
+}
 
 type ItemDef struct {
 	Name     string
