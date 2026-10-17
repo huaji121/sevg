@@ -21,6 +21,9 @@ func (g *Game) drawUI() {
 		g.drawMenu(w, h)
 	default:
 		g.drawHUD(w, h)
+		if g.state == StatePlaying {
+			g.drawChat(w, h)
+		}
 		switch g.state {
 		case StateInventory:
 			g.drawInventory(w, h)
@@ -190,7 +193,7 @@ func (g *Game) drawHUD(w, h float32) {
 		c.TextCentered(w/2, y0-29, label, 1.2, ui.TextColor)
 	}
 
-	if g.helpTime > 0 && g.state == StatePlaying {
+	if g.helpTime > 0 && g.state == StatePlaying && !g.chatOpen {
 		px, py := float32(24), h-300
 		c.Panel(px, py, 500, 192, ui.RGBA(12, 16, 20, 195), ui.RGBA(80, 100, 110, 160))
 		c.Text(px+14, py+10, i18n.T("hud.quick_start"), 1.5, ui.Accent)

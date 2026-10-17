@@ -158,6 +158,7 @@ func (g *Game) startWorld(load bool) error {
 	g.startWorkers()
 	fmt.Printf("WORLD seed=%d spawn=%.2f,%.2f,%.2f loaded=%d meshed=%d mobs=%d\n", seed, p.Body.Pos.X, p.Body.Pos.Y, p.Body.Pos.Z, w.Loaded(), len(g.meshed), g.mobs.MobCount())
 	_ = g.Win.SetTitle(i18n.T("window.title"))
+	g.addChat(i18n.T("chat.welcome"))
 	g.setState(StatePlaying)
 	g.requestChunks(center)
 	if sv != nil {

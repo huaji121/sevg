@@ -20,6 +20,10 @@ var current = ZH
 var translations = map[string]map[string]string{
 	ZH: {
 		"window.title":     "SEVG - 简单且可扩展的体素游戏",
+		"chat.welcome":     "欢迎来到 SEVG！按 T 打开聊天",
+		"chat.you":         "你",
+		"chat.placeholder": "输入消息…",
+		"chat.hint":        "Enter 发送 · Esc 关闭",
 		"common.health":    "生命",
 		"common.inventory": "背包",
 		"common.crafting":  "合成",
@@ -75,7 +79,7 @@ var translations = map[string]map[string]string{
 		"hud.help1":       "WASD 移动 - SPACE 跳跃 - SHIFT 疾跑",
 		"hud.help2":       "左键 挖掘/攻击 - 右键 放置/进食",
 		"hud.help3":       "中键 选取方块 - 滚轮 切换 - 1-9 快捷栏",
-		"hud.help4":       "E 背包与合成 - F 飞行 - F3 调试",
+		"hud.help4":       "E 背包与合成 - T 聊天 - F 飞行 - F3 调试",
 		"hud.help5":       "破坏方块收集物品，开始建造吧！",
 		"hud.help6":       "H 隐藏帮助",
 		"hud.debug_title": "SEVG 调试 (F3)",
@@ -112,6 +116,10 @@ var translations = map[string]map[string]string{
 	},
 	EN: {
 		"window.title":     "SEVG - Simple and Extendable Voxel Game",
+		"chat.welcome":     "Welcome to SEVG! Press T to chat",
+		"chat.you":         "You",
+		"chat.placeholder": "Type a message...",
+		"chat.hint":        "Enter send · Esc close",
 		"common.health":    "HEALTH",
 		"common.inventory": "INVENTORY",
 		"common.crafting":  "CRAFTING",
@@ -167,7 +175,7 @@ var translations = map[string]map[string]string{
 		"hud.help1":       "WASD MOVE - SPACE JUMP - SHIFT SPRINT",
 		"hud.help2":       "LMB MINE / ATTACK - RMB PLACE / EAT",
 		"hud.help3":       "MMB PICK BLOCK - WHEEL SELECT - 1-9 HOTBAR",
-		"hud.help4":       "E INVENTORY + CRAFTING - F FLY - F3 DEBUG",
+		"hud.help4":       "E INVENTORY - T CHAT - F FLY - F3 DEBUG",
 		"hud.help5":       "BREAK BLOCKS TO COLLECT ITEMS AND BUILD!",
 		"hud.help6":       "H TO HIDE HELP",
 		"hud.debug_title": "SEVG DEBUG (F3)",
@@ -343,5 +351,22 @@ func AllRunes() []rune {
 		out = append(out, r)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
+// ChatRunes returns a broad set of characters that can be entered into the
+// chat. They are baked into the UI atlas so arbitrary Chinese chat text does
+// not render as question marks.
+func ChatRunes() []rune {
+	out := make([]rune, 0, 0x9FFF-0x4E00+0x100)
+	for r := rune(0x4E00); r <= 0x9FFF; r++ {
+		out = append(out, r)
+	}
+	for r := rune(0x3000); r <= 0x303F; r++ {
+		out = append(out, r)
+	}
+	for r := rune(0xFF01); r <= 0xFF5E; r++ {
+		out = append(out, r)
+	}
 	return out
 }

@@ -72,6 +72,12 @@ type Game struct {
 	placeCool     float32
 	pickCool      float32
 
+	chatOpen        bool
+	chatInput       []rune
+	chatCaret       int
+	chatComposition string
+	chatMessages    []chatMessage
+
 	toast      string
 	toastTime  float32
 	helpTime   float32
@@ -116,7 +122,8 @@ func Run(opts Options) error {
 		opts.Language = i18n.ZH
 	}
 	i18n.Set(opts.Language)
-	fontAtlas := ui.BuildFontAtlas(i18n.AllRunes(), render.BuildAtlas())
+	runes := append(i18n.AllRunes(), i18n.ChatRunes()...)
+	fontAtlas := ui.BuildFontAtlas(runes, render.BuildAtlas())
 
 	var unload func()
 	if err := sdl.LoadLibrary(sdl.Path()); err != nil {
@@ -179,6 +186,15 @@ func Run(opts Options) error {
 }
 
 func (g *Game) setState(s State) {
+	if s != StatePlaying && g.chatOpen {
+		g.chatOpen = false
+		g.chatInput = g.chatInput[:0]
+		g.chatCaret = 0
+		g.chatComposition = ""
+		if g.Win != nil {
+			_ = g.Win.StopTextInput()
+		}
+	}
 	g.state = s
 	captured := s == StatePlaying
 	if g.Win != nil {
@@ -252,6 +268,14 @@ func (g *Game) poll() {
 				g.gfx.Resize(int(w), int(h))
 				g.canv.Resize(int(w), int(h))
 			}
+		case sdl.EVENT_TEXT_INPUT:
+			if g.chatOpen {
+				g.chatInsert(e.TextInputEvent().Text)
+			}
+		case sdl.EVENT_TEXT_EDITING:
+			if g.chatOpen {
+				g.chatComposition = e.TextEditingEvent().Text
+			}
 		case sdl.EVENT_KEY_DOWN:
 			ke := e.KeyboardEvent()
 			if ke.Repeat {
@@ -261,7 +285,7 @@ func (g *Game) poll() {
 		case sdl.EVENT_MOUSE_MOTION:
 			me := e.MouseMotionEvent()
 			g.mouseX, g.mouseY = g.toUI(me.X, me.Y)
-			if g.state == StatePlaying {
+			if g.state == StatePlaying && !g.chatOpen {
 				g.player.Rotate(me.Xrel, me.Yrel, 0.0022)
 			}
 		case sdl.EVENT_MOUSE_BUTTON_DOWN:
@@ -274,7 +298,7 @@ func (g *Game) poll() {
 			g.onMouseUp(be.Button)
 		case sdl.EVENT_MOUSE_WHEEL:
 			we := e.MouseWheelEvent()
-			if g.state == StatePlaying {
+			if g.state == StatePlaying && !g.chatOpen {
 				if we.Y < 0 {
 					g.inv.Scroll(1)
 				} else if we.Y > 0 {
@@ -286,6 +310,14 @@ func (g *Game) poll() {
 }
 
 func (g *Game) onKey(k sdl.Keycode) {
+	if g.chatOpen {
+		g.onChatKey(k)
+		return
+	}
+	if g.state == StatePlaying && (k == sdl.K_T || k == sdl.K_RETURN || k == sdl.K_KP_ENTER) {
+		g.openChat()
+		return
+	}
 	switch g.state {
 	case StateMenu:
 		if k == sdl.K_RETURN || k == sdl.K_KP_ENTER {
@@ -358,6 +390,9 @@ func (g *Game) onKey(k sdl.Keycode) {
 }
 
 func (g *Game) onMouseDown(button uint8) {
+	if g.chatOpen {
+		return
+	}
 	if g.state != StatePlaying {
 		if button == uint8(sdl.BUTTON_LEFT) {
 			g.handleUIClick(false)
@@ -406,13 +441,15 @@ func (g *Game) updatePlaying(dt float32) {
 	}
 	ks := sdl.GetKeyboardState()
 	down := func(code sdl.Scancode) bool { return int(code) < len(ks) && ks[code] }
-	in := player.Input{
-		Forward: float32(boolToInt(down(sdl.SCANCODE_W))) - float32(boolToInt(down(sdl.SCANCODE_S))),
-		Strafe:  float32(boolToInt(down(sdl.SCANCODE_D))) - float32(boolToInt(down(sdl.SCANCODE_A))),
-		Jump:    down(sdl.SCANCODE_SPACE),
-		Descend: down(sdl.SCANCODE_LCTRL) || down(sdl.SCANCODE_RCTRL),
-		Sprint:  down(sdl.SCANCODE_LSHIFT) || down(sdl.SCANCODE_RSHIFT),
+	in := player.Input{}
+	if !g.chatOpen {
+		in.Forward = float32(boolToInt(down(sdl.SCANCODE_W))) - float32(boolToInt(down(sdl.SCANCODE_S)))
+		in.Strafe = float32(boolToInt(down(sdl.SCANCODE_D))) - float32(boolToInt(down(sdl.SCANCODE_A)))
+		in.Jump = down(sdl.SCANCODE_SPACE)
+		in.Descend = down(sdl.SCANCODE_LCTRL) || down(sdl.SCANCODE_RCTRL)
+		in.Sprint = down(sdl.SCANCODE_LSHIFT) || down(sdl.SCANCODE_RSHIFT)
 	}
+	g.ageChat(dt)
 	g.player.Update(dt, g.world, in)
 	g.mobs.Update(dt, g.world, g.player.Body.Pos, &g.inv)
 	g.time += float64(dt) / 600.0
@@ -428,7 +465,9 @@ func (g *Game) updatePlaying(dt float32) {
 	if g.pickCool > 0 {
 		g.pickCool -= dt
 	}
-	g.handleActions(dt)
+	if !g.chatOpen {
+		g.handleActions(dt)
+	}
 	g.saveTimer += dt
 	if g.saveTimer > 30 && g.opts.SmokeFrames == 0 {
 		g.saveTimer = 0

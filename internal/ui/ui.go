@@ -18,7 +18,7 @@ import (
 
 const (
 	fontSize   = 16.0
-	atlasWidth = 1024
+	atlasWidth = 2048
 	cellPad    = 1
 )
 

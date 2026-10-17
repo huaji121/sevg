@@ -70,3 +70,19 @@ func TestContentNamesComplete(t *testing.T) {
 		}
 	}
 }
+func TestChatRunesIncludeChinese(t *testing.T) {
+	rs := ChatRunes()
+	if len(rs) < 20000 {
+		t.Fatalf("chat rune set too small: %d", len(rs))
+	}
+	found := false
+	for _, r := range rs {
+		if r == '你' {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("chat rune set missing common Chinese characters")
+	}
+}
