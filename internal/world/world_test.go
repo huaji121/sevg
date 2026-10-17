@@ -279,3 +279,70 @@ func TestBlockLightCrossesChunkBoundaryAndDirtiesNeighbor(t *testing.T) {
 		t.Fatal("neighbor chunk was not marked dirty after light changed")
 	}
 }
+func TestDynamicLightFollowsAndCrossesChunks(t *testing.T) {
+	w := New(123)
+	w.EnsureChunk(ChunkPos{0, 0})
+	n, _ := w.EnsureChunk(ChunkPos{1, 0})
+	w.SetDynamicLight(14, 110, 8, 14)
+	if got := w.BlockLightAt(14, 110, 8); got != 14 {
+		t.Fatalf("dynamic source light = %d", got)
+	}
+	if got := w.BlockLightAt(16, 110, 8); got != 12 {
+		t.Fatalf("dynamic cross-chunk light = %d", got)
+	}
+	if !n.Dirty {
+		t.Fatal("neighbor chunk was not marked dirty by dynamic light")
+	}
+	w.SetBlock(2, 110, 30, core.Air)
+	w.SetDynamicLight(2, 110, 30, 14)
+	if got := w.BlockLightAt(14, 110, 8); got != 0 {
+		t.Fatalf("old dynamic light = %d", got)
+	}
+	if got := w.BlockLightAt(2, 110, 30); got != 14 {
+		t.Fatalf("new dynamic light = %d", got)
+	}
+	w.SetDynamicLight(2, 110, 30, 0)
+	if got := w.BlockLightAt(2, 110, 30); got != 0 {
+		t.Fatalf("cleared dynamic light = %d", got)
+	}
+}
+func BenchmarkDynamicLightMove(b *testing.B) {
+	w := New(123)
+	for x := -2; x <= 2; x++ {
+		for z := -2; z <= 2; z++ {
+			w.EnsureChunk(ChunkPos{x, z})
+		}
+	}
+	w.SetDynamicLight(8, 100, 8, 14)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w.SetDynamicLight(8+i%8, 100, 8, 14)
+	}
+}
+func TestDynamicLightBakedIntoMesh(t *testing.T) {
+	w := New(123)
+	w.EnsureChunk(ChunkPos{0, 0})
+	w.SetBlock(8, 110, 8, core.Air)
+	w.SetBlock(9, 110, 8, core.Stone)
+	w.SetDynamicLight(8, 110, 8, 14)
+	mesh, ok := w.Mesh(ChunkPos{0, 0})
+	if !ok {
+		t.Fatal("missing mesh")
+	}
+	for _, v := range mesh.Opaque.Vertices {
+		if v.Block > 0 {
+			return
+		}
+	}
+	t.Fatal("dynamic light was not baked into the chunk mesh")
+}
+func TestDeferredDynamicLightForNewChunk(t *testing.T) {
+	w := New(123)
+	w.EnsureChunk(ChunkPos{0, 0})
+	w.SetDynamicLight(14, 110, 8, 14)
+	w.EnsureChunk(ChunkPos{1, 0})
+	w.RefreshDynamicLightIfNeeded()
+	if got := w.BlockLightAt(16, 110, 8); got != 12 {
+		t.Fatalf("deferred dynamic light across chunk = %d", got)
+	}
+}

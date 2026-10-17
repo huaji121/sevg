@@ -13,6 +13,7 @@ type Chunk struct {
 	Blocks     []core.BlockID
 	SkyLight   []uint8
 	BlockLight []uint8
+	DynLight   []uint8
 	WaterLevel []uint8
 	Dirty      bool
 }
@@ -23,6 +24,7 @@ func NewChunk(pos ChunkPos) *Chunk {
 		Blocks:     make([]core.BlockID, ChunkArea),
 		SkyLight:   make([]uint8, ChunkArea),
 		BlockLight: make([]uint8, ChunkArea),
+		DynLight:   make([]uint8, ChunkArea),
 		WaterLevel: make([]uint8, ChunkArea),
 		Dirty:      true,
 	}
@@ -88,15 +90,20 @@ type EditRecord struct {
 }
 
 type World struct {
-	mu             sync.RWMutex
-	Seed           int64
-	Gen            *Generator
-	SmoothLighting bool
-	chunks         map[[2]int]*Chunk
-	edits          map[[2]int]map[int]core.BlockID
-	fluidQueue     map[[3]int]bool
-	fluidOrder     [][3]int
-	lightSources   int
+	mu              sync.RWMutex
+	Seed            int64
+	Gen             *Generator
+	SmoothLighting  bool
+	chunks          map[[2]int]*Chunk
+	edits           map[[2]int]map[int]core.BlockID
+	fluidQueue      map[[3]int]bool
+	fluidOrder      [][3]int
+	lightSources    int
+	dynLightX       int
+	dynLightY       int
+	dynLightZ       int
+	dynLightLevel   uint8
+	dynNeedsRefresh bool
 }
 
 func New(seed int64) *World {
@@ -113,9 +120,23 @@ func New(seed int64) *World {
 // EnsureChunk generates a chunk if it does not exist and reports whether it
 // was newly created.
 func (w *World) EnsureChunk(pos ChunkPos) (*Chunk, bool) {
+	key := pos.Key()
+	w.mu.RLock()
+	existing := w.chunks[key]
+	w.mu.RUnlock()
+	if existing != nil {
+		return existing, false
+	}
+	// Terrain generation is deterministic and reads only immutable noise
+	// tables, so it can run outside the world lock and truly in parallel on
+	// the streaming workers.
+	blocks := w.Gen.GenerateChunk(pos)
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.ensureLocked(pos)
+	if c := w.chunks[key]; c != nil {
+		return c, false
+	}
+	return w.insertChunkLocked(pos, blocks)
 }
 
 func (w *World) ensureLocked(pos ChunkPos) (*Chunk, bool) {
@@ -123,8 +144,13 @@ func (w *World) ensureLocked(pos ChunkPos) (*Chunk, bool) {
 	if c := w.chunks[key]; c != nil {
 		return c, false
 	}
+	return w.insertChunkLocked(pos, w.Gen.GenerateChunk(pos))
+}
+
+func (w *World) insertChunkLocked(pos ChunkPos, blocks []core.BlockID) (*Chunk, bool) {
+	key := pos.Key()
 	c := NewChunk(pos)
-	c.Blocks = w.Gen.GenerateChunk(pos)
+	c.Blocks = blocks
 	if ed := w.edits[key]; ed != nil {
 		for i, b := range ed {
 			if i >= 0 && i < len(c.Blocks) {
@@ -146,6 +172,9 @@ func (w *World) ensureLocked(pos ChunkPos) (*Chunk, bool) {
 	}
 	if needLight {
 		w.rebuildBlockLightLocked()
+	}
+	if w.chunkInDynamicBounds(pos) {
+		w.dynNeedsRefresh = true
 	}
 	for _, n := range []ChunkPos{{pos.X + 1, pos.Z}, {pos.X - 1, pos.Z}, {pos.X, pos.Z + 1}, {pos.X, pos.Z - 1}} {
 		if nc := w.chunks[n.Key()]; nc != nil {
@@ -217,6 +246,9 @@ func (w *World) SetBlock(wx, wy, wz int, b core.BlockID) bool {
 	}
 	c.RebuildSkyLight()
 	w.rebuildBlockLightLocked()
+	if w.dynLightLevel > 0 {
+		w.dynNeedsRefresh = true
+	}
 	key := cp.Key()
 	if w.edits[key] == nil {
 		w.edits[key] = make(map[int]core.BlockID)
@@ -242,6 +274,172 @@ func (w *World) markDirtyLocked(p ChunkPos) {
 	if c := w.chunks[p.Key()]; c != nil {
 		c.Dirty = true
 	}
+}
+
+// SetDynamicLight updates a non-block light source, such as a torch held by
+// the player. Moving the source rebuilds block light and the affected chunk
+// meshes, including neighbours whose smooth lighting samples cross borders.
+func (w *World) SetDynamicLight(x, y, z int, level uint8) {
+	if level > 15 {
+		level = 15
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.dynLightX == x && w.dynLightY == y && w.dynLightZ == z && w.dynLightLevel == level {
+		return
+	}
+	oldX, oldY, oldZ, oldLevel := w.dynLightX, w.dynLightY, w.dynLightZ, w.dynLightLevel
+	w.dynLightX, w.dynLightY, w.dynLightZ = x, y, z
+	w.dynLightLevel = level
+	w.rebuildDynamicLightLocked(oldX, oldY, oldZ, oldLevel)
+}
+
+const dynamicLightRadius = 14
+
+func (w *World) dynamicBounds(x, z int) (minX, maxX, minZ, maxZ int) {
+	a := ChunkOf(x-dynamicLightRadius, z-dynamicLightRadius)
+	b := ChunkOf(x+dynamicLightRadius, z+dynamicLightRadius)
+	return a.X, b.X, a.Z, b.Z
+}
+
+func (w *World) chunkInDynamicBounds(pos ChunkPos) bool {
+	if w.dynLightLevel == 0 {
+		return false
+	}
+	minX, maxX, minZ, maxZ := w.dynamicBounds(w.dynLightX, w.dynLightZ)
+	return pos.X >= minX && pos.X <= maxX && pos.Z >= minZ && pos.Z <= maxZ
+}
+
+func (w *World) markDynamicBorderLocked(c *Chunk, idx int, dirty map[[2]int]bool) {
+	dirty[c.Pos.Key()] = true
+	lx := idx % ChunkSize
+	lz := (idx / ChunkSize) % ChunkSize
+	if lx == 0 {
+		w.markDirtyLocked(ChunkPos{X: c.Pos.X - 1, Z: c.Pos.Z})
+	}
+	if lx == ChunkSize-1 {
+		w.markDirtyLocked(ChunkPos{X: c.Pos.X + 1, Z: c.Pos.Z})
+	}
+	if lz == 0 {
+		w.markDirtyLocked(ChunkPos{X: c.Pos.X, Z: c.Pos.Z - 1})
+	}
+	if lz == ChunkSize-1 {
+		w.markDirtyLocked(ChunkPos{X: c.Pos.X, Z: c.Pos.Z + 1})
+	}
+	if (lx == 0 || lx == ChunkSize-1) && (lz == 0 || lz == ChunkSize-1) {
+		dx, dz := -1, -1
+		if lx == ChunkSize-1 {
+			dx = 1
+		}
+		if lz == ChunkSize-1 {
+			dz = 1
+		}
+		w.markDirtyLocked(ChunkPos{X: c.Pos.X + dx, Z: c.Pos.Z + dz})
+	}
+}
+
+// rebuildDynamicLightLocked recomputes only the player-held light layer within
+// the union of the old and new 14-block light volumes. Static block light is
+// untouched, so moving a held torch no longer scans or clears every chunk.
+func (w *World) rebuildDynamicLightLocked(oldX, oldY, oldZ int, oldLevel uint8) {
+	minX, minZ := 1<<30, 1<<30
+	maxX, maxZ := -(1 << 30), -(1 << 30)
+	addBounds := func(x, z int) {
+		a, b, c, d := w.dynamicBounds(x, z)
+		if a < minX {
+			minX = a
+		}
+		if b > maxX {
+			maxX = b
+		}
+		if c < minZ {
+			minZ = c
+		}
+		if d > maxZ {
+			maxZ = d
+		}
+	}
+	if oldLevel > 0 {
+		addBounds(oldX, oldZ)
+	}
+	if w.dynLightLevel > 0 {
+		addBounds(w.dynLightX, w.dynLightZ)
+	}
+	if minX > maxX {
+		return
+	}
+	dirty := make(map[[2]int]bool)
+	for _, c := range w.chunks {
+		if c.Pos.X < minX || c.Pos.X > maxX || c.Pos.Z < minZ || c.Pos.Z > maxZ {
+			continue
+		}
+		for i, v := range c.DynLight {
+			if v != 0 {
+				w.markDynamicBorderLocked(c, i, dirty)
+			}
+		}
+		clear(c.DynLight)
+	}
+	queue := make([]lightNode, 0, 64)
+	if w.dynLightLevel > 0 && w.dynLightY >= 0 && w.dynLightY < ChunkHeight {
+		cp := ChunkOf(w.dynLightX, w.dynLightZ)
+		if c := w.chunks[cp.Key()]; c != nil {
+			i := index(Mod(w.dynLightX, ChunkSize), w.dynLightY, Mod(w.dynLightZ, ChunkSize))
+			if !c.Blocks[i].Opaque() {
+				c.DynLight[i] = w.dynLightLevel
+				w.markDynamicBorderLocked(c, i, dirty)
+				queue = append(queue, lightNode{x: w.dynLightX, y: w.dynLightY, z: w.dynLightZ, level: w.dynLightLevel})
+			}
+		}
+	}
+	dirs := [6][3]int{{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}
+	for head := 0; head < len(queue); head++ {
+		n := queue[head]
+		next := n.level - 1
+		if next == 0 {
+			continue
+		}
+		for _, d := range dirs {
+			x, y, z := n.x+d[0], n.y+d[1], n.z+d[2]
+			if y < 0 || y >= ChunkHeight {
+				continue
+			}
+			cp := ChunkOf(x, z)
+			c := w.chunks[cp.Key()]
+			if c == nil {
+				continue
+			}
+			i := index(Mod(x, ChunkSize), y, Mod(z, ChunkSize))
+			if c.Blocks[i].Opaque() || next <= c.DynLight[i] {
+				continue
+			}
+			c.DynLight[i] = next
+			w.markDynamicBorderLocked(c, i, dirty)
+			queue = append(queue, lightNode{x: x, y: y, z: z, level: next})
+		}
+	}
+	for key := range dirty {
+		w.markDirtyLocked(ChunkPos{X: key[0], Z: key[1]})
+	}
+	w.dynNeedsRefresh = false
+}
+
+func (w *World) refreshDynamicLightLocked() {
+	if w.dynLightLevel == 0 {
+		return
+	}
+	w.rebuildDynamicLightLocked(w.dynLightX, w.dynLightY, w.dynLightZ, w.dynLightLevel)
+}
+
+// RefreshDynamicLightIfNeeded coalesces light rebuilds caused by newly loaded
+// chunks so generation workers do not pay for a full local BFS per chunk.
+func (w *World) RefreshDynamicLightIfNeeded() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.dynNeedsRefresh || w.dynLightLevel == 0 {
+		return
+	}
+	w.refreshDynamicLightLocked()
 }
 
 func (w *World) SetSmoothLighting(on bool) {
@@ -590,5 +788,9 @@ func (w *World) BlockLightAt(wx, wy, wz int) uint8 {
 	if c == nil {
 		return 0
 	}
-	return c.BlockLight[index(Mod(wx, ChunkSize), wy, Mod(wz, ChunkSize))]
+	i := index(Mod(wx, ChunkSize), wy, Mod(wz, ChunkSize))
+	if c.DynLight[i] > c.BlockLight[i] {
+		return c.DynLight[i]
+	}
+	return c.BlockLight[i]
 }

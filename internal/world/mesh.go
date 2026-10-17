@@ -121,7 +121,11 @@ func (w *World) Mesh(pos ChunkPos) (ChunkMesh, bool) {
 				si := src + y*ChunkSize*ChunkSize
 				pad[base+y] = nc.Blocks[si]
 				padSky[base+y] = nc.SkyLight[si]
-				padBlock[base+y] = nc.BlockLight[si]
+				bl := nc.BlockLight[si]
+				if d := nc.DynLight[si]; d > bl {
+					bl = d
+				}
+				padBlock[base+y] = bl
 				padWater[base+y] = nc.WaterLevel[si]
 			}
 		}

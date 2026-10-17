@@ -166,6 +166,7 @@ func (g *Game) startWorld(load bool) error {
 	g.craftGrid = [9]core.Stack{}
 	g.craftSize = 2
 	g.recipeBookOpen = false
+	g.heldLightT = 0
 	g.mobs = entity.NewManager(seed)
 	g.time = timeOfDay
 	g.helpTime = 18
@@ -267,23 +268,34 @@ drained:
 	// frame produces visible hitches while streaming.
 	dirty := g.world.DirtyChunks(center)
 	budget := 1
+	// Newly generated chunks get first claim on the upload budget. Otherwise
+	// the player's moving torch can dirty nearby chunks every frame and starve
+	// chunks that have never been meshed or uploaded.
+	var priorityKey [2]int
+	priorityDone := false
 	for _, cp := range dirty {
-		if cheb(cp, center) > g.opts.RenderDist+1 {
+		if g.meshed[cp.Key()] || cheb(cp, center) > g.opts.RenderDist+1 {
 			continue
 		}
-		mesh, ok := g.world.Mesh(cp)
-		if !ok {
-			continue
-		}
-		if err := g.gfx.UploadChunk(cp, mesh); err != nil {
-			fmt.Println("chunk upload:", err)
-			continue
-		}
-		g.world.ClearDirty(cp)
-		g.meshed[cp.Key()] = true
-		budget--
-		if budget <= 0 {
+		if g.uploadChunk(cp) {
+			priorityKey = cp.Key()
+			priorityDone = true
+			budget--
 			break
+		}
+	}
+	if budget > 0 {
+		for _, cp := range dirty {
+			if priorityDone && cp.Key() == priorityKey {
+				continue
+			}
+			if cheb(cp, center) > g.opts.RenderDist+1 {
+				continue
+			}
+			if g.uploadChunk(cp) {
+				budget--
+				break
+			}
 		}
 	}
 
@@ -300,6 +312,20 @@ drained:
 	}
 }
 
+func (g *Game) uploadChunk(cp world.ChunkPos) bool {
+	mesh, ok := g.world.Mesh(cp)
+	if !ok {
+		return false
+	}
+	if err := g.gfx.UploadChunk(cp, mesh); err != nil {
+		fmt.Println("chunk upload:", err)
+		return false
+	}
+	g.world.ClearDirty(cp)
+	g.meshed[cp.Key()] = true
+	return true
+}
+
 func (g *Game) requestChunks(center world.ChunkPos) {
 	if g.world == nil || g.genJobs == nil {
 		return
@@ -309,7 +335,32 @@ func (g *Game) requestChunks(center world.ChunkPos) {
 		return
 	}
 	radius := g.opts.RenderDist
-	for r := 0; r <= radius && queued < 8; r++ {
+	// Keep most of the queue close to the player, but reserve a couple of
+	// slots for the outer ring. Without this, continuously moving with a held
+	// torch could keep restarting the near rings and starve distant chunks.
+	nearTarget := 6
+	for r := 0; r <= radius && queued < nearTarget; r++ {
+		for dz := -r; dz <= r && queued < nearTarget; dz++ {
+			for dx := -r; dx <= r && queued < nearTarget; dx++ {
+				if maxAbs(dx) != r && maxAbs(dz) != r {
+					continue
+				}
+				cp := world.ChunkPos{X: center.X + dx, Z: center.Z + dz}
+				key := cp.Key()
+				if g.pending[key] || g.world.HasChunk(cp) {
+					continue
+				}
+				select {
+				case g.genJobs <- cp:
+					g.pending[key] = true
+					queued++
+				default:
+					return
+				}
+			}
+		}
+	}
+	for r := radius; r >= 0 && queued < 8; r-- {
 		for dz := -r; dz <= r && queued < 8; dz++ {
 			for dx := -r; dx <= r && queued < 8; dx++ {
 				if maxAbs(dx) != r && maxAbs(dz) != r {

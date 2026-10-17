@@ -85,6 +85,16 @@ type gpuChunk struct {
 	transparent gpuMesh
 }
 
+type retiredMesh struct {
+	mesh   gpuMesh
+	frames int
+}
+
+type retiredTransfer struct {
+	buffer *sdl.GPUTransferBuffer
+	frames int
+}
+
 type Renderer struct {
 	Dev  *sdl.GPUDevice
 	Win  *sdl.Window
@@ -123,6 +133,8 @@ type Renderer struct {
 	heldIconICount             uint32
 	staging                    *sdl.GPUTransferBuffer
 	stagingCap                 uint32
+	retired                    []retiredMesh
+	retiredTransfers           []retiredTransfer
 }
 
 func New(win *sdl.Window, w, h int, fontAtlas ui.FontAtlas) (*Renderer, error) {
@@ -484,18 +496,27 @@ func (r *Renderer) UploadChunk(pos world.ChunkPos, mesh world.ChunkMesh) error {
 		gc = &gpuChunk{pos: pos}
 		r.chunks[key] = gc
 	}
-	var err error
-	if gc.opaque, err = r.uploadMesh(gc.opaque, mesh.Opaque); err != nil {
+	oldOpaque, oldTransparent := gc.opaque, gc.transparent
+	newOpaque, err := r.uploadMesh(mesh.Opaque)
+	if err != nil {
 		return err
 	}
-	if gc.transparent, err = r.uploadMesh(gc.transparent, mesh.Transparent); err != nil {
+	newTransparent, err := r.uploadMesh(mesh.Transparent)
+	if err != nil {
+		// Keep the previous transparent mesh (e.g. water) instead of making
+		// the whole chunk's transparent pass disappear after an upload error.
+		r.retireMesh(oldOpaque)
+		gc.opaque = newOpaque
 		return err
 	}
+	r.retireMesh(oldOpaque)
+	r.retireMesh(oldTransparent)
+	gc.opaque = newOpaque
+	gc.transparent = newTransparent
 	return nil
 }
 
-func (r *Renderer) uploadMesh(old gpuMesh, md world.MeshData) (gpuMesh, error) {
-	old.release(r.Dev)
+func (r *Renderer) uploadMesh(md world.MeshData) (gpuMesh, error) {
 	if len(md.Vertices) == 0 || len(md.Indices) == 0 {
 		return gpuMesh{}, nil
 	}
@@ -553,8 +574,47 @@ func (r *Renderer) uploadMesh(old gpuMesh, md world.MeshData) (gpuMesh, error) {
 		r.Dev.ReleaseBuffer(ib)
 		return gpuMesh{}, err
 	}
-	r.Dev.ReleaseTransferBuffer(tb)
+	r.retireTransfer(tb)
 	return gpuMesh{vb: vb, ib: ib, count: uint32(len(md.Indices))}, nil
+}
+
+const retiredFrames = 3
+
+func (r *Renderer) retireMesh(m gpuMesh) {
+	if m.vb == nil && m.ib == nil {
+		return
+	}
+	r.retired = append(r.retired, retiredMesh{mesh: m, frames: retiredFrames})
+}
+
+func (r *Renderer) retireTransfer(tb *sdl.GPUTransferBuffer) {
+	if tb == nil {
+		return
+	}
+	r.retiredTransfers = append(r.retiredTransfers, retiredTransfer{buffer: tb, frames: retiredFrames})
+}
+
+func (r *Renderer) collectRetired() {
+	kept := r.retired[:0]
+	for _, item := range r.retired {
+		item.frames--
+		if item.frames <= 0 {
+			item.mesh.release(r.Dev)
+		} else {
+			kept = append(kept, item)
+		}
+	}
+	r.retired = kept
+	keptT := r.retiredTransfers[:0]
+	for _, item := range r.retiredTransfers {
+		item.frames--
+		if item.frames <= 0 {
+			r.Dev.ReleaseTransferBuffer(item.buffer)
+		} else {
+			keptT = append(keptT, item)
+		}
+	}
+	r.retiredTransfers = keptT
 }
 
 func (r *Renderer) ChunkPositions() []world.ChunkPos {
@@ -567,8 +627,8 @@ func (r *Renderer) ChunkPositions() []world.ChunkPos {
 
 func (r *Renderer) ReleaseAllChunks() {
 	for _, gc := range r.chunks {
-		gc.opaque.release(r.Dev)
-		gc.transparent.release(r.Dev)
+		r.retireMesh(gc.opaque)
+		r.retireMesh(gc.transparent)
 	}
 	r.chunks = make(map[[2]int]*gpuChunk)
 }
@@ -576,13 +636,14 @@ func (r *Renderer) ReleaseAllChunks() {
 func (r *Renderer) ReleaseChunk(pos world.ChunkPos) {
 	key := pos.Key()
 	if gc := r.chunks[key]; gc != nil {
-		gc.opaque.release(r.Dev)
-		gc.transparent.release(r.Dev)
+		r.retireMesh(gc.opaque)
+		r.retireMesh(gc.transparent)
 		delete(r.chunks, key)
 	}
 }
 
 func (r *Renderer) Render(f *Frame) error {
+	r.collectRetired()
 	if w, h, err := r.Win.SizeInPixels(); err == nil && w > 0 && h > 0 && (int(w) != r.W || int(h) != r.H) {
 		r.Resize(int(w), int(h))
 		if f.UI != nil {
@@ -1070,6 +1131,14 @@ func (r *Renderer) Close() {
 		gc.opaque.release(r.Dev)
 		gc.transparent.release(r.Dev)
 	}
+	for _, item := range r.retired {
+		item.mesh.release(r.Dev)
+	}
+	for _, item := range r.retiredTransfers {
+		r.Dev.ReleaseTransferBuffer(item.buffer)
+	}
+	r.retired = nil
+	r.retiredTransfers = nil
 	r.chunks = map[[2]int]*gpuChunk{}
 	for _, b := range []*sdl.GPUBuffer{r.uiVB, r.entVB, r.entIB, r.entTransVB, r.entTransIB, r.entIconVB, r.entIconIB, r.heldVB, r.heldIB, r.heldTransVB, r.heldTransIB, r.heldIconVB, r.heldIconIB} {
 		if b != nil {

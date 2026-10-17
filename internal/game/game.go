@@ -110,6 +110,7 @@ type Game struct {
 	chatMessages      []chatMessage
 
 	toasts     []toastEntry
+	heldLightT float32
 	helpTime   float32
 	debug      bool
 	fullscreen bool
@@ -321,6 +322,7 @@ func (g *Game) run() {
 		case StateMenu:
 			// idle title animation
 		}
+		g.updateHeldLight(float32(dt))
 		g.updateStreaming(float32(dt))
 		g.audio.Update()
 		g.drawUI()
@@ -781,4 +783,30 @@ func (g *Game) updateFootsteps(dt float32) {
 		g.playSound("step")
 		g.stepTimer = 1.5
 	}
+}
+func (g *Game) updateHeldLight(dt float32) {
+	if g.world == nil || g.player == nil {
+		return
+	}
+	if g.heldLightT > 0 {
+		g.heldLightT -= dt
+		if g.heldLightT > 0 {
+			return
+		}
+	}
+	g.heldLightT = 0.08
+	level := uint8(0)
+	if g.state != StateDead {
+		if st := g.inv.SelectedStack(); !st.Empty() && st.Item.IsBlock() {
+			level = st.Item.Def().Block.Def().Light
+		}
+	}
+	pos := g.player.Body.Pos
+	g.world.SetDynamicLight(
+		int(math.Floor(float64(pos.X))),
+		int(math.Floor(float64(pos.Y+1))),
+		int(math.Floor(float64(pos.Z))),
+		level,
+	)
+	g.world.RefreshDynamicLightIfNeeded()
 }
