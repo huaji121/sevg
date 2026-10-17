@@ -3,7 +3,7 @@ package ui
 import "testing"
 
 func TestFontAtlasBuildsGlyphs(t *testing.T) {
-	atlas := BuildFontAtlas([]rune("中文ABC"), nil)
+	atlas := BuildFontAtlas([]rune("中文ABC"))
 	if len(atlas.Pixels) == 0 || atlas.W <= 0 || atlas.H <= 0 {
 		t.Fatal("empty font atlas")
 	}

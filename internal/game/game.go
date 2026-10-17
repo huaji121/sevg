@@ -136,7 +136,7 @@ func Run(opts Options) error {
 	}
 	i18n.Set(opts.Language)
 	runes := append(i18n.AllRunes(), i18n.ChatRunes()...)
-	fontAtlas := ui.BuildFontAtlas(runes, render.BuildAtlas())
+	fontAtlas := ui.BuildFontAtlas(runes)
 
 	var unload func()
 	if err := sdl.LoadLibrary(sdl.Path()); err != nil {

@@ -28,7 +28,7 @@ SEVG 的目标不是复刻完整的 Minecraft，而是提供一个 **结构清�
 - 区块级顶点/索引缓冲
 - 为每个区块构建 18 × 18 的邻域快照，用于面剔除和 AO
 - 环境光遮蔽、方向面明暗、距离雾
-- 程序化 8 × 8 材质图集（16 px 贴图 + 4 px 防渗色边距），无外部图片资源
+- 8 × 8 材质图集（16 px 贴图 + 4 px 防渗色边距），贴图素材存放在 `assets/textures/` 并嵌入二进制
 - 水/玻璃/冰使用透明通道，水面从远到近排序
 - 深度纹理、窗口缩放、高 DPI 鼠标坐标换算
 - 第一人称手持物品使用独立清空深度缓冲的视图模型通道，始终位于世界之上，同时保持自身前后遮挡
@@ -43,7 +43,7 @@ SEVG 的目标不是复刻完整的 Minecraft，而是提供一个 **结构清�
 - 生存模式 / 创造模式，可通过 `/gamemode 0|1` 切换
 - 生命值、坠落伤害、死亡与重生
 - 长按挖掘（方块硬度 + 手持工具速度）
-- 方块破坏进度使用 10 阶段程序化裂纹贴图覆盖在方块表面
+- 方块破坏进度使用 10 阶段裂纹贴图覆盖在方块表面
 - 右键放置方块 / 进食
 - 中键选取方块
 - 方块目标高亮
@@ -92,7 +92,7 @@ SEVG 的目标不是复刻完整的 Minecraft，而是提供一个 **结构清�
 - 聊天指令：`/gamemode 0` 生存模式，`/gamemode 1` 创造模式
 - 按 `/` 直接打开指令聊天，和 Minecraft 一致
 - 生命条、快捷栏、物品名称、准星、挖掘进度
-- 背包/快捷栏物品图标：方块等距贴图、植物贴图、工具与材料程序化图标
+- 背包/快捷栏物品图标来自 `assets/textures/items/`，方块、植物、工具和材料均可在 PNG 中替换
 - F3 调试信息
 - 多语言标题、暂停、背包、提示与调试文本
 - 水下屏幕染色
@@ -248,11 +248,14 @@ py run.py -seed 12345 -renderdist 8
 │   ├── entity/                 # 猪/羊 AI、物品掉落、攻击拾取
 │   ├── render/
 │   │   ├── renderer.go         # SDL_GPU 设备、管线、缓冲、绘制
-│   │   ├── atlas.go            # 程序化方块材质图集
+│   │   ├── atlas.go            # 从 assets/textures/blocks 装载材质图集
 │   │   └── shaders/            # GLSL + 预编译 SPIR-V
 │   ├── i18n/                   # 多语言文本、方块/物品/群系名称
 │   ├── ui/                     # CJK 系统字体图集与 2D 画布
 │   └── game/                   # 游戏循环、输入、HUD、菜单、存档、流式调度、语言切换
+├── assets/textures/            # 可编辑的方块与物品贴图素材
+│   ├── blocks/                 # 16 × 16 方块、裂纹、调色板贴图
+│   └── items/                  # 40 × 40 物品图标
 ├── cmd/atlasdump/              # 可选：导出材质图集 PNG
 ├── docs/                       # 截图
 ├── build.py / run.py / test.py # Python 开发脚本
@@ -266,7 +269,7 @@ py run.py -seed 12345 -renderdist 8
 
 1. `CreateGPUDevice(GPU_SHADERFORMAT_SPIRV, ...)` 创建 Vulkan 后端。
 2. 创建交换链颜色目标 + `D32_FLOAT` 深度目标。
-3. 上传程序化材质图集与字体图集。
+3. 上传从 `assets/textures/` 组装的材质图集与字体图集。
 4. 每个脏区块在 CPU 上生成 `world.MeshData`，再通过传输缓冲上传为 GPU 顶点/索引缓冲。
 5. 主渲染通道：
    - 不透明区块（深度测试 + 深度写入）
@@ -295,7 +298,7 @@ py shaders.py
 ### 添加一个方块
 
 1. 在 `internal/core/core.go` 添加 `BlockID` 常量、`BlockDefs` 条目和对应 `ItemID`。
-2. 在 `internal/render/atlas.go` 添加程序化贴图（或复用现有 tile）。
+2. 把 16 × 16 PNG 放入 `assets/textures/blocks/`，并在 `internal/render/atlas.go` 的 `blockTextureFiles` 中登记文件名。
 3. 在 `internal/core` 的 `init` 中把方块映射到物品。
 4. 重新编译即可；网格、碰撞、掉落、存档会自动支持。
 

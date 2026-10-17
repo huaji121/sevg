@@ -57,7 +57,7 @@ type placement struct {
 // BuildFontAtlas rasterizes all requested runes into one texture. It uses a
 // system CJK font when available (Microsoft YaHei, Noto Sans CJK, PingFang,
 // etc.) and falls back to the embedded 7x13 bitmap font.
-func BuildFontAtlas(runes []rune, blockAtlas []byte) FontAtlas {
+func BuildFontAtlas(runes []rune) FontAtlas {
 	face, source := loadFace()
 	if face != nil {
 		defer face.Close()
@@ -92,12 +92,10 @@ func BuildFontAtlas(runes []rune, blockAtlas []byte) FontAtlas {
 		}
 		placements = append(placements, placement{r: r, g: g, alpha: alpha})
 	}
-	if len(blockAtlas) > 0 {
-		icons := buildItemIcons(blockAtlas)
-		for item := core.ItemID(1); item < core.ItemCount; item++ {
-			if img := icons[item]; img != nil {
-				placements = append(placements, placement{item: item, rgba: img})
-			}
+	itemImages := buildItemIcons()
+	for item := core.ItemID(1); item < core.ItemCount; item++ {
+		if img := itemImages[item]; img != nil {
+			placements = append(placements, placement{item: item, rgba: img})
 		}
 	}
 

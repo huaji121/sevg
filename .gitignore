@@ -29,5 +29,8 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+# Texture assets are source assets
+!/assets/textures/**/*.png
+
 # Documentation images are source assets
 !/docs/*.png
