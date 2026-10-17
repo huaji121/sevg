@@ -8,13 +8,21 @@ func (w *World) queueFluidLocked(x, y, z int) {
 	if y < 0 || y >= ChunkHeight {
 		return
 	}
-	w.fluidQueue[[3]int{x, y, z}] = true
+	w.queueFluidCellLocked([3]int{x, y, z})
 	for _, d := range [6][3]int{{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}} {
 		ny := y + d[1]
 		if ny >= 0 && ny < ChunkHeight {
-			w.fluidQueue[[3]int{x + d[0], ny, z + d[2]}] = true
+			w.queueFluidCellLocked([3]int{x + d[0], ny, z + d[2]})
 		}
 	}
+}
+
+func (w *World) queueFluidCellLocked(p [3]int) {
+	if w.fluidQueue[p] {
+		return
+	}
+	w.fluidQueue[p] = true
+	w.fluidOrder = append(w.fluidOrder, p)
 }
 
 func (w *World) waterLevelUnlocked(x, y, z int) (uint8, bool) {
@@ -96,14 +104,21 @@ func (w *World) TickFluids() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	const batch = 256
-	n := 0
-	for p := range w.fluidQueue {
-		if n >= batch {
-			break
+	n := len(w.fluidOrder)
+	if n > batch {
+		n = batch
+	}
+	pending := w.fluidOrder[:n]
+	w.fluidOrder = w.fluidOrder[n:]
+	if len(w.fluidOrder) == 0 {
+		w.fluidOrder = nil
+	}
+	for _, p := range pending {
+		if !w.fluidQueue[p] {
+			continue
 		}
 		delete(w.fluidQueue, p)
 		w.updateFluidLocked(p[0], p[1], p[2])
-		n++
 	}
 }
 

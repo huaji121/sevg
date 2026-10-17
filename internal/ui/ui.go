@@ -387,6 +387,31 @@ func (c *Canvas) TextShadow(x, y float32, s string, scale float32, col [4]float3
 	c.Text(x, y, s, scale, col)
 }
 
+// TextInkBounds reports the vertical ink bounds of a single-line string
+// relative to the text origin. It is used to center actual glyphs rather than
+// the font line box, which includes uneven ascent/descent padding.
+func (c *Canvas) TextInkBounds(s string, scale float32) (float32, float32) {
+	minY, maxY := float32(1e9), float32(-1e9)
+	for _, r := range s {
+		g := c.glyph(r)
+		if g.W <= 0 || g.H <= 0 {
+			continue
+		}
+		top := g.OffsetY * scale
+		bottom := top + g.H*scale
+		if top < minY {
+			minY = top
+		}
+		if bottom > maxY {
+			maxY = bottom
+		}
+	}
+	if minY > maxY {
+		return 0, c.LineHeight * scale
+	}
+	return minY, maxY
+}
+
 func (c *Canvas) TextCentered(cx, y float32, s string, scale float32, col [4]float32) {
 	w := c.TextWidth(s, scale)
 	c.Text(cx-w/2, y, s, scale, col)

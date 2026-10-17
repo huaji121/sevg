@@ -222,9 +222,9 @@ func (g *Game) drawSettings(w, h float32) {
 		r := l.rows[i]
 		c.Rect(r.X, r.Y, r.W, r.H, ui.RGBA(12, 16, 20, 225))
 		c.Border(r.X, r.Y, r.W, r.H, 1, ui.RGBA(65, 78, 86, 180))
-		c.Text(r.X+20, r.Y+(r.H-c.LineHeight*1.15)/2, labels[i], 1.15, ui.TextColor)
+		g.drawLeftLabel(r.X+20, r, labels[i], 1.15, ui.TextColor)
 		if i < 3 {
-			c.TextCentered(l.values[i].X+l.values[i].W/2, r.Y+(r.H-c.LineHeight*1.2)/2, values[i], 1.2, ui.Accent)
+			g.drawCenteredLabel(l.values[i], values[i], 1.2, ui.Accent)
 			g.drawButtonScale(l.minus[i], "-", true, 1.3)
 			g.drawButtonScale(l.plus[i], "+", true, 1.3)
 		} else if i == 3 {

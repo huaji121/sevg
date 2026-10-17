@@ -52,11 +52,7 @@ func (g *Game) drawUI() {
 		const toastH = float32(40)
 		x := w/2 - tw/2
 		g.canv.Panel(x, toastY, tw, toastH, ui.RGBA(20, 25, 30, 230), ui.RGBA(255, 196, 82, 220))
-		textY := toastY + (toastH-g.canv.LineHeight*1.5)/2
-		if textY < toastY+2 {
-			textY = toastY + 2
-		}
-		g.canv.TextCentered(w/2, textY, g.toast, 1.5, ui.TextColor)
+		g.drawCenteredLabel(ui.Rect{X: x, Y: toastY, W: tw, H: toastH}, g.toast, 1.5, ui.TextColor)
 	}
 }
 
@@ -297,7 +293,7 @@ func (g *Game) drawSurvivalInventory(w, h float32) {
 	c.Text(p.X+24, p.Y+49, i18n.T("inventory.hint"), 0.9, ui.MutedColor)
 	closeR := g.invCloseRect()
 	c.Rect(closeR.X, closeR.Y, closeR.W, closeR.H, ui.RGBA(180, 60, 60, 230))
-	c.TextCentered(closeR.X+closeR.W/2, closeR.Y+(closeR.H-c.LineHeight*1.5)/2, "X", 1.5, ui.TextColor)
+	g.drawCenteredLabel(closeR, "X", 1.5, ui.TextColor)
 
 	for vis := 0; vis < core.InventorySlots; vis++ {
 		r := g.invSlotRect(vis)
@@ -375,7 +371,7 @@ func (g *Game) drawDead(w, h float32) {
 	}
 	c.Rect(r.X, r.Y, r.W, r.H, bg)
 	c.Border(r.X, r.Y, r.W, r.H, 2, ui.RGBA(90, 105, 115, 220))
-	c.TextCentered(r.X+r.W/2, r.Y+(r.H-c.LineHeight*1.4)/2, i18n.T("death.title_screen"), 1.4, ui.TextColor)
+	g.drawCenteredLabel(r, i18n.T("death.title_screen"), 1.4, ui.TextColor)
 }
 
 func (g *Game) drawButton(r ui.Rect, label string, enabled bool) {
@@ -400,11 +396,7 @@ func (g *Game) drawButtonScale(r ui.Rect, label string, enabled bool, scale floa
 	c.Rect(r.X+4, r.Y+4, r.W, r.H, [4]float32{0, 0, 0, 0.35})
 	c.Rect(r.X, r.Y, r.W, r.H, bg)
 	c.Border(r.X, r.Y, r.W, r.H, 2, border)
-	labelY := r.Y + (r.H-c.LineHeight*scale)/2
-	if labelY < r.Y+2 {
-		labelY = r.Y + 2
-	}
-	c.TextCentered(r.X+r.W/2, labelY, label, scale, text)
+	g.drawCenteredLabel(r, label, scale, text)
 }
 
 func (g *Game) drawInventorySlot(r ui.Rect, st core.Stack, bg, border [4]float32, number int) {
@@ -952,11 +944,15 @@ func (g *Game) appendFallingBlocks(m *world.MeshData) {
 	}
 }
 func (g *Game) drawCenteredLabel(r ui.Rect, text string, scale float32, col [4]float32) {
-	y := r.Y + (r.H-g.canv.LineHeight*scale)/2
-	if y < r.Y+2 {
-		y = r.Y + 2
-	}
+	top, bottom := g.canv.TextInkBounds(text, scale)
+	y := r.Y + (r.H-(bottom-top))/2 - top
 	g.canv.TextCentered(r.X+r.W/2, y, text, scale, col)
+}
+
+func (g *Game) drawLeftLabel(x float32, r ui.Rect, text string, scale float32, col [4]float32) {
+	top, bottom := g.canv.TextInkBounds(text, scale)
+	y := r.Y + (r.H-(bottom-top))/2 - top
+	g.canv.Text(x, y, text, scale, col)
 }
 
 func (g *Game) drawItemTooltip(name string) {

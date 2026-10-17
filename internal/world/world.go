@@ -95,6 +95,7 @@ type World struct {
 	chunks         map[[2]int]*Chunk
 	edits          map[[2]int]map[int]core.BlockID
 	fluidQueue     map[[3]int]bool
+	fluidOrder     [][3]int
 	lightSources   int
 }
 
