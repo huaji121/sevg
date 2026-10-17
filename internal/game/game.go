@@ -473,6 +473,7 @@ func (g *Game) renderFrame() {
 		EntityTransparent: transparent,
 		EntityIcon:        entityIcons,
 		Held:              g.buildHeldMesh(),
+		HeldTransparent:   g.buildHeldTransparentMesh(),
 		HeldIcon:          g.buildHeldIconMesh(),
 		UI:                g.canv,
 	}

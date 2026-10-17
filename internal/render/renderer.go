@@ -47,6 +47,7 @@ type Frame struct {
 	EntityTransparent world.MeshData
 	EntityIcon        world.MeshData
 	Held              world.MeshData
+	HeldTransparent   world.MeshData
 	HeldIcon          world.MeshData
 	UI                *ui.Canvas
 }
@@ -109,13 +110,16 @@ type Renderer struct {
 	entTransVB, entTransIB     *sdl.GPUBuffer
 	entIconVB, entIconIB       *sdl.GPUBuffer
 	heldVB, heldIB             *sdl.GPUBuffer
+	heldTransVB, heldTransIB   *sdl.GPUBuffer
 	heldIconVB, heldIconIB     *sdl.GPUBuffer
 	uiCap, entCap, entTransCap uint32
 	entIconCap, heldCap        uint32
-	heldIconCap                uint32
+	heldTransCap, heldIconCap  uint32
 	entICount, entTransICount  uint32
 	entIconICount              uint32
-	heldICount, heldIconICount uint32
+	heldICount                 uint32
+	heldTransICount            uint32
+	heldIconICount             uint32
 	staging                    *sdl.GPUTransferBuffer
 	stagingCap                 uint32
 }
@@ -281,6 +285,15 @@ func (r *Renderer) createResources() error {
 		return err
 	}
 	r.heldIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.heldCap})
+	if err != nil {
+		return err
+	}
+	r.heldTransCap = r.entCap
+	r.heldTransVB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: r.heldTransCap})
+	if err != nil {
+		return err
+	}
+	r.heldTransIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.heldTransCap})
 	if err != nil {
 		return err
 	}
@@ -673,7 +686,7 @@ func (r *Renderer) Render(f *Frame) error {
 	// First-person held item: a dedicated pass with a fresh depth buffer so
 	// its own front faces occlude its back faces without clipping into the
 	// nearby world geometry.
-	if r.heldICount > 0 || r.heldIconICount > 0 {
+	if r.heldICount > 0 || r.heldTransICount > 0 || r.heldIconICount > 0 {
 		heldColor := sdl.GPUColorTargetInfo{
 			Texture: sw.Texture,
 			LoadOp:  sdl.GPU_LOADOP_LOAD,
@@ -698,6 +711,15 @@ func (r *Renderer) Render(f *Frame) error {
 			hvp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.heldVB, Offset: 0}})
 			hvp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.heldIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
 			hvp.DrawIndexedPrimitives(r.heldICount, 1, 0, 0, 0)
+		}
+		if r.heldTransICount > 0 && r.heldTransVB != nil && r.heldTransIB != nil {
+			// Glass/ice: transparent blend, no depth writes. Otherwise one
+			// cube face writes depth first and erases a neighbouring edge.
+			hvp.BindGraphicsPipeline(r.blockTrans)
+			hvp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}})
+			hvp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.heldTransVB, Offset: 0}})
+			hvp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.heldTransIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
+			hvp.DrawIndexedPrimitives(r.heldTransICount, 1, 0, 0, 0)
 		}
 		if r.heldIconICount > 0 && r.heldIconVB != nil && r.heldIconIB != nil {
 			// Match dropped items: alpha test only, no blending. The icon
@@ -739,14 +761,17 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 	entII := meshIndexBytes(f.EntityIcon)
 	heldV := meshVertBytes(f.Held)
 	heldI := meshIndexBytes(f.Held)
+	heldTV := meshVertBytes(f.HeldTransparent)
+	heldTI := meshIndexBytes(f.HeldTransparent)
 	heldIV := meshVertBytes(f.HeldIcon)
 	heldII := meshIndexBytes(f.HeldIcon)
 	r.entICount = uint32(len(f.Entity.Indices))
 	r.entTransICount = uint32(len(f.EntityTransparent.Indices))
 	r.entIconICount = uint32(len(f.EntityIcon.Indices))
 	r.heldICount = uint32(len(f.Held.Indices))
+	r.heldTransICount = uint32(len(f.HeldTransparent.Indices))
 	r.heldIconICount = uint32(len(f.HeldIcon.Indices))
-	total := len(uiBytes) + len(entV) + len(entI) + len(entTV) + len(entTI) + len(entIV) + len(entII) + len(heldV) + len(heldI) + len(heldIV) + len(heldII)
+	total := len(uiBytes) + len(entV) + len(entI) + len(entTV) + len(entTI) + len(entIV) + len(entII) + len(heldV) + len(heldI) + len(heldTV) + len(heldTI) + len(heldIV) + len(heldII)
 	if total == 0 {
 		return nil
 	}
@@ -828,6 +853,21 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 			return err
 		}
 	}
+	needHeldTrans := maxInt(len(heldTV), len(heldTI))
+	if uint32(needHeldTrans) > r.heldTransCap {
+		r.Dev.ReleaseBuffer(r.heldTransVB)
+		r.Dev.ReleaseBuffer(r.heldTransIB)
+		r.heldTransCap = uint32(needHeldTrans * 2)
+		var err error
+		r.heldTransVB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: r.heldTransCap})
+		if err != nil {
+			return err
+		}
+		r.heldTransIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.heldTransCap})
+		if err != nil {
+			return err
+		}
+	}
 	needHeldIcon := maxInt(len(heldIV), len(heldII))
 	if uint32(needHeldIcon) > r.heldIconCap {
 		r.Dev.ReleaseBuffer(r.heldIconVB)
@@ -857,7 +897,9 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 	offEntII := offEntIV + len(entIV)
 	offHeldV := offEntII + len(entII)
 	offHeldI := offHeldV + len(heldV)
-	offHeldIV := offHeldI + len(heldI)
+	offHeldTV := offHeldI + len(heldI)
+	offHeldTI := offHeldTV + len(heldTV)
+	offHeldIV := offHeldTI + len(heldTI)
 	offHeldII := offHeldIV + len(heldIV)
 	copy(mem[offUI:], uiBytes)
 	copy(mem[offEntV:], entV)
@@ -868,6 +910,8 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 	copy(mem[offEntII:], entII)
 	copy(mem[offHeldV:], heldV)
 	copy(mem[offHeldI:], heldI)
+	copy(mem[offHeldTV:], heldTV)
+	copy(mem[offHeldTI:], heldTI)
 	copy(mem[offHeldIV:], heldIV)
 	copy(mem[offHeldII:], heldII)
 	r.Dev.UnmapTransferBuffer(r.staging)
@@ -939,6 +983,20 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 			true,
 		)
 	}
+	if len(heldTV) > 0 {
+		cp.UploadToGPUBuffer(
+			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offHeldTV)},
+			&sdl.GPUBufferRegion{Buffer: r.heldTransVB, Offset: 0, Size: uint32(len(heldTV))},
+			true,
+		)
+	}
+	if len(heldTI) > 0 {
+		cp.UploadToGPUBuffer(
+			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offHeldTI)},
+			&sdl.GPUBufferRegion{Buffer: r.heldTransIB, Offset: 0, Size: uint32(len(heldTI))},
+			true,
+		)
+	}
 	if len(heldIV) > 0 {
 		cp.UploadToGPUBuffer(
 			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offHeldIV)},
@@ -1007,7 +1065,7 @@ func (r *Renderer) Close() {
 		gc.transparent.release(r.Dev)
 	}
 	r.chunks = map[[2]int]*gpuChunk{}
-	for _, b := range []*sdl.GPUBuffer{r.uiVB, r.entVB, r.entIB, r.entTransVB, r.entTransIB, r.entIconVB, r.entIconIB, r.heldVB, r.heldIB, r.heldIconVB, r.heldIconIB} {
+	for _, b := range []*sdl.GPUBuffer{r.uiVB, r.entVB, r.entIB, r.entTransVB, r.entTransIB, r.entIconVB, r.entIconIB, r.heldVB, r.heldIB, r.heldTransVB, r.heldTransIB, r.heldIconVB, r.heldIconIB} {
 		if b != nil {
 			r.Dev.ReleaseBuffer(b)
 		}

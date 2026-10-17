@@ -584,7 +584,7 @@ func (g *Game) buildHeldMesh() world.MeshData {
 	case entity.DropVisualBlock:
 		appendBlockBox(&local, c.Sub(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), c.Add(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), def.Block)
 	case entity.DropVisualGlass:
-		appendBlockBox(&local, c.Sub(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), c.Add(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), def.Block)
+		return world.MeshData{}
 	case entity.DropVisualPlant:
 		appendPlant(&local, c, 0.30, 0.38, def.Block)
 	default:
@@ -658,6 +658,45 @@ func (g *Game) buildHeldIconMesh() world.MeshData {
 	var held world.MeshData
 	appendIconCard(&held, c, cardRight, cardUp, rotNormal, 0.30, 0.30, 0.012, icon, g.canv.IconSides[st.Item])
 	return held
+}
+
+// buildHeldTransparentMesh builds the transparent held cube (glass/ice).
+// It is drawn after opaque held items with depth writes disabled so adjacent
+// edges do not occlude each other.
+func (g *Game) buildHeldTransparentMesh() world.MeshData {
+	if g.state != StatePlaying || g.player == nil {
+		return world.MeshData{}
+	}
+	st := g.inv.SelectedStack()
+	if st.Empty() || entity.VisualForItem(st.Item) != entity.DropVisualGlass {
+		return world.MeshData{}
+	}
+	def := st.Item.Def()
+	var local world.MeshData
+	c := mathx.Vec3{}
+	appendBlockBox(&local, c.Sub(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), c.Add(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), def.Block)
+	if len(local.Indices) == 0 {
+		return world.MeshData{}
+	}
+	fwd := g.player.LookDir()
+	right := fwd.Cross(mathx.V3(0, 1, 0)).Normalize()
+	up := right.Cross(fwd)
+	eye := g.player.Eye()
+	offR := float32(0.32)
+	offU := float32(-0.24) + g.player.Bob*1.5
+	offF := float32(0.52)
+	rot := float32(0.35)
+	rc, rs := float32(math.Cos(float64(rot))), float32(math.Sin(float64(rot)))
+	out := world.MeshData{Vertices: make([]world.Vertex, len(local.Vertices)), Indices: local.Indices}
+	for i, v := range local.Vertices {
+		lx := (v.X*rc - v.Z*rs) * 0.65
+		lz := (v.X*rs + v.Z*rc) * 0.65
+		ly := v.Y * 0.65
+		p := eye.Add(right.Mul(offR + lx)).Add(up.Mul(offU + ly)).Add(fwd.Mul(offF + lz))
+		out.Vertices[i] = v
+		out.Vertices[i].X, out.Vertices[i].Y, out.Vertices[i].Z = p.X, p.Y, p.Z
+	}
+	return out
 }
 
 // appendIconCard builds a single textured sheet plus silhouette side walls.

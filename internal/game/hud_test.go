@@ -81,3 +81,12 @@ func TestIconCardGeometry(t *testing.T) {
 		t.Fatalf("icon card front UV = %v,%v", m.Vertices[0].U, m.Vertices[0].V)
 	}
 }
+func TestHeldTransparentGlassMesh(t *testing.T) {
+	g := newTestGame(t)
+	g.state = StatePlaying
+	g.inv.Slots[0] = core.Stack{Item: core.ItemGlass, Count: 4}
+	m := g.buildHeldTransparentMesh()
+	if len(m.Vertices) == 0 || len(m.Indices) == 0 {
+		t.Fatal("held glass produced no transparent mesh")
+	}
+}
