@@ -1,12 +1,14 @@
 package game
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/Zyko0/go-sdl3/sdl"
 
 	"sevg/internal/core"
 	"sevg/internal/ui"
+	"sevg/internal/world"
 )
 
 func TestThirdPersonPlayerModel(t *testing.T) {
@@ -80,5 +82,20 @@ func TestThirdPersonPlayerHeldIcon(t *testing.T) {
 	}
 	if len(icons.Vertices) == 0 || len(icons.Indices) == 0 {
 		t.Fatal("held texture item has no icon-card mesh")
+	}
+}
+func TestHeldBlockIgnoresHeadPitch(t *testing.T) {
+	g := newTestGame(t)
+	g.state = StatePlaying
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{Item: core.ItemPlanks, Count: 1}
+	g.player.Pitch = -0.8
+	var a, ta world.MeshData
+	g.appendPlayerHeldBlock(&a, &ta, 0)
+	g.player.Pitch = 0.8
+	var b, tb world.MeshData
+	g.appendPlayerHeldBlock(&b, &tb, 0)
+	if !reflect.DeepEqual(a, b) {
+		t.Fatal("held block changed with head pitch")
 	}
 }

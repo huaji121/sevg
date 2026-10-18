@@ -3,6 +3,7 @@ package game
 import (
 	"math"
 
+	"sevg/internal/entity"
 	"sevg/internal/mathx"
 	"sevg/internal/world"
 )
@@ -35,6 +36,41 @@ func appendPlayerPart(dst *world.MeshData, min, max mathx.Vec3, col [4]float32, 
 		p := mathx.Vec3{X: v.X, Y: v.Y, Z: v.Z}.Sub(pivot)
 		p = rotateX(p, rotX).Add(pivot)
 		v.X, v.Y, v.Z = p.X, p.Y, p.Z
+		dst.Vertices = append(dst.Vertices, v)
+	}
+	for _, idx := range part.Indices {
+		dst.Indices = append(dst.Indices, base+idx)
+	}
+}
+
+// appendPlayerHeldBlock places a fixed-orientation block in the right hand.
+// It follows body yaw and arm swing, never head pitch.
+func (g *Game) appendPlayerHeldBlock(opaque, transparent *world.MeshData, swing float32) {
+	st := g.inv.SelectedStack()
+	if st.Empty() || !st.Item.IsBlock() {
+		return
+	}
+	def := st.Item.Def()
+	dst := opaque
+	switch entity.VisualForItem(st.Item) {
+	case entity.DropVisualBlock:
+	case entity.DropVisualGlass:
+		dst = transparent
+	default:
+		return
+	}
+	center := mathx.V3(0.48, 0.56, -0.16)
+	const half = float32(0.13)
+	var part world.MeshData
+	appendBlockBox(&part, center.Sub(mathx.V3(half, half, half)), center.Add(mathx.V3(half, half, half)), def.Block)
+	p := g.player
+	pivot := mathx.V3(0.36, 1.25, 0)
+	base := uint32(len(dst.Vertices))
+	for _, v := range part.Vertices {
+		q := mathx.Vec3{X: v.X, Y: v.Y, Z: v.Z}.Sub(pivot)
+		q = rotateX(q, -swing).Add(pivot)
+		q = rotateY(q, p.Yaw).Add(p.Body.Pos)
+		v.X, v.Y, v.Z = q.X, q.Y, q.Z
 		dst.Vertices = append(dst.Vertices, v)
 	}
 	for _, idx := range part.Indices {
@@ -97,7 +133,7 @@ func (g *Game) appendPlayerModel(dst, icons, transparent *world.MeshData) {
 		dst.Indices = append(dst.Indices, base+idx)
 	}
 	g.appendPlayerHeldIconCard(icons, swing)
-	g.appendFirstPersonHeld(dst, icons, transparent)
+	g.appendPlayerHeldBlock(dst, transparent, swing)
 }
 
 // appendPlayerHeldIconCard places a thick icon card in front of the right
@@ -135,63 +171,4 @@ func (g *Game) appendPlayerHeldIconCard(dst *world.MeshData, swing float32) {
 	for _, idx := range card.Indices {
 		dst.Indices = append(dst.Indices, base+idx)
 	}
-}
-
-// appendFirstPersonHeld reuses the exact first-person held-item meshes and
-// recenters them on the player's right hand for second/third-person rendering.
-func (g *Game) appendFirstPersonHeld(opaque, icons, transparent *world.MeshData) {
-	if g.player == nil {
-		return
-	}
-	oldCamera, oldState := g.camera, g.state
-	g.camera, g.state = cameraFirst, StatePlaying
-	held := g.buildHeldMesh()
-	heldTrans := g.buildHeldTransparentMesh()
-	g.camera, g.state = oldCamera, oldState
-
-	p := g.player
-	pos := p.Body.Pos
-	right := mathx.Vec3{X: float32(math.Cos(float64(p.Yaw))), Z: float32(math.Sin(float64(p.Yaw)))}
-	fwd := mathx.Vec3{X: float32(math.Sin(float64(p.Yaw))), Z: -float32(math.Cos(float64(p.Yaw)))}
-	target := pos.Add(right.Mul(0.52)).Add(mathx.Vec3{Y: 0.58}).Add(fwd.Mul(0.06))
-	speed := float32(math.Hypot(float64(p.Body.Vel.X), float64(p.Body.Vel.Z)))
-	amp := clampF(speed/4.6, 0, 1) * 0.65
-	if p.Flying || !p.Body.OnGround {
-		amp *= 0.25
-	}
-	swing := float32(math.Sin(float64(p.WalkPhase))) * amp
-	pivot := mathx.V3(0.36, 1.25, 0)
-	local := rotateY(target.Sub(pos), -p.Yaw)
-	local = rotateX(local.Sub(pivot), -swing).Add(pivot)
-	target = rotateY(local, p.Yaw).Add(pos)
-
-	appendHeldAt := func(dst *world.MeshData, src world.MeshData, flip bool) {
-		if len(src.Vertices) == 0 {
-			return
-		}
-		c := mathx.Vec3{}
-		for _, v := range src.Vertices {
-			c = c.Add(mathx.Vec3{X: v.X, Y: v.Y, Z: v.Z})
-		}
-		c = c.Mul(1 / float32(len(src.Vertices)))
-		delta := target.Sub(c)
-		base := uint32(len(dst.Vertices))
-		for _, v := range src.Vertices {
-			v.X += delta.X
-			v.Y += delta.Y
-			v.Z += delta.Z
-			dst.Vertices = append(dst.Vertices, v)
-		}
-		for i := 0; i < len(src.Indices); i += 3 {
-			a, b, cidx := base+src.Indices[i], base+src.Indices[i+1], base+src.Indices[i+2]
-			if flip {
-				// The first-person view model uses a mirrored camera basis.
-				// Reverse its triangle winding when reusing it in world space.
-				b, cidx = cidx, b
-			}
-			dst.Indices = append(dst.Indices, a, b, cidx)
-		}
-	}
-	appendHeldAt(opaque, held, true)
-	appendHeldAt(transparent, heldTrans, false)
 }
