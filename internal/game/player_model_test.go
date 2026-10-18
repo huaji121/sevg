@@ -128,3 +128,29 @@ func TestActionSwingAnimation(t *testing.T) {
 		t.Fatalf("finished swing angle = %f", a)
 	}
 }
+func TestCrouchLowersThirdPersonModel(t *testing.T) {
+	g := newTestGame(t)
+	g.state = StatePlaying
+	g.camera = cameraThird
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{}
+	standing, _, _ := g.buildEntityMeshes()
+	maxStand := float32(-100)
+	for _, v := range standing.Vertices {
+		if v.Y > maxStand {
+			maxStand = v.Y
+		}
+	}
+	g.player.Crouching = true
+	g.player.Body.Height = 1.5
+	crouched, _, _ := g.buildEntityMeshes()
+	maxCrouch := float32(-100)
+	for _, v := range crouched.Vertices {
+		if v.Y > maxCrouch {
+			maxCrouch = v.Y
+		}
+	}
+	if maxCrouch >= maxStand-0.2 {
+		t.Fatalf("crouched model top %f vs standing %f", maxCrouch, maxStand)
+	}
+}

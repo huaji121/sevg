@@ -637,8 +637,10 @@ func (g *Game) updateWorld(dt float32, allowInput bool) {
 		in.Forward = float32(boolToInt(bindDown(g.keys.Forward))) - float32(boolToInt(bindDown(g.keys.Back)))
 		in.Strafe = float32(boolToInt(bindDown(g.keys.Right))) - float32(boolToInt(bindDown(g.keys.Left)))
 		in.Jump = bindDown(g.keys.Jump)
-		in.Descend = down(sdl.SCANCODE_LCTRL) || down(sdl.SCANCODE_RCTRL)
-		in.Sprint = down(sdl.SCANCODE_LSHIFT) || down(sdl.SCANCODE_RSHIFT)
+		shift := down(sdl.SCANCODE_LSHIFT) || down(sdl.SCANCODE_RSHIFT)
+		in.Crouch = shift
+		in.Descend = shift
+		in.Sprint = down(sdl.SCANCODE_LCTRL) || down(sdl.SCANCODE_RCTRL)
 	}
 	g.ageChat(dt)
 	g.player.Update(dt, g.world, in)

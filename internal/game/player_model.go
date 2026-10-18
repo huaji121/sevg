@@ -103,6 +103,7 @@ func (g *Game) appendPlayerHeldBlock(opaque, transparent *world.MeshData, swing 
 	for _, v := range part.Vertices {
 		q := mathx.Vec3{X: v.X, Y: v.Y, Z: v.Z}.Sub(pivot)
 		q = rotateX(q, -swing).Add(pivot)
+		q.Y *= p.CrouchScale()
 		q = rotateY(q, p.Yaw).Add(p.Body.Pos)
 		v.X, v.Y, v.Z = q.X, q.Y, q.Z
 		dst.Vertices = append(dst.Vertices, v)
@@ -163,8 +164,9 @@ func (g *Game) appendPlayerModel(dst, icons, transparent *world.MeshData) {
 	// Rotate the whole model to the player's yaw and move it to the feet.
 	base := uint32(len(dst.Vertices))
 	pos := p.Body.Pos
+	yscale := p.CrouchScale()
 	for _, v := range model.Vertices {
-		q := rotateY(mathx.Vec3{X: v.X, Y: v.Y, Z: v.Z}, p.Yaw).Add(pos)
+		q := rotateY(mathx.Vec3{X: v.X, Y: v.Y * yscale, Z: v.Z}, p.Yaw).Add(pos)
 		v.X, v.Y, v.Z = q.X, q.Y, q.Z
 		dst.Vertices = append(dst.Vertices, v)
 	}
@@ -203,6 +205,7 @@ func (g *Game) appendPlayerHeldIconCard(dst *world.MeshData, swing float32) {
 	for _, v := range card.Vertices {
 		q := mathx.Vec3{X: v.X, Y: v.Y, Z: v.Z}.Sub(pivot)
 		q = rotateX(q, -swing).Add(pivot)
+		q.Y *= p.CrouchScale()
 		q = rotateY(q, p.Yaw).Add(p.Body.Pos)
 		v.X, v.Y, v.Z = q.X, q.Y, q.Z
 		dst.Vertices = append(dst.Vertices, v)

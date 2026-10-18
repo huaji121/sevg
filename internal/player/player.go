@@ -13,6 +13,7 @@ type Input struct {
 	Forward, Strafe float32
 	Jump, Descend   bool
 	Sprint          bool
+	Crouch          bool
 }
 
 type Player struct {
@@ -25,6 +26,7 @@ type Player struct {
 	Creative  bool
 	HurtPulse bool
 	InWater   bool
+	Crouching bool
 	Spawning  mathx.Vec3
 
 	fallStart    float32
@@ -102,6 +104,58 @@ func (p *Player) FallingReset() {
 	p.falling = false
 }
 
+const (
+	standHeight  = float32(1.8)
+	crouchHeight = float32(1.5)
+)
+
+// CrouchScale is the vertical scale used by the third-person model.
+func (p *Player) CrouchScale() float32 {
+	if p.Crouching {
+		return crouchHeight / standHeight
+	}
+	return 1
+}
+
+func (p *Player) updateCrouch(w *world.World, crouch bool) {
+	if crouch {
+		p.Crouching = true
+		p.Body.Height = crouchHeight
+		return
+	}
+	if !p.Crouching {
+		p.Body.Height = standHeight
+		return
+	}
+	// Stay crouched until there is room to stand up again.
+	if !physics.Collides(w, p.Body.Pos, p.Body.Width, standHeight) {
+		p.Crouching = false
+		p.Body.Height = standHeight
+	}
+}
+
+func (p *Player) hasFloor(w *world.World, x, z float32) bool {
+	bx := int(math.Floor(float64(x)))
+	by := int(math.Floor(float64(p.Body.Pos.Y - 0.05)))
+	bz := int(math.Floor(float64(z)))
+	return w.GetBlock(bx, by, bz).Solid()
+}
+
+// supportedAt reports whether any point inside the player's footprint has
+// solid ground below. The inset avoids treating a mere AABB edge touch as
+// support, which would let the player slide off and fall.
+func (p *Player) supportedAt(w *world.World, x, z float32) bool {
+	half := p.Body.Width/2 - 0.03
+	for _, px := range [3]float32{x - half, x, x + half} {
+		for _, pz := range [3]float32{z - half, z, z + half} {
+			if p.hasFloor(w, px, pz) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (p *Player) Update(dt float32, w *world.World, in Input) {
 	if dt > 0.05 {
 		dt = 0.05
@@ -111,6 +165,7 @@ func (p *Player) Update(dt float32, w *world.World, in Input) {
 	}
 	feet := w.GetBlock(int(math.Floor(float64(p.Body.Pos.X))), int(math.Floor(float64(p.Body.Pos.Y))), int(math.Floor(float64(p.Body.Pos.Z))))
 	p.InWater = feet == core.Water
+	p.updateCrouch(w, in.Crouch && !p.Flying)
 
 	yawSin, yawCos := float32(math.Sin(float64(p.Yaw))), float32(math.Cos(float64(p.Yaw)))
 	forward := mathx.Vec3{X: yawSin, Z: -yawCos}
@@ -120,7 +175,9 @@ func (p *Player) Update(dt float32, w *world.World, in Input) {
 		move = move.Normalize()
 	}
 	speed := float32(4.6)
-	if in.Sprint {
+	if p.Crouching {
+		speed *= 0.35
+	} else if in.Sprint {
 		speed = 7.0
 	}
 	if p.Flying {
@@ -158,13 +215,37 @@ func (p *Player) Update(dt float32, w *world.World, in Input) {
 		if p.Body.Vel.Y < -55 {
 			p.Body.Vel.Y = -55
 		}
-		if in.Jump && grounded {
+		if in.Jump && grounded && !p.Crouching {
 			p.Body.Vel.Y = 8.4
 			grounded = false
 		}
 	}
 
 	delta := p.Body.Vel.Mul(dt)
+	if p.Crouching && grounded && !p.Flying {
+		// Allow overhanging the edge while at least part of the footprint is
+		// still supported. Reject only the part of the movement that would
+		// leave the body completely unsupported.
+		nx, nz := p.Body.Pos.X+delta.X, p.Body.Pos.Z+delta.Z
+		if !p.supportedAt(w, nx, nz) {
+			okX := p.supportedAt(w, nx, p.Body.Pos.Z)
+			okZ := p.supportedAt(w, p.Body.Pos.X, nz)
+			switch {
+			case okX && !okZ:
+				delta.Z = 0
+			case okZ && !okX:
+				delta.X = 0
+			case okX && okZ:
+				if absF(delta.X) >= absF(delta.Z) {
+					delta.Z = 0
+				} else {
+					delta.X = 0
+				}
+			default:
+				delta.X, delta.Z = 0, 0
+			}
+		}
+	}
 	p.Body.Move(w, delta)
 
 	if !p.Flying && !p.InWater {
@@ -207,4 +288,10 @@ func (p *Player) IntersectsBlock(x, y, z int) bool {
 	return max.X > float32(x) && min.X < float32(x+1) &&
 		max.Y > float32(y) && min.Y < float32(y+1) &&
 		max.Z > float32(z) && min.Z < float32(z+1)
+}
+func absF(v float32) float32 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
