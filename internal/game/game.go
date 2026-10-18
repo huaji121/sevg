@@ -653,6 +653,26 @@ func (g *Game) updateWorld(dt float32, allowInput bool) {
 	}
 }
 
+// clampCamera shortens a camera offset when world geometry blocks the view,
+// keeping third/second-person cameras from entering blocks.
+func (g *Game) clampCamera(origin, offset mathx.Vec3) mathx.Vec3 {
+	dist := offset.Length()
+	if g.world == nil || dist < 0.001 {
+		return origin.Add(offset)
+	}
+	if hit := g.world.Raycast(origin, offset, dist); hit.Hit {
+		d := hit.Distance - 0.25
+		if d < 0.2 {
+			d = 0.2
+		}
+		if d > dist {
+			d = dist
+		}
+		return origin.Add(offset.Normalize().Mul(d))
+	}
+	return origin.Add(offset)
+}
+
 func (g *Game) renderFrame() {
 	if g.player == nil {
 		g.gfx.Render(&render.Frame{
@@ -662,18 +682,21 @@ func (g *Game) renderFrame() {
 		})
 		return
 	}
-	dir := g.player.LookDir()
+	look := g.player.LookDir()
+	dir := look
 	eye := g.player.Eye()
 	camPos := eye
 	switch g.camera {
 	case cameraThird:
 		// Pull the camera behind the player and aim at the torso/head.
-		target := eye.Add(dir.Mul(1.2))
-		camPos = eye.Sub(dir.Mul(3.6)).Add(mathx.Vec3{Y: 0.45})
+		target := eye.Add(look.Mul(1.2))
+		offset := look.Mul(-3.6).Add(mathx.Vec3{Y: 0.45})
+		camPos = g.clampCamera(eye, offset)
 		dir = target.Sub(camPos).Normalize()
 	case cameraSecond:
 		// Place the camera in front of the player and look back at the face.
-		camPos = eye.Add(dir.Mul(3.6)).Add(mathx.Vec3{Y: 0.35})
+		offset := look.Mul(3.6).Add(mathx.Vec3{Y: 0.35})
+		camPos = g.clampCamera(eye, offset)
 		dir = eye.Sub(camPos).Normalize()
 	}
 	cam := render.Camera{
