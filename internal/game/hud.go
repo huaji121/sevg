@@ -600,6 +600,17 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 	return opaque, transparent, icons
 }
 
+func (g *Game) applyHeldLight(m *world.MeshData) {
+	if g.player == nil || g.world == nil || len(m.Vertices) == 0 {
+		return
+	}
+	sky, block := g.lightAt(g.player.Eye())
+	for i := range m.Vertices {
+		m.Vertices[i].Sky = sky
+		m.Vertices[i].Block = block
+	}
+}
+
 // buildHeldMesh creates a small first-person view model for the selected
 // item. It is built in camera space and drawn with depth testing disabled.
 func (g *Game) buildHeldMesh() world.MeshData {
@@ -614,6 +625,7 @@ func (g *Game) buildHeldMesh() world.MeshData {
 	bob := g.player.Bob * 1.5
 
 	var out world.MeshData
+	defer g.applyHeldLight(&out)
 	g.appendFirstPersonHand(&out, eye, right, up, fwd, bob)
 
 	st := g.inv.SelectedStack()
@@ -743,6 +755,7 @@ func (g *Game) buildHeldIconMesh() world.MeshData {
 	c := eye.Add(right.Mul(0.28 - swing*0.06)).Add(up.Mul(-0.19 - swing*0.08 + g.player.Bob*1.5)).Add(fwd.Mul(0.50 + swing*0.04))
 	var held world.MeshData
 	appendIconCard(&held, c, cardRight, cardUp, rotNormal, 0.30, 0.30, 0.012, icon, g.canv.IconSides[st.Item])
+	g.applyHeldLight(&held)
 	return held
 }
 
@@ -786,6 +799,7 @@ func (g *Game) buildHeldTransparentMesh() world.MeshData {
 		out.Vertices[i] = v
 		out.Vertices[i].X, out.Vertices[i].Y, out.Vertices[i].Z = p.X, p.Y, p.Z
 	}
+	g.applyHeldLight(&out)
 	return out
 }
 

@@ -140,3 +140,29 @@ func TestLitEntityBoxSetsBothLightChannels(t *testing.T) {
 		}
 	}
 }
+func TestFirstPersonHeldUsesWorldLight(t *testing.T) {
+	g := newTestGame(t)
+	g.state = StatePlaying
+	g.camera = cameraFirst
+	g.player.Body.Pos = mathx.Vec3{X: 8.5, Y: 100, Z: 8.5}
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{Item: core.ItemPlanks, Count: 1}
+	g.world.SetBlock(8, 120, 8, core.Stone)
+	held := g.buildHeldMesh()
+	if len(held.Vertices) == 0 {
+		t.Fatal("held mesh is empty")
+	}
+	for _, v := range held.Vertices {
+		if v.Sky > 0.01 || v.Block > 0.01 {
+			t.Fatalf("held item not in shadow: sky=%f block=%f", v.Sky, v.Block)
+		}
+	}
+
+	g.world.SetBlock(8, 101, 8, core.Torch)
+	lit := g.buildHeldMesh()
+	for _, v := range lit.Vertices {
+		if v.Sky > 0.01 || v.Block < 0.5 {
+			t.Fatalf("held item not lit by torch: sky=%f block=%f", v.Sky, v.Block)
+		}
+	}
+}
