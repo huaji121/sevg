@@ -32,7 +32,7 @@ func TestDroppedBlockUsesPlacedBlockTiles(t *testing.T) {
 func TestPlantDropGeometry(t *testing.T) {
 	var m world.MeshData
 	appendPlant(&m, mathx.Vec3{X: 0.5, Y: 64.2, Z: 0.5}, 0.34, 0.42, core.TallGrass)
-	if len(m.Vertices) != 8 || len(m.Indices) != 12 {
+	if len(m.Vertices) != 8 || len(m.Indices) != 24 {
 		t.Fatalf("plant vertices=%d indices=%d", len(m.Vertices), len(m.Indices))
 	}
 	u0, _, _, v1 := world.TileUV(core.TallGrass.Tile(2))
@@ -104,5 +104,12 @@ func TestHeldItemSwingAnimation(t *testing.T) {
 	}
 	if idle.Vertices[0] == swinging.Vertices[0] {
 		t.Fatal("held item did not move during action swing")
+	}
+}
+func TestPlantMeshDoubleSided(t *testing.T) {
+	var m world.MeshData
+	appendPlant(&m, mathx.Vec3{}, 0.3, 0.4, core.Flower)
+	if len(m.Vertices) != 8 || len(m.Indices) != 24 {
+		t.Fatalf("plant mesh vertices=%d indices=%d", len(m.Vertices), len(m.Indices))
 	}
 }

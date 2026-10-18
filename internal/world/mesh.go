@@ -375,6 +375,9 @@ func addCross(m *MeshData, bx, by, bz, ox, oz int, b core.BlockID, skyAt, blockA
 				Light: 0.92, Sky: sky, Block: blk,
 			})
 		}
-		m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)
+		m.Indices = append(m.Indices,
+			base, base+1, base+2, base, base+2, base+3,
+			base, base+2, base+1, base, base+3, base+2,
+		)
 	}
 }

@@ -848,7 +848,10 @@ func appendPlant(m *world.MeshData, c mathx.Vec3, width, height float32, block c
 				Light: 0.92, Sky: 1,
 			})
 		}
-		m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)
+		m.Indices = append(m.Indices,
+			base, base+1, base+2, base, base+2, base+3,
+			base, base+2, base+1, base, base+3, base+2,
+		)
 	}
 }
 
