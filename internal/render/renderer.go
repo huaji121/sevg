@@ -113,6 +113,7 @@ type Renderer struct {
 	blockOpaque *sdl.GPUGraphicsPipeline
 	blockTrans  *sdl.GPUGraphicsPipeline
 	blockView   *sdl.GPUGraphicsPipeline
+	blockIcon   *sdl.GPUGraphicsPipeline
 	uiPipeline  *sdl.GPUGraphicsPipeline
 
 	chunks map[[2]int]*gpuChunk
@@ -244,6 +245,14 @@ func (r *Renderer) createResources() error {
 	// has a negative determinant), so their winding is reversed compared to
 	// world geometry. Cull front faces to keep the outward-facing surfaces.
 	r.blockView, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, true, true, true, sdl.GPU_CULLMODE_FRONT)
+	if err != nil {
+		r.Dev.ReleaseShader(blockVS)
+		r.Dev.ReleaseShader(blockFS)
+		return err
+	}
+	// Icon cards are single quads with silhouette sides. They are visible from
+	// both faces, so render them without culling.
+	r.blockIcon, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, false, true, true, sdl.GPU_CULLMODE_NONE)
 	if err != nil {
 		r.Dev.ReleaseShader(blockVS)
 		r.Dev.ReleaseShader(blockFS)
@@ -723,6 +732,7 @@ func (r *Renderer) Render(f *Frame) error {
 		rp.DrawIndexedPrimitives(r.entICount, 1, 0, 0, 0)
 	}
 	if r.entIconICount > 0 && r.entIconVB != nil && r.entIconIB != nil {
+		rp.BindGraphicsPipeline(r.blockIcon)
 		rp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.uiTex, Sampler: r.sampler}})
 		rp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.entIconVB, Offset: 0}})
 		rp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.entIconIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
@@ -1151,7 +1161,7 @@ func (r *Renderer) Close() {
 	if r.staging != nil {
 		r.Dev.ReleaseTransferBuffer(r.staging)
 	}
-	for _, p := range []*sdl.GPUGraphicsPipeline{r.blockOpaque, r.blockTrans, r.blockView, r.uiPipeline} {
+	for _, p := range []*sdl.GPUGraphicsPipeline{r.blockOpaque, r.blockTrans, r.blockView, r.blockIcon, r.uiPipeline} {
 		if p != nil {
 			r.Dev.ReleaseGraphicsPipeline(p)
 		}

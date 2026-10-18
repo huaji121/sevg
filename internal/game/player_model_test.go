@@ -6,6 +6,7 @@ import (
 	"github.com/Zyko0/go-sdl3/sdl"
 
 	"sevg/internal/core"
+	"sevg/internal/ui"
 )
 
 func TestThirdPersonPlayerModel(t *testing.T) {
@@ -60,5 +61,24 @@ func TestSecondPersonPlayerModel(t *testing.T) {
 	opaque, _, _ := g.buildEntityMeshes()
 	if len(opaque.Vertices) == 0 {
 		t.Fatal("second-person player model produced an empty mesh")
+	}
+}
+func TestThirdPersonPlayerHeldIcon(t *testing.T) {
+	g := newTestGame(t)
+	g.state = StatePlaying
+	g.camera = cameraThird
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{Item: core.ItemStonePickaxe, Count: 1}
+	g.canv = &ui.Canvas{
+		Icons: map[core.ItemID]ui.Glyph{
+			core.ItemStonePickaxe: {U0: 0.1, V0: 0.1, U1: 0.2, V1: 0.2},
+		},
+	}
+	opaque, _, icons := g.buildEntityMeshes()
+	if len(opaque.Vertices) == 0 {
+		t.Fatal("player model is missing")
+	}
+	if len(icons.Vertices) == 0 || len(icons.Indices) == 0 {
+		t.Fatal("held texture item has no icon-card mesh")
 	}
 }

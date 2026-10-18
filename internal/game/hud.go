@@ -578,7 +578,7 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 	g.appendParticleMeshes(&opaque, &transparent)
 	g.appendBreakOverlay(&transparent)
 	if g.camera != cameraFirst && g.player != nil {
-		g.appendPlayerModel(&opaque)
+		g.appendPlayerModel(&opaque, &icons, &transparent)
 	}
 	if g.player != nil && g.targetValid {
 		x, y, z := g.targetPos[0], g.targetPos[1], g.targetPos[2]
