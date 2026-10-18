@@ -601,7 +601,7 @@ func (w *World) FindSpawn() mathx.Vec3 {
 		for x := -r * 8; x <= r*8; x += 8 {
 			for z := -r * 8; z <= r*8; z += 8 {
 				h, biome := w.Gen.HeightAt(x, z)
-				if h <= SeaLevel || h >= ChunkHeight-8 || biome == BiomeOcean {
+				if h <= SeaLevel || h >= ChunkHeight-8 || biome == BiomeOcean || biome == BiomeHighMountains {
 					continue
 				}
 				d := x*x + z*z

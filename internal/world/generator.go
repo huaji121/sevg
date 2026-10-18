@@ -8,7 +8,7 @@ import (
 
 const (
 	ChunkSize   = 16
-	ChunkHeight = 128
+	ChunkHeight = 256
 	SeaLevel    = 48
 	ChunkArea   = ChunkSize * ChunkSize * ChunkHeight
 )
@@ -21,6 +21,7 @@ const (
 	BiomeDesert
 	BiomeSnow
 	BiomeMountains
+	BiomeHighMountains
 	BiomeOcean
 )
 
@@ -34,6 +35,8 @@ func (b Biome) Name() string {
 		return "Snow"
 	case BiomeMountains:
 		return "Mountains"
+	case BiomeHighMountains:
+		return "High Mountains"
 	case BiomeOcean:
 		return "Ocean"
 	default:
@@ -73,6 +76,7 @@ type Generator struct {
 	height *Noise
 	detail *Noise
 	ridge  *Noise
+	alpine *Noise
 	temp   *Noise
 	moist  *Noise
 	cave   *Noise
@@ -86,6 +90,7 @@ func NewGenerator(seed int64) *Generator {
 		height: NewNoise(seed + 11),
 		detail: NewNoise(seed + 29),
 		ridge:  NewNoise(seed + 47),
+		alpine: NewNoise(seed + 251),
 		temp:   NewNoise(seed + 71),
 		moist:  NewNoise(seed + 97),
 		cave:   NewNoise(seed + 131),
@@ -113,11 +118,20 @@ func (g *Generator) HeightAt(wx, wz int) (int, Biome) {
 	mountainMask := smoothstep(0.02, 0.55, continent)
 	h := 48.0 + continent*19.0 + detail*5.5 + mountainMask*ridge*32.0
 
+	// Alpine ranges rise from the highest continental areas. The ridged noise
+	// creates sharp connecting peaks instead of rounded hills.
+	alpineNoise := g.alpine.Fbm2(x*0.0021+500, z*0.0021-300, 4, 2.0, 0.5)
+	alpineMask := smoothstep(0.08, 0.50, continent) * (0.75 + 0.25*smoothstep(-0.2, 0.3, alpineNoise))
+	alpineRidge := g.alpine.Ridged2(x*0.0031+410, z*0.0031-310, 5)
+	h += alpineMask * (alpineRidge*175.0 + detail*8.0)
+
 	temp := g.temp.Fbm2(x*0.0028-41, z*0.0028+19, 3, 2.0, 0.5)
 	moist := g.moist.Fbm2(x*0.0036+77, z*0.0036-31, 3, 2.0, 0.5)
 
 	biome := BiomePlains
 	switch {
+	case h >= 145:
+		biome = BiomeHighMountains
 	case h > 78:
 		biome = BiomeMountains
 	case temp > 0.30 && moist < -0.05:
@@ -138,15 +152,23 @@ func (g *Generator) surfaceBlock(biome Biome, h int) core.BlockID {
 	case BiomeDesert:
 		return core.Sand
 	case BiomeSnow:
-		if h > 86 {
+		if h > 110 {
 			return core.Snow
 		}
 		return core.SnowyGrass
-	case BiomeMountains:
-		if h > 92 {
+	case BiomeHighMountains:
+		if h > 185 {
 			return core.Snow
 		}
-		if h > 82 {
+		if h > 150 {
+			return core.Stone
+		}
+		return core.Grass
+	case BiomeMountains:
+		if h > 125 {
+			return core.Snow
+		}
+		if h > 100 {
 			return core.Stone
 		}
 		return core.Grass
@@ -183,6 +205,8 @@ func (g *Generator) GenerateChunk(cp ChunkPos) []core.BlockID {
 					b = core.Dirt
 					if biome == BiomeDesert || biome == BiomeOcean {
 						b = core.Sand
+					} else if biome == BiomeMountains || biome == BiomeHighMountains {
+						b = core.Stone
 					}
 				default:
 					b = surface
