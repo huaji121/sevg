@@ -394,6 +394,16 @@ func (g *Game) handleUIClick(right bool) {
 			g.quitToTitle()
 		}
 	case StateInventory:
+		panel := g.invPanelRect()
+		invTab, creativeTab := g.inventoryTabRects()
+		if !panel.Contains(g.mouseX, g.mouseY) &&
+			!invTab.Contains(g.mouseX, g.mouseY) &&
+			!creativeTab.Contains(g.mouseX, g.mouseY) {
+			if !g.heldStack.Empty() {
+				g.dropHeldOutside()
+			}
+			return
+		}
 		if g.mode == ModeCreative {
 			invTab, creativeTab := g.inventoryTabRects()
 			if invTab.Contains(g.mouseX, g.mouseY) {

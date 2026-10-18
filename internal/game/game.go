@@ -481,7 +481,9 @@ func (g *Game) onKey(k sdl.Keycode) {
 			g.inv.Select(int(k - sdl.K_1))
 		}
 	case StateInventory:
-		if k == sdl.K_R && g.mode != ModeCreative {
+		if k == sdl.K_Q {
+			g.dropFromInventory()
+		} else if k == sdl.K_R && g.mode != ModeCreative {
 			g.recipeBookOpen = !g.recipeBookOpen
 		} else if (k == sdl.K_E || k == sdl.K_ESCAPE) && g.recipeBookOpen {
 			g.recipeBookOpen = false
@@ -717,10 +719,12 @@ func (g *Game) dropSelected() {
 		return
 	}
 	item := s.Item
-	g.inv.TakeSelected(1)
-	dir := g.player.LookDir()
-	pos := g.player.Eye().Add(dir.Mul(0.8))
-	g.mobs.Drop(item, 1, pos, dir.Mul(3).Add(mathx.Vec3{Y: 1.5}))
+	count := 1
+	if g.shiftDown {
+		count = s.Count
+	}
+	g.inv.TakeSelected(count)
+	g.throwItem(item, count)
 }
 
 func (g *Game) respawn() {

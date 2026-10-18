@@ -52,10 +52,7 @@ func (g *Game) creativeItemAt(x, y float32) core.ItemID {
 	return core.ItemNone
 }
 
-func (g *Game) giveCreativeItem(item core.ItemID, bulk bool) {
-	if item == core.ItemNone || item >= core.ItemCount {
-		return
-	}
+func creativeTakeCount(item core.ItemID, bulk bool) int {
 	count := 1
 	if bulk {
 		count = 64
@@ -66,6 +63,18 @@ func (g *Game) giveCreativeItem(item core.ItemID, bulk bool) {
 	}
 	if count > max {
 		count = max
+	}
+	return count
+}
+
+func (g *Game) giveCreativeItem(item core.ItemID, bulk bool) {
+	if item == core.ItemNone || item >= core.ItemCount {
+		return
+	}
+	count := creativeTakeCount(item, bulk)
+	max := item.MaxStack()
+	if max <= 0 {
+		max = 64
 	}
 	if !g.heldStack.Empty() && g.heldStack.Item != item {
 		// The infinite creative catalog only destroys a held item when a
