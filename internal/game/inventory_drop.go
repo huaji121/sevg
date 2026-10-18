@@ -11,7 +11,7 @@ func (g *Game) throwItem(item core.ItemID, count int) {
 	}
 	dir := g.player.LookDir()
 	pos := g.player.Eye().Add(dir.Mul(0.8))
-	g.mobs.Drop(item, count, pos, dir.Mul(3).Add(mathx.Vec3{Y: 1.5}))
+	g.mobs.DropPlayer(item, count, pos, dir.Mul(3).Add(mathx.Vec3{Y: 1.5}))
 }
 
 func (g *Game) dropFromStack(st *core.Stack, count int) {

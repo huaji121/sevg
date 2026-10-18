@@ -65,3 +65,27 @@ func TestDropVisuals(t *testing.T) {
 		}
 	}
 }
+func TestPlayerDropPickupDelay(t *testing.T) {
+	m := NewManager(1)
+	w := world.New(1)
+	w.EnsureChunk(world.ChunkPos{})
+	w.SetBlock(8, 69, 8, core.Stone)
+	pos := mathx.Vec3{X: 8.5, Y: 70, Z: 8.5}
+	var inv core.Inventory
+	m.DropPlayer(core.ItemPlanks, 1, pos, mathx.Vec3{})
+	if m.Items[0].PickupDelay < 1 {
+		t.Fatalf("player drop pickup delay = %f", m.Items[0].PickupDelay)
+	}
+	for i := 0; i < 12; i++ {
+		m.Update(0.05, w, pos, &inv)
+	}
+	if m.ItemCount() != 1 || inv.Count(core.ItemPlanks) != 0 {
+		t.Fatalf("player drop picked up too early: items=%d inv=%d", m.ItemCount(), inv.Count(core.ItemPlanks))
+	}
+	for i := 0; i < 30; i++ {
+		m.Update(0.05, w, pos, &inv)
+	}
+	if m.ItemCount() != 0 || inv.Count(core.ItemPlanks) != 1 {
+		t.Fatalf("player drop was not picked up: items=%d inv=%d", m.ItemCount(), inv.Count(core.ItemPlanks))
+	}
+}

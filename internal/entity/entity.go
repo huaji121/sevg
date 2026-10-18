@@ -107,13 +107,14 @@ const (
 )
 
 type ItemDrop struct {
-	ID    int
-	Item  core.ItemID
-	Count int
-	Body  physics.Body
-	Age   float32
-	Bob   float32
-	Dead  bool
+	ID          int
+	Item        core.ItemID
+	Count       int
+	Body        physics.Body
+	Age         float32
+	PickupDelay float32
+	Bob         float32
+	Dead        bool
 }
 
 func (d *ItemDrop) Boxes() []Box {
@@ -323,7 +324,7 @@ func (m *Manager) Update(dt float32, w *world.World, playerPos mathx.Vec3, inv *
 		if d.Body.Pos.Y > 300 {
 			d.Dead = true
 		}
-		if d.Age > 0.45 {
+		if d.Age > d.PickupDelay {
 			delta := d.Body.Pos.Add(mathx.Vec3{Y: 0.2}).Sub(playerPos)
 			if delta.Length() < 2.2 {
 				before := d.Count
@@ -379,10 +380,20 @@ func angleDelta(a, b float32) float32 {
 }
 
 func (m *Manager) Drop(item core.ItemID, count int, pos mathx.Vec3, vel mathx.Vec3) {
+	m.drop(item, count, pos, vel, 0.45)
+}
+
+// DropPlayer creates a drop thrown by the player. It cannot be picked up for a
+// short time so Q-dropped items do not immediately return to the inventory.
+func (m *Manager) DropPlayer(item core.ItemID, count int, pos mathx.Vec3, vel mathx.Vec3) {
+	m.drop(item, count, pos, vel, 1.25)
+}
+
+func (m *Manager) drop(item core.ItemID, count int, pos mathx.Vec3, vel mathx.Vec3, pickupDelay float32) {
 	if item == core.ItemNone || count <= 0 {
 		return
 	}
-	d := &ItemDrop{ID: m.nextID, Item: item, Count: count, Body: physics.Body{Pos: pos, Vel: vel, Width: 0.25, Height: 0.25}}
+	d := &ItemDrop{ID: m.nextID, Item: item, Count: count, PickupDelay: pickupDelay, Body: physics.Body{Pos: pos, Vel: vel, Width: 0.25, Height: 0.25}}
 	m.nextID++
 	m.Items = append(m.Items, d)
 }
