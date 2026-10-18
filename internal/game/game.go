@@ -321,6 +321,10 @@ func (g *Game) run() {
 		switch g.state {
 		case StatePlaying:
 			g.updatePlaying(float32(dt))
+		case StateInventory:
+			// Keep the world, mobs, fluids and item drops running while the
+			// inventory is open; only suppress player movement and actions.
+			g.updateWorld(float32(dt), false)
 		case StateMenu:
 			// idle title animation
 		}
@@ -560,13 +564,17 @@ func (g *Game) toUI(x, y float32) (float32, float32) {
 }
 
 func (g *Game) updatePlaying(dt float32) {
+	g.updateWorld(dt, true)
+}
+
+func (g *Game) updateWorld(dt float32, allowInput bool) {
 	if g.player == nil {
 		return
 	}
-	ks := sdl.GetKeyboardState()
-	down := func(code sdl.Scancode) bool { return int(code) < len(ks) && ks[code] }
 	in := player.Input{}
-	if !g.chatOpen {
+	if allowInput && !g.chatOpen {
+		ks := sdl.GetKeyboardState()
+		down := func(code sdl.Scancode) bool { return int(code) < len(ks) && ks[code] }
 		in.Forward = float32(boolToInt(down(sdl.SCANCODE_W))) - float32(boolToInt(down(sdl.SCANCODE_S)))
 		in.Strafe = float32(boolToInt(down(sdl.SCANCODE_D))) - float32(boolToInt(down(sdl.SCANCODE_A)))
 		in.Jump = down(sdl.SCANCODE_SPACE)
@@ -605,7 +613,7 @@ func (g *Game) updatePlaying(dt float32) {
 	if g.spaceTapTimer > 0 {
 		g.spaceTapTimer -= dt
 	}
-	if !g.chatOpen {
+	if allowInput && !g.chatOpen {
 		g.handleActions(dt)
 	}
 	g.fluidTimer -= dt
@@ -614,7 +622,7 @@ func (g *Game) updatePlaying(dt float32) {
 		g.fluidTimer = 0.12
 	}
 	g.saveTimer += dt
-	if g.saveTimer > 30 && g.opts.SmokeFrames == 0 {
+	if g.saveTimer > 30 && g.state == StatePlaying && g.opts.SmokeFrames == 0 {
 		g.saveTimer = 0
 		if err := g.saveGame(); err == nil {
 			g.notify(i18n.T("toast.autosaved"), 1.2)
