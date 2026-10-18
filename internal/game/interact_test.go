@@ -211,3 +211,29 @@ func TestSolidBlockStillRequiresSpace(t *testing.T) {
 		t.Fatalf("planks count = %d", got)
 	}
 }
+func TestUnsupportedPlantDropsItem(t *testing.T) {
+	g := newTestGame(t)
+	g.world.SetBlock(8, 100, 8, core.Stone)
+	g.world.SetBlock(8, 101, 8, core.Flower)
+	g.world.TakeBlockBreaks()
+	g.world.SetBlock(8, 100, 8, core.Air)
+	g.processBlockBreaks()
+	if g.mobs.ItemCount() != 1 {
+		t.Fatalf("plant drop count = %d", g.mobs.ItemCount())
+	}
+	if got := g.mobs.Items[0].Item; got != core.ItemFlower {
+		t.Fatalf("plant drop = %v", got)
+	}
+}
+func TestCreativePlantSupportBreakDoesNotDrop(t *testing.T) {
+	g := newTestGame(t)
+	g.mode = ModeCreative
+	g.world.SetBlock(8, 110, 8, core.Stone)
+	g.world.SetBlock(8, 111, 8, core.TallGrass)
+	g.world.TakeBlockBreaks()
+	g.world.SetBlock(8, 110, 8, core.Air)
+	g.processBlockBreaks()
+	if g.mobs.ItemCount() != 0 {
+		t.Fatalf("creative support break dropped %d items", g.mobs.ItemCount())
+	}
+}

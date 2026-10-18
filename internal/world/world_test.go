@@ -408,3 +408,67 @@ func TestSkyLightColumnUpdatesOnEdit(t *testing.T) {
 		t.Fatalf("sky after roof removal = %d", got)
 	}
 }
+func TestBlockUpdateBreaksUnsupportedPlant(t *testing.T) {
+	w := New(77)
+	w.EnsureChunk(ChunkPos{0, 0})
+	w.SetBlock(8, 90, 8, core.Stone)
+	w.SetBlock(8, 91, 8, core.Flower)
+	w.SetBlock(8, 100, 8, core.Stone)
+	w.SetBlock(8, 101, 8, core.Torch)
+	w.TakeBlockBreaks()
+
+	w.SetBlock(8, 100, 8, core.Air) // torch loses its support
+	breaks := w.TakeBlockBreaks()
+	if len(breaks) != 1 || breaks[0].Block != core.Torch || breaks[0].Y != 101 {
+		t.Fatalf("breaks after torch support removed = %+v", breaks)
+	}
+	if b := w.GetBlock(8, 101, 8); b != core.Air {
+		t.Fatalf("torch still present: %v", b)
+	}
+
+	w.SetBlock(8, 90, 8, core.Air) // flower loses its support
+	breaks = w.TakeBlockBreaks()
+	if len(breaks) != 1 || breaks[0].Block != core.Flower || breaks[0].Y != 91 {
+		t.Fatalf("breaks after flower support removed = %+v", breaks)
+	}
+	if b := w.GetBlock(8, 91, 8); b != core.Air {
+		t.Fatalf("flower still present: %v", b)
+	}
+	if again := w.TakeBlockBreaks(); again != nil {
+		t.Fatalf("break queue was not drained: %+v", again)
+	}
+}
+
+func TestSupportedPlantSurvivesBlockReplacement(t *testing.T) {
+	w := New(78)
+	w.EnsureChunk(ChunkPos{0, 0})
+	w.SetBlock(3, 80, 3, core.Stone)
+	w.SetBlock(3, 81, 3, core.TallGrass)
+	w.TakeBlockBreaks()
+	w.SetBlock(3, 80, 3, core.Dirt)
+	if breaks := w.TakeBlockBreaks(); len(breaks) != 0 {
+		t.Fatalf("plant broke on solid replacement: %+v", breaks)
+	}
+	if b := w.GetBlock(3, 81, 3); b != core.TallGrass {
+		t.Fatalf("grass disappeared: %v", b)
+	}
+}
+func TestCactusStackBreaksWhenBaseRemoved(t *testing.T) {
+	w := New(79)
+	w.EnsureChunk(ChunkPos{0, 0})
+	w.SetBlock(5, 70, 5, core.Sand)
+	w.SetBlock(5, 71, 5, core.Cactus)
+	w.SetBlock(5, 72, 5, core.Cactus)
+	w.TakeBlockBreaks()
+	w.SetBlock(5, 70, 5, core.Air)
+	breaks := w.TakeBlockBreaks()
+	if len(breaks) != 2 || breaks[0].Block != core.Cactus || breaks[1].Block != core.Cactus {
+		t.Fatalf("cactus stack breaks = %+v", breaks)
+	}
+	if b := w.GetBlock(5, 71, 5); b != core.Air {
+		t.Fatalf("lower cactus remains: %v", b)
+	}
+	if b := w.GetBlock(5, 72, 5); b != core.Air {
+		t.Fatalf("upper cactus remains: %v", b)
+	}
+}

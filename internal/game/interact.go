@@ -201,6 +201,31 @@ func (g *Game) selectedDamage() float32 {
 	return 1.5
 }
 
+// processBlockBreaks drains blocks removed by neighbour updates (for example
+// a flower whose supporting block was mined) and gives them the same effects
+// as a normal break: particles, sound and a survival drop.
+func (g *Game) processBlockBreaks() {
+	if g.world == nil {
+		return
+	}
+	for _, br := range g.world.TakeBlockBreaks() {
+		pos := [3]int{br.X, br.Y, br.Z}
+		g.spawnBlockParticles(br.Block, pos, mathx.Vec3{Y: 1}, 8)
+		g.playSound(breakSound(br.Block))
+		if g.mode == ModeCreative {
+			continue
+		}
+		drop := dropForBlock(br.Block)
+		if drop == core.ItemNone || g.mobs == nil {
+			continue
+		}
+		p := mathx.Vec3{X: float32(br.X) + 0.5, Y: float32(br.Y) + 0.35, Z: float32(br.Z) + 0.5}
+		ang := float32(g.frame%360) * 0.0174
+		vel := mathx.Vec3{X: float32(math.Cos(float64(ang))) * 1.5, Y: 3.4, Z: float32(math.Sin(float64(ang))) * 1.5}
+		g.mobs.Drop(drop, 1, p, vel)
+	}
+}
+
 func (g *Game) useItem(hit world.RayHit) {
 	if hit.Block == core.CraftingTable {
 		g.openCraftingTable()

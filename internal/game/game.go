@@ -118,6 +118,7 @@ type Game struct {
 	breakCool     float32
 	spaceTapTimer float32
 	stepTimer     float32
+	stepCooldown  float32
 	fluidTimer    float32
 
 	chatOpen          bool
@@ -688,6 +689,7 @@ func (g *Game) updateWorld(dt float32, allowInput bool) {
 		g.world.TickFluids()
 		g.fluidTimer = 0.12
 	}
+	g.processBlockBreaks()
 	g.saveTimer += dt
 	if g.saveTimer > 30 && g.state == StatePlaying && g.opts.SmokeFrames == 0 {
 		g.saveTimer = 0
@@ -898,8 +900,16 @@ func (g *Game) playSound(name string) {
 	}
 }
 func (g *Game) updateFootsteps(dt float32) {
-	if g.player == nil || g.chatOpen || g.player.Flying || !g.player.Body.OnGround {
-		g.stepTimer = 0
+	if g.stepCooldown > 0 {
+		g.stepCooldown -= dt
+	}
+	if g.player == nil || g.chatOpen || g.player.Flying {
+		return
+	}
+	// Keep the accumulated step distance while airborne. Resetting it on every
+	// jump/landing frame made a landing immediately emit a step, and small
+	// ground-contact flickers could repeat it many times in quick succession.
+	if !g.player.Body.OnGround {
 		return
 	}
 	speed := float32(math.Hypot(float64(g.player.Body.Vel.X), float64(g.player.Body.Vel.Z)))
@@ -909,7 +919,10 @@ func (g *Game) updateFootsteps(dt float32) {
 	}
 	g.stepTimer -= dt * speed
 	if g.stepTimer <= 0 {
-		g.playSound("step")
+		if g.stepCooldown <= 0 {
+			g.playSound("step")
+			g.stepCooldown = 0.20
+		}
 		g.stepTimer = 1.5
 	}
 }

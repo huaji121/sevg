@@ -217,6 +217,7 @@ func (p *Player) Update(dt float32, w *world.World, in Input) {
 		}
 		if in.Jump && grounded && !p.Crouching {
 			p.Body.Vel.Y = 8.4
+			p.Body.OnGround = false
 			grounded = false
 		}
 	}

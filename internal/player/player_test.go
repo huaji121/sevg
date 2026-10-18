@@ -79,3 +79,12 @@ func TestCrouchStopsAtBlockEdge(t *testing.T) {
 		t.Fatalf("stuck or fell while retreating: x=%f y=%f", p.Body.Pos.X, p.Body.Pos.Y)
 	}
 }
+func TestJumpClearsOnGroundImmediately(t *testing.T) {
+	w := flatWorld(t, 3)
+	p := New(mathx.Vec3{X: 0.5, Y: 65, Z: 0.5})
+	p.Update(0.016, w, Input{})
+	p.Update(0.016, w, Input{Jump: true})
+	if p.Body.OnGround || p.Body.Vel.Y <= 0 {
+		t.Fatalf("jump state: onGround=%v vy=%f", p.Body.OnGround, p.Body.Vel.Y)
+	}
+}

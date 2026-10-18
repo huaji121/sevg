@@ -121,6 +121,14 @@ type EditRecord struct {
 	Block core.BlockID
 }
 
+// BlockBreak describes a block removed by a neighbour update, such as a
+// flower whose supporting block was mined. The game drains these to spawn
+// particles, sounds and item drops.
+type BlockBreak struct {
+	X, Y, Z int
+	Block   core.BlockID
+}
+
 type World struct {
 	mu              sync.RWMutex
 	Seed            int64
@@ -136,6 +144,7 @@ type World struct {
 	dynLightZ       int
 	dynLightLevel   uint8
 	dynNeedsRefresh bool
+	breaks          []BlockBreak
 }
 
 func New(seed int64) *World {
@@ -286,22 +295,30 @@ func (w *World) blockUnlocked(wx, wy, wz int) core.BlockID {
 	return c.Blocks[index(Mod(wx, ChunkSize), wy, Mod(wz, ChunkSize))]
 }
 
-// SetBlock edits a block, records the change for saving, and marks this chunk
-// and any bordering neighbours dirty.
+// SetBlock edits a block, records the change for saving, marks this chunk and
+// bordering neighbours dirty, then runs support updates for neighbours.
 func (w *World) SetBlock(wx, wy, wz int, b core.BlockID) bool {
 	if wy < 0 || wy >= ChunkHeight {
 		return false
 	}
-	cp := ChunkOf(wx, wz)
-	lx, lz := Mod(wx, ChunkSize), Mod(wz, ChunkSize)
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if _, ok := w.setBlockLocked(wx, wy, wz, b); !ok {
+		return false
+	}
+	w.applySupportUpdatesLocked(wx, wy, wz)
+	return true
+}
+
+func (w *World) setBlockLocked(wx, wy, wz int, b core.BlockID) (core.BlockID, bool) {
+	cp := ChunkOf(wx, wz)
+	lx, lz := Mod(wx, ChunkSize), Mod(wz, ChunkSize)
 	c, _ := w.ensureLocked(cp)
 	i := index(lx, wy, lz)
 	old := c.Blocks[i]
 	oldLevel := c.WaterLevel[i]
 	if !c.SetLocal(lx, wy, lz, b) {
-		return false
+		return old, false
 	}
 	c.WaterLevel[i] = 0
 	w.queueFluidLocked(wx, wy, wz)
@@ -336,7 +353,44 @@ func (w *World) SetBlock(wx, wy, wz int, b core.BlockID) bool {
 	if lz == ChunkSize-1 {
 		w.markDirtyLocked(ChunkPos{cp.X, cp.Z + 1})
 	}
-	return true
+	return old, true
+}
+
+func needsSupport(b core.BlockID) bool {
+	return b.Cross() || b == core.Cactus
+}
+
+// applySupportUpdatesLocked validates the column above a changed block.
+// A support-dependent block only checks the block directly below it, so a
+// change can only invalidate the block immediately above. Cacti can form
+// vertical stacks, hence the loop.
+func (w *World) applySupportUpdatesLocked(x, y, z int) {
+	for ny := y + 1; ny < ChunkHeight; ny++ {
+		b := w.blockUnlocked(x, ny, z)
+		if !needsSupport(b) {
+			return
+		}
+		if w.blockUnlocked(x, ny-1, z).Solid() {
+			return
+		}
+		old, ok := w.setBlockLocked(x, ny, z, core.Air)
+		if !ok {
+			return
+		}
+		w.breaks = append(w.breaks, BlockBreak{X: x, Y: ny, Z: z, Block: old})
+	}
+}
+
+// TakeBlockBreaks returns and clears block breaks produced by support updates.
+func (w *World) TakeBlockBreaks() []BlockBreak {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(w.breaks) == 0 {
+		return nil
+	}
+	out := w.breaks
+	w.breaks = nil
+	return out
 }
 
 func (w *World) markDirtyLocked(p ChunkPos) {
