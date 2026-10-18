@@ -393,3 +393,18 @@ func TestNeighborsLoaded(t *testing.T) {
 		t.Fatal("chunk with all neighbours reported missing")
 	}
 }
+func TestSkyLightColumnUpdatesOnEdit(t *testing.T) {
+	w := New(321)
+	w.EnsureChunk(ChunkPos{0, 0})
+	w.SetBlock(8, 200, 8, core.Stone)
+	if got := w.SkyLightAt(8, 199, 8); got != 0 {
+		t.Fatalf("sky under new roof = %d", got)
+	}
+	if got := w.SkyLightAt(8, 201, 8); got != 15 {
+		t.Fatalf("sky above new roof = %d", got)
+	}
+	w.SetBlock(8, 200, 8, core.Air)
+	if got := w.SkyLightAt(8, 199, 8); got != 15 {
+		t.Fatalf("sky after roof removal = %d", got)
+	}
+}

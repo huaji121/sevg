@@ -70,6 +70,38 @@ func (c *Chunk) RebuildSkyLight() {
 	}
 }
 
+// RebuildSkyLightColumn updates only one vertical column. Sky light is
+// computed independently per column, so editing one block does not require a
+// full 16x16 chunk rebuild.
+func (c *Chunk) RebuildSkyLightColumn(x, z int) {
+	if x < 0 || x >= ChunkSize || z < 0 || z >= ChunkSize {
+		return
+	}
+	level := 15
+	for y := ChunkHeight - 1; y >= 0; y-- {
+		i := index(x, y, z)
+		b := c.Blocks[i]
+		if b.Opaque() {
+			level = 0
+			c.SkyLight[i] = 0
+			continue
+		}
+		switch b {
+		case core.Water:
+			if level > 0 {
+				level--
+			}
+		case core.Leaves:
+			if level > 1 {
+				level -= 2
+			} else {
+				level = 0
+			}
+		}
+		c.SkyLight[i] = uint8(level)
+	}
+}
+
 func (c *Chunk) SetLocal(x, y, z int, b core.BlockID) bool {
 	if x < 0 || x >= ChunkSize || z < 0 || z >= ChunkSize || y < 0 || y >= ChunkHeight {
 		return false
@@ -276,9 +308,14 @@ func (w *World) SetBlock(wx, wy, wz int, b core.BlockID) bool {
 	if old == core.Water && oldLevel == 0 && b != core.Water {
 		w.drainLocalWaterLocked(wx, wy, wz)
 	}
-	c.RebuildSkyLight()
-	w.rebuildBlockLightLocked()
-	if w.dynLightLevel > 0 {
+	c.RebuildSkyLightColumn(lx, lz)
+	// Rebuilding all block light is expensive. Only a light source being
+	// added or removed can change the light field; ordinary mining must stay
+	// cheap so creative mass-breaking does not hitch.
+	if old.Def().Light > 0 || b.Def().Light > 0 {
+		w.rebuildBlockLightLocked()
+	}
+	if w.dynLightLevel > 0 && abs(wx-w.dynLightX) <= dynamicLightRadius+2 && abs(wy-w.dynLightY) <= dynamicLightRadius+2 && abs(wz-w.dynLightZ) <= dynamicLightRadius+2 {
 		w.dynNeedsRefresh = true
 	}
 	key := cp.Key()
