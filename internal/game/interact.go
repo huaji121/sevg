@@ -407,7 +407,6 @@ func (g *Game) handleUIClick(right bool) {
 		}
 		if g.mode == ModeCreative && g.inventoryTab == 1 {
 			if g.creativeCloseRect().Contains(g.mouseX, g.mouseY) {
-				g.heldStack = core.Stack{}
 				g.setState(StatePlaying)
 				return
 			}
@@ -454,13 +453,6 @@ func (g *Game) handleUIClick(right bool) {
 			}
 		}
 		if g.invCloseRect().Contains(g.mouseX, g.mouseY) {
-			if !g.heldStack.Empty() {
-				left := g.inv.Add(g.heldStack.Item, g.heldStack.Count)
-				if left > 0 {
-					g.mobs.Drop(g.heldStack.Item, left, g.player.Body.Pos, mathx.Vec3{Y: 3})
-				}
-				g.heldStack = core.Stack{}
-			}
 			g.setState(StatePlaying)
 			return
 		}

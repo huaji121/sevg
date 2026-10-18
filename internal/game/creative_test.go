@@ -84,3 +84,16 @@ func TestCreativeSlotPickupFloats(t *testing.T) {
 		t.Fatalf("creative slot pickup: held=%+v slot=%+v", g.heldStack, g.inv.Slots[0])
 	}
 }
+func TestClosingCreativeReturnsHeldStack(t *testing.T) {
+	g := newTestGame(t)
+	g.inv = core.Inventory{}
+	g.mode = ModeCreative
+	g.heldStack = core.Stack{Item: core.ItemPlanks, Count: 7}
+	g.returnHeldStack()
+	if !g.heldStack.Empty() {
+		t.Fatalf("held stack not cleared: %+v", g.heldStack)
+	}
+	if got := g.inv.Count(core.ItemPlanks); got != 7 {
+		t.Fatalf("returned planks = %d", got)
+	}
+}

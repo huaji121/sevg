@@ -254,6 +254,7 @@ func (g *Game) openCraftingTable() {
 
 func (g *Game) setState(s State) {
 	if g.state == StateInventory && s != StateInventory {
+		g.returnHeldStack()
 		if g.mode != ModeCreative {
 			g.returnCraftGrid()
 		}
@@ -480,15 +481,6 @@ func (g *Game) onKey(k sdl.Keycode) {
 		} else if k == sdl.K_L {
 			g.toggleLanguage()
 		} else if k == sdl.K_E || k == sdl.K_ESCAPE {
-			if g.mode == ModeCreative {
-				g.heldStack = core.Stack{}
-			} else if !g.heldStack.Empty() {
-				left := g.inv.Add(g.heldStack.Item, g.heldStack.Count)
-				if left > 0 && g.mobs != nil {
-					g.mobs.Drop(g.heldStack.Item, left, g.player.Body.Pos, mathx.Vec3{Y: 3})
-				}
-				g.heldStack = core.Stack{}
-			}
 			g.setState(StatePlaying)
 		}
 	case StateSettings:

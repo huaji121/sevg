@@ -482,3 +482,17 @@ func (g *Game) timeString() string {
 	mins := int(g.time*24*60) % 60
 	return fmt.Sprintf("%02d:%02d", hours, mins)
 }
+
+// returnHeldStack puts the cursor stack back into the inventory. Both survival
+// and creative inventory close paths use this so an item is never silently
+// deleted when closing the UI.
+func (g *Game) returnHeldStack() {
+	if g.heldStack.Empty() {
+		return
+	}
+	left := g.inv.Add(g.heldStack.Item, g.heldStack.Count)
+	if left > 0 && g.mobs != nil && g.player != nil {
+		g.mobs.Drop(g.heldStack.Item, left, g.player.Body.Pos, mathx.Vec3{Y: 3})
+	}
+	g.heldStack = core.Stack{}
+}
