@@ -90,3 +90,19 @@ func TestHeldTransparentGlassMesh(t *testing.T) {
 		t.Fatal("held glass produced no transparent mesh")
 	}
 }
+func TestHeldItemSwingAnimation(t *testing.T) {
+	g := newTestGame(t)
+	g.state = StatePlaying
+	g.camera = cameraFirst
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{Item: core.ItemPlanks, Count: 1}
+	idle := g.buildHeldMesh()
+	g.swingT = 0.15
+	swinging := g.buildHeldMesh()
+	if len(idle.Vertices) == 0 || len(swinging.Vertices) != len(idle.Vertices) {
+		t.Fatalf("held mesh sizes idle=%d swing=%d", len(idle.Vertices), len(swinging.Vertices))
+	}
+	if idle.Vertices[0] == swinging.Vertices[0] {
+		t.Fatal("held item did not move during action swing")
+	}
+}

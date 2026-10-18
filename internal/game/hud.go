@@ -629,16 +629,20 @@ func (g *Game) buildHeldMesh() world.MeshData {
 		return out
 	}
 
-	offR := float32(0.32)
-	offU := float32(-0.24) + bob
-	offF := float32(0.52)
+	swing := g.swingAngle()
+	offR := float32(0.32) - swing*0.06
+	offU := float32(-0.24) - swing*0.08 + bob
+	offF := float32(0.52) + swing*0.04
 	rot := float32(0.35)
 	rc, rs := float32(math.Cos(float64(rot))), float32(math.Sin(float64(rot)))
+	pitch := -swing * 0.8
+	pc, ps := float32(math.Cos(float64(pitch))), float32(math.Sin(float64(pitch)))
 	base := uint32(len(out.Vertices))
 	for _, v := range local.Vertices {
 		lx := (v.X*rc - v.Z*rs) * scale
 		lz := (v.X*rs + v.Z*rc) * scale
 		ly := v.Y * scale
+		ly, lz = ly*pc-lz*ps, ly*ps+lz*pc
 		p := eye.Add(right.Mul(offR + lx)).Add(up.Mul(offU + ly)).Add(fwd.Mul(offF + lz))
 		v.X, v.Y, v.Z = p.X, p.Y, p.Z
 		out.Vertices = append(out.Vertices, v)
@@ -719,12 +723,13 @@ func (g *Game) buildHeldIconMesh() world.MeshData {
 	cy, sy := float32(math.Cos(float64(yaw))), float32(math.Sin(float64(yaw)))
 	rotRight := right.Mul(cy).Add(normal.Mul(sy))
 	rotNormal := normal.Mul(cy).Sub(right.Mul(sy))
-	roll := float32(-0.10)
+	swing := g.swingAngle()
+	roll := float32(-0.10) + swing*0.55
 	cr, sr := float32(math.Cos(float64(roll))), float32(math.Sin(float64(roll)))
 	cardRight := rotRight.Mul(cr).Add(up.Mul(sr))
 	cardUp := up.Mul(cr).Sub(rotRight.Mul(sr))
 	eye := g.player.Eye()
-	c := eye.Add(right.Mul(0.28)).Add(up.Mul(-0.19 + g.player.Bob*1.5)).Add(fwd.Mul(0.50))
+	c := eye.Add(right.Mul(0.28 - swing*0.06)).Add(up.Mul(-0.19 - swing*0.08 + g.player.Bob*1.5)).Add(fwd.Mul(0.50 + swing*0.04))
 	var held world.MeshData
 	appendIconCard(&held, c, cardRight, cardUp, rotNormal, 0.30, 0.30, 0.012, icon, g.canv.IconSides[st.Item])
 	return held
@@ -752,16 +757,20 @@ func (g *Game) buildHeldTransparentMesh() world.MeshData {
 	right := fwd.Cross(mathx.V3(0, 1, 0)).Normalize()
 	up := right.Cross(fwd)
 	eye := g.player.Eye()
-	offR := float32(0.32)
-	offU := float32(-0.24) + g.player.Bob*1.5
-	offF := float32(0.52)
+	swing := g.swingAngle()
+	offR := float32(0.32) - swing*0.06
+	offU := float32(-0.24) - swing*0.08 + g.player.Bob*1.5
+	offF := float32(0.52) + swing*0.04
 	rot := float32(0.35)
 	rc, rs := float32(math.Cos(float64(rot))), float32(math.Sin(float64(rot)))
+	pitch := -swing * 0.8
+	pc, ps := float32(math.Cos(float64(pitch))), float32(math.Sin(float64(pitch)))
 	out := world.MeshData{Vertices: make([]world.Vertex, len(local.Vertices)), Indices: local.Indices}
 	for i, v := range local.Vertices {
 		lx := (v.X*rc - v.Z*rs) * 0.65
 		lz := (v.X*rs + v.Z*rc) * 0.65
 		ly := v.Y * 0.65
+		ly, lz = ly*pc-lz*ps, ly*ps+lz*pc
 		p := eye.Add(right.Mul(offR + lx)).Add(up.Mul(offU + ly)).Add(fwd.Mul(offF + lz))
 		out.Vertices[i] = v
 		out.Vertices[i].X, out.Vertices[i].Y, out.Vertices[i].Z = p.X, p.Y, p.Z
