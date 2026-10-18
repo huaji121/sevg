@@ -204,6 +204,14 @@ func (g *Game) scrollChat(delta int) {
 	}
 }
 
+func chatTextY(c *ui.Canvas, sample string, scale, top, height float32) float32 {
+	if sample == "" {
+		sample = "Ag"
+	}
+	inkTop, inkBottom := c.TextInkBounds(sample, scale)
+	return top + (height-(inkBottom-inkTop))/2 - inkTop
+}
+
 func (g *Game) drawChat(w, h float32) {
 	if g.state != StatePlaying || g.canv == nil {
 		return
@@ -230,7 +238,7 @@ func (g *Game) drawChat(w, h float32) {
 		x := float32(20)
 		y := h - ph - 64
 		c.Panel(x, y, pw, ph, ui.RGBA(8, 10, 12, 205), ui.RGBA(170, 170, 170, 190))
-		c.Text(x+14, y+8, i18n.T("chat.hint"), 0.85, ui.MutedColor)
+		c.Text(x+14, chatTextY(c, i18n.T("chat.hint"), 0.85, y, 30), i18n.T("chat.hint"), 0.85, ui.MutedColor)
 
 		lines := g.chatLines(pw-28, scale)
 		messageTop := y + 32
@@ -252,6 +260,7 @@ func (g *Game) drawChat(w, h float32) {
 		}
 		for i := start; i < len(lines) && i < start+maxLines; i++ {
 			yy := messageTop + float32(i-start)*lineH
+			yy = chatTextY(c, lines[i].text, scale, yy, lineH)
 			c.Text(x+16, yy, lines[i].text, scale, ui.TextColor)
 		}
 		if maxScroll > 0 {
@@ -267,6 +276,7 @@ func (g *Game) drawChat(w, h float32) {
 		}
 
 		inputY := y + ph - 40
+		inputTextY := chatTextY(c, string(g.chatInput)+g.chatComposition, 1.2, inputY-6, y+ph-(inputY-6))
 		c.Rect(x+12, inputY-6, pw-24, 1, [4]float32{1, 1, 1, 0.20})
 		prompt := "> "
 		comp := g.chatComposition
@@ -288,20 +298,20 @@ func (g *Game) drawChat(w, h float32) {
 		pre := string(g.chatInput[textStart:caret])
 		post := string(g.chatInput[caret:])
 		if len(g.chatInput) == 0 && comp == "" {
-			c.Text(x+16, inputY, prompt, 1.2, ui.MutedColor)
-			c.Text(x+16+c.TextWidth(prompt, 1.2), inputY, i18n.T("chat.placeholder"), 1.2, ui.MutedColor)
+			c.Text(x+16, inputTextY, prompt, 1.2, ui.MutedColor)
+			c.Text(x+16+c.TextWidth(prompt, 1.2), inputTextY, i18n.T("chat.placeholder"), 1.2, ui.MutedColor)
 		} else {
 			c.Text(x+16, inputY, prompt, 1.2, ui.MutedColor)
 			tx := x + 16 + c.TextWidth(prompt, 1.2)
-			c.Text(tx, inputY, pre, 1.2, ui.TextColor)
+			c.Text(tx, inputTextY, pre, 1.2, ui.TextColor)
 			tx += c.TextWidth(pre, 1.2)
 			if comp != "" {
-				c.Text(tx, inputY, comp, 1.2, ui.RGBA(255, 214, 120, 255))
+				c.Text(tx, inputTextY, comp, 1.2, ui.RGBA(255, 214, 120, 255))
 				tx += c.TextWidth(comp, 1.2)
 			}
-			c.Text(tx, inputY, post, 1.2, ui.TextColor)
+			c.Text(tx, inputTextY, post, 1.2, ui.TextColor)
 			if g.frame/30%2 == 0 {
-				c.Rect(tx+1, inputY+2, 2, 22, [4]float32{1, 1, 1, 0.9})
+				c.Rect(tx+1, inputTextY+1, 2, 20, [4]float32{1, 1, 1, 0.9})
 			}
 		}
 		return
@@ -328,8 +338,10 @@ func (g *Game) drawChat(w, h float32) {
 		row := len(lines) - 1 - i
 		yy := baseY - float32(row)*lineH
 		tw := c.TextWidth(lines[i].text, scale)
-		c.Rect(16, yy-2, tw+12, lineH, [4]float32{0, 0, 0, 0.30 * alpha})
-		c.Text(22, yy, lines[i].text, scale, [4]float32{1, 1, 1, alpha})
+		bgY := yy - 2
+		c.Rect(16, bgY, tw+12, lineH, [4]float32{0, 0, 0, 0.30 * alpha})
+		tY := chatTextY(c, lines[i].text, scale, bgY, lineH)
+		c.Text(22, tY, lines[i].text, scale, [4]float32{1, 1, 1, alpha})
 	}
 }
 
