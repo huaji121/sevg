@@ -121,7 +121,7 @@ func (g *Game) appendPlayerHeldIconCard(dst *world.MeshData, swing float32) {
 	cardRight := right
 	cardUp := up
 	var card world.MeshData
-	appendIconCard(&card, center, cardRight, cardUp, normal, 0.42, 0.42, 0.08, glyph, g.canv.IconSides[st.Item])
+	appendIconCard(&card, center, cardRight, cardUp, normal, 0.42, 0.42, 0.012, glyph, g.canv.IconSides[st.Item])
 	p := g.player
 	pivot := mathx.V3(0.36, 1.25, 0)
 	base := uint32(len(dst.Vertices))
