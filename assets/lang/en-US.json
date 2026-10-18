@@ -162,6 +162,7 @@
   "pause.title": "PAUSED",
   "pause.title_screen": "QUIT TO TITLE",
   "settings.back": "BACK",
+  "settings.dynamic_light": "Dynamic Light",
   "settings.fov": "FIELD OF VIEW",
   "settings.fps_limit": "FPS LIMIT",
   "settings.fullscreen": "FULLSCREEN",

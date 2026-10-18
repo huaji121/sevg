@@ -18,6 +18,7 @@ type videoSettings struct {
 	FOV            int   `json:"fov"`
 	Fullscreen     bool  `json:"fullscreen"`
 	SmoothLighting *bool `json:"smooth_lighting,omitempty"`
+	DynamicLight   *bool `json:"dynamic_light,omitempty"`
 	VSync          *bool `json:"vsync,omitempty"`
 }
 
@@ -43,6 +44,9 @@ func loadVideoSettings(opts *Options) {
 	if s.SmoothLighting != nil {
 		opts.SmoothLighting = *s.SmoothLighting
 	}
+	if s.DynamicLight != nil {
+		opts.DynamicLight = *s.DynamicLight
+	}
 	if s.VSync != nil {
 		opts.VSync = *s.VSync
 	}
@@ -58,6 +62,7 @@ func saveVideoSettings(opts Options) {
 		FOV:            opts.FOV,
 		Fullscreen:     opts.Fullscreen,
 		SmoothLighting: &opts.SmoothLighting,
+		DynamicLight:   &opts.DynamicLight,
 		VSync:          &opts.VSync,
 	}
 	data, err := json.MarshalIndent(s, "", "  ")
@@ -150,6 +155,9 @@ func (g *Game) applyVideoChange(kind, delta int) {
 	case 5:
 		g.setVSync(!g.opts.VSync)
 		return
+	case 6:
+		g.opts.DynamicLight = !g.opts.DynamicLight
+		g.heldLightT = 0
 	}
 	saveVideoSettings(g.opts)
 }
@@ -174,20 +182,21 @@ func (g *Game) setFullscreen(on bool) {
 }
 
 type settingsLayout struct {
-	panel  ui.Rect
-	rows   [6]ui.Rect
-	minus  [6]ui.Rect
-	plus   [6]ui.Rect
-	values [6]ui.Rect
-	full   ui.Rect
-	smooth ui.Rect
-	vsync  ui.Rect
-	back   ui.Rect
+	panel   ui.Rect
+	rows    [7]ui.Rect
+	minus   [7]ui.Rect
+	plus    [7]ui.Rect
+	values  [7]ui.Rect
+	full    ui.Rect
+	smooth  ui.Rect
+	vsync   ui.Rect
+	dynamic ui.Rect
+	back    ui.Rect
 }
 
 func (g *Game) settingsRects() settingsLayout {
 	w, h := float32(g.gfx.W), float32(g.gfx.H)
-	pw, ph := float32(760), float32(520)
+	pw, ph := float32(760), float32(600)
 	if pw > w-32 {
 		pw = w - 32
 	}
@@ -201,16 +210,25 @@ func (g *Game) settingsRects() settingsLayout {
 	rowY := p.Y + 86
 	rowH := float32(46)
 	gap := float32(8)
-	for i := 0; i < 6; i++ {
-		l.rows[i] = ui.Rect{X: rowX, Y: rowY + float32(i)*(rowH+gap), W: rowW, H: rowH}
-		l.minus[i] = ui.Rect{X: p.X + p.W - 250, Y: l.rows[i].Y + 7, W: 38, H: 30}
-		l.plus[i] = ui.Rect{X: p.X + p.W - 72, Y: l.rows[i].Y + 7, W: 38, H: 30}
-		l.values[i] = ui.Rect{X: l.minus[i].X + 44, Y: l.rows[i].Y + 2, W: 130, H: 42}
+	avail := p.H - 86 - 72
+	if used := 7*rowH + 6*gap; used > avail {
+		gap = 5
+		rowH = (avail - 6*gap) / 7
+		if rowH < 34 {
+			rowH = 34
+		}
 	}
-	l.values[3] = ui.Rect{X: p.X + p.W - 246, Y: l.rows[3].Y + 7, W: 212, H: 30}
-	l.values[4] = ui.Rect{X: p.X + p.W - 246, Y: l.rows[4].Y + 7, W: 212, H: 30}
-	l.values[5] = ui.Rect{X: p.X + p.W - 246, Y: l.rows[5].Y + 7, W: 212, H: 30}
-	l.full, l.smooth, l.vsync = l.values[3], l.values[4], l.values[5]
+	for i := 0; i < 7; i++ {
+		l.rows[i] = ui.Rect{X: rowX, Y: rowY + float32(i)*(rowH+gap), W: rowW, H: rowH}
+		btnY := l.rows[i].Y + (rowH-30)/2
+		l.minus[i] = ui.Rect{X: p.X + p.W - 250, Y: btnY, W: 38, H: 30}
+		l.plus[i] = ui.Rect{X: p.X + p.W - 72, Y: btnY, W: 38, H: 30}
+		l.values[i] = ui.Rect{X: l.minus[i].X + 44, Y: btnY, W: 130, H: 30}
+	}
+	for i := 3; i <= 6; i++ {
+		l.values[i] = ui.Rect{X: p.X + p.W - 246, Y: l.rows[i].Y + (rowH-30)/2, W: 212, H: 30}
+	}
+	l.full, l.smooth, l.vsync, l.dynamic = l.values[3], l.values[4], l.values[5], l.values[6]
 	l.back = ui.Rect{X: p.X + p.W/2 - 110, Y: p.Y + p.H - 62, W: 220, H: 42}
 	return l
 }
@@ -231,6 +249,7 @@ func (g *Game) drawSettings(w, h float32) {
 		i18n.T("settings.fullscreen"),
 		i18n.T("settings.smooth_lighting"),
 		i18n.T("settings.vsync"),
+		i18n.T("settings.dynamic_light"),
 	}
 	values := []string{
 		fmt.Sprintf("%d", g.opts.RenderDist),
@@ -239,8 +258,9 @@ func (g *Game) drawSettings(w, h float32) {
 		onOffLabel(g.fullscreen),
 		onOffLabel(g.opts.SmoothLighting),
 		onOffLabel(g.opts.VSync),
+		onOffLabel(g.opts.DynamicLight),
 	}
-	for i := 0; i < 6; i++ {
+	for i := 0; i < 7; i++ {
 		r := l.rows[i]
 		c.Rect(r.X, r.Y, r.W, r.H, ui.RGBA(12, 16, 20, 225))
 		c.Border(r.X, r.Y, r.W, r.H, 1, ui.RGBA(65, 78, 86, 180))
@@ -253,8 +273,10 @@ func (g *Game) drawSettings(w, h float32) {
 			g.drawButtonScale(l.full, values[i], true, 1.2)
 		} else if i == 4 {
 			g.drawButtonScale(l.smooth, values[i], true, 1.2)
-		} else {
+		} else if i == 5 {
 			g.drawButtonScale(l.vsync, values[i], true, 1.2)
+		} else {
+			g.drawButtonScale(l.dynamic, values[i], true, 1.2)
 		}
 	}
 	g.drawButtonScale(l.back, i18n.T("settings.back"), true, 1.2)

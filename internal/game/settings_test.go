@@ -40,4 +40,38 @@ func TestSettingsLayout(t *testing.T) {
 			t.Fatalf("minus button %d is outside its row", i)
 		}
 	}
+	if !l.rows[6].Contains(l.dynamic.X+1, l.dynamic.Y+1) {
+		t.Fatal("dynamic light button is outside its row")
+	}
+	if l.rows[6].Y+l.rows[6].H > l.back.Y {
+		t.Fatal("settings rows overlap the back button")
+	}
+}
+func TestDynamicLightToggle(t *testing.T) {
+	g := newTestGame(t)
+	g.opts.SmokeFrames = 1
+	g.opts.DynamicLight = true
+	g.world.SetDynamicLight(8, 70, 8, 14)
+	if g.world.BlockLightAt(8, 70, 8) == 0 {
+		t.Fatal("dynamic light was not applied")
+	}
+	g.applyVideoChange(6, 0)
+	if g.opts.DynamicLight {
+		t.Fatal("dynamic light option did not turn off")
+	}
+	g.updateHeldLight(0.1)
+	if got := g.world.BlockLightAt(8, 70, 8); got != 0 {
+		t.Fatalf("dynamic light remains after disabling: %d", got)
+	}
+}
+func TestSettingsLayoutSmallWindow(t *testing.T) {
+	g := newTestGame(t)
+	g.gfx = &render.Renderer{W: 800, H: 500}
+	l := g.settingsRects()
+	if l.panel.H > 468 {
+		t.Fatalf("settings panel too tall: %f", l.panel.H)
+	}
+	if l.rows[6].Y+l.rows[6].H > l.back.Y {
+		t.Fatalf("rows overlap back button: row end %f back %f", l.rows[6].Y+l.rows[6].H, l.back.Y)
+	}
 }

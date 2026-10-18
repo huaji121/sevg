@@ -162,6 +162,7 @@
   "pause.title": "已暂停",
   "pause.title_screen": "返回标题",
   "settings.back": "返回",
+  "settings.dynamic_light": "动态光源",
   "settings.fov": "视野",
   "settings.fps_limit": "帧率限制",
   "settings.fullscreen": "全屏",

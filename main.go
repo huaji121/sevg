@@ -22,6 +22,7 @@ func main() {
 	flag.IntVar(&opts.FOV, "fov", 72, "field of view")
 	flag.BoolVar(&opts.Fullscreen, "fullscreen", false, "start in fullscreen")
 	flag.BoolVar(&opts.SmoothLighting, "smoothlighting", true, "smooth vertex lighting")
+	flag.BoolVar(&opts.DynamicLight, "dynamiclight", true, "held light source updates")
 	flag.BoolVar(&opts.VSync, "vsync", true, "vertical sync")
 	flag.Parse()
 

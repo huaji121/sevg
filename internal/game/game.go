@@ -32,6 +32,7 @@ type Options struct {
 	FOV            int
 	Fullscreen     bool
 	SmoothLighting bool
+	DynamicLight   bool
 	VSync          bool
 }
 
@@ -809,7 +810,7 @@ func (g *Game) updateHeldLight(dt float32) {
 	}
 	g.heldLightT = 0.08
 	level := uint8(0)
-	if g.state != StateDead {
+	if g.opts.DynamicLight && g.state != StateDead {
 		if st := g.inv.SelectedStack(); !st.Empty() && st.Item.IsBlock() {
 			level = st.Item.Def().Block.Def().Light
 		}
