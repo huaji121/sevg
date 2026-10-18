@@ -37,6 +37,8 @@ func (g *Game) drawUI() {
 		switch g.state {
 		case StateInventory:
 			g.drawInventory(w, h)
+		case StateChest:
+			g.drawChest(w, h)
 		case StatePaused:
 			g.drawPause(w, h)
 		case StateDead:

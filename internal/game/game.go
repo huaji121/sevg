@@ -53,6 +53,7 @@ const (
 	StateMenu State = iota
 	StatePlaying
 	StateInventory
+	StateChest
 	StatePaused
 	StateDead
 	StateSettings
@@ -119,6 +120,8 @@ type Game struct {
 	spaceTapTimer float32
 	stepTimer     float32
 	stepCooldown  float32
+	chests        map[[3]int]*[27]core.Stack
+	chestPos      [3]int
 	fluidTimer    float32
 
 	chatOpen          bool
@@ -230,6 +233,7 @@ func Run(opts Options) error {
 		keys:          opts.Keys,
 		bindingAction: -1,
 		dragSlider:    -1,
+		chests:        make(map[[3]int]*[27]core.Stack),
 		pending:       make(map[[2]int]bool),
 		meshed:        make(map[[2]int]bool),
 		lastTime:      time.Now(),
@@ -282,7 +286,7 @@ func (g *Game) openCraftingTable() {
 }
 
 func (g *Game) setState(s State) {
-	if g.state == StateInventory && s != StateInventory {
+	if (g.state == StateInventory || g.state == StateChest) && s != StateInventory && s != StateChest {
 		g.returnHeldStack()
 		if g.mode != ModeCreative {
 			g.returnCraftGrid()
@@ -306,10 +310,14 @@ func (g *Game) setState(s State) {
 	if g.Win != nil {
 		_ = g.Win.SetRelativeMouseMode(captured)
 	}
-	if captured {
-		_ = sdl.HideCursor()
-	} else {
-		_ = sdl.ShowCursor()
+	if g.Win != nil {
+		if captured {
+			_ = sdl.HideCursor()
+		} else {
+			_ = sdl.ShowCursor()
+		}
+	}
+	if !captured {
 		g.mouseLeft = false
 		g.mouseRight = false
 	}
@@ -349,9 +357,9 @@ func (g *Game) run() {
 		switch g.state {
 		case StatePlaying:
 			g.updatePlaying(float32(dt))
-		case StateInventory:
+		case StateInventory, StateChest:
 			// Keep the world, mobs, fluids and item drops running while the
-			// inventory is open; only suppress player movement and actions.
+			// inventory or chest is open; only suppress movement and actions.
 			g.updateWorld(float32(dt), false)
 		case StateMenu:
 			// idle title animation
@@ -537,6 +545,10 @@ func (g *Game) onKey(k sdl.Keycode) {
 		} else if k == sdl.K_L {
 			g.toggleLanguage()
 		} else if k == sdl.K_E || k == sdl.K_ESCAPE {
+			g.setState(StatePlaying)
+		}
+	case StateChest:
+		if k == sdl.K_E || k == sdl.K_ESCAPE {
 			g.setState(StatePlaying)
 		}
 	case StateSettings:

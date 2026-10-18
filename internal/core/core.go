@@ -33,6 +33,7 @@ const (
 	Wool
 	Torch
 	CraftingTable
+	Chest
 	BlockCount
 )
 
@@ -94,6 +95,7 @@ const (
 	TilePlayerSkinMap
 	TileSun
 	TileMoon
+	TileChest
 	TileTileCount
 )
 
@@ -145,6 +147,7 @@ const (
 	ItemWool
 	ItemTorch
 	ItemCraftingTable
+	ItemChest
 	ItemCount
 )
 
@@ -197,6 +200,7 @@ var BlockDefs = [BlockCount]BlockDef{
 	Wool:          {Name: "Wool", Solid: true, Opaque: true, Hardness: 0.6, Tiles: [6]uint8{TileWool, TileWool, TileWool, TileWool, TileWool, TileWool}},
 	Torch:         {Name: "Torch", Cross: true, Light: 14, Hardness: 0.05, Tiles: [6]uint8{TileTorch, TileTorch, TileTorch, TileTorch, TileTorch, TileTorch}, Drop: ItemTorch},
 	CraftingTable: {Name: "Crafting Table", Solid: true, Opaque: true, Hardness: 1.2, Tiles: [6]uint8{TileCraftingTable, TileCraftingTable, TileCraftingTable, TileCraftingTable, TileCraftingTable, TileCraftingTable}},
+	Chest:         {Name: "Chest", Solid: true, Opaque: true, Hardness: 1.0, Tiles: [6]uint8{TileChest, TileChest, TileChest, TileChest, TileChest, TileChest}, Drop: ItemChest},
 }
 
 func (b BlockID) Valid() bool { return b < BlockCount }
@@ -270,6 +274,7 @@ var ItemDefs = [ItemCount]ItemDef{
 	ItemWool:          {Name: "Wool", Kind: KindBlock, Block: Wool, MaxStack: StackLimit, Color: [3]float32{0.92, 0.92, 0.90}},
 	ItemTorch:         {Name: "Torch", Kind: KindBlock, Block: Torch, MaxStack: StackLimit, Color: [3]float32{0.95, 0.58, 0.18}},
 	ItemCraftingTable: {Name: "Crafting Table", Kind: KindBlock, Block: CraftingTable, MaxStack: StackLimit, Color: [3]float32{0.55, 0.38, 0.22}},
+	ItemChest:         {Name: "Chest", Kind: KindBlock, Block: Chest, MaxStack: StackLimit, Color: [3]float32{0.62, 0.40, 0.18}},
 }
 
 func init() {
@@ -320,6 +325,8 @@ func init() {
 			blockItems[id] = ItemTorch
 		case CraftingTable:
 			blockItems[id] = ItemCraftingTable
+		case Chest:
+			blockItems[id] = ItemChest
 		}
 	}
 	// Flowers and tall grass are picked up and placeable.

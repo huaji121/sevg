@@ -42,6 +42,7 @@ var recipes = []recipe{
 	shaped(core.Stack{Item: core.ItemPlanks, Count: 4}, []string{"L"}, map[rune]core.ItemID{'L': core.ItemLog}),
 	shaped(core.Stack{Item: core.ItemStick, Count: 4}, []string{"P", "P"}, map[rune]core.ItemID{'P': core.ItemPlanks}),
 	shaped(core.Stack{Item: core.ItemCraftingTable, Count: 1}, []string{"PP", "PP"}, map[rune]core.ItemID{'P': core.ItemPlanks}),
+	shaped(core.Stack{Item: core.ItemChest, Count: 1}, []string{"PPP", "P P", "PPP"}, map[rune]core.ItemID{'P': core.ItemPlanks}),
 	shaped(core.Stack{Item: core.ItemStoneBrick, Count: 4}, []string{"CC", "CC"}, map[rune]core.ItemID{'C': core.ItemCobble}),
 	shaped(core.Stack{Item: core.ItemGlass, Count: 1}, []string{"SS", "SS"}, map[rune]core.ItemID{'S': core.ItemSand}),
 	shaped(core.Stack{Item: core.ItemTorch, Count: 4}, []string{"C", "S"}, map[rune]core.ItemID{'C': core.ItemCoal, 'S': core.ItemStick}),
@@ -90,6 +91,10 @@ func (g *Game) handleActions(dt float32) {
 	}
 
 	if g.mouseRight && g.placeCool <= 0 && blockHit.Hit && !mobFirst {
+		if blockHit.Block == core.Chest {
+			g.openChest(blockHit.Pos)
+			return
+		}
 		g.useItem(blockHit)
 	}
 }
@@ -111,6 +116,9 @@ func (g *Game) mineBlock(dt float32, hit world.RayHit) {
 		g.spawnBlockParticles(b, hit.Pos, hit.Normal, 18)
 		g.playSound(breakSound(b))
 		g.world.SetBlock(x, y, z, core.Air)
+		if b == core.Chest {
+			g.dropChest([3]int{x, y, z})
+		}
 		g.mobs.StartFalling(g.world, x, y+1, z)
 		g.breakCool = 0.12
 		g.breakActive = false
@@ -158,6 +166,9 @@ func (g *Game) mineBlock(dt float32, hit world.RayHit) {
 	g.spawnBlockParticles(b, hit.Pos, hit.Normal, 18)
 	g.playSound(breakSound(b))
 	g.world.SetBlock(x, y, z, core.Air)
+	if b == core.Chest {
+		g.dropChest([3]int{x, y, z})
+	}
 	g.mobs.StartFalling(g.world, x, y+1, z)
 	drop := dropForBlock(b)
 	if drop != core.ItemNone {
@@ -445,6 +456,11 @@ func (g *Game) handleUIClick(right bool) {
 				}
 			}
 		}
+	case StateChest:
+		if right {
+			return
+		}
+		g.clickChest(false)
 	case StateDead:
 		if right {
 			return
@@ -618,7 +634,7 @@ func breakSound(b core.BlockID) string {
 	switch b {
 	case core.Glass, core.Ice:
 		return "break_glass"
-	case core.Log, core.Planks:
+	case core.Log, core.Planks, core.Chest:
 		return "break_wood"
 	case core.Grass, core.Leaves, core.Flower, core.TallGrass, core.Torch:
 		return "break_grass"

@@ -33,6 +33,7 @@ type SaveGame struct {
 	Time      float64
 	Player    playerSave
 	Inventory core.Inventory
+	Chests    map[[3]int][27]core.Stack
 	Edits     []world.EditRecord
 }
 
@@ -72,6 +73,13 @@ func (g *Game) startWorld(load bool) error {
 	g.gfx.ReleaseAllChunks()
 	g.meshed = make(map[[2]int]bool)
 	g.pending = make(map[[2]int]bool)
+	g.chests = make(map[[3]int]*[27]core.Stack)
+	if sv != nil {
+		for pos, slots := range sv.Chests {
+			copy := slots
+			g.chests[pos] = &copy
+		}
+	}
 
 	seed := g.seed
 	inv := core.Inventory{}
@@ -410,6 +418,7 @@ func (g *Game) saveGame() error {
 			Flying: g.player.Flying,
 		},
 		Inventory: g.inv,
+		Chests:    g.chestSaveData(),
 		Edits:     g.world.ExportEdits(),
 	}
 	dir := filepath.Dir(g.saveAt)
