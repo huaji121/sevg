@@ -1240,15 +1240,31 @@ func (f *frustum) containsAABB(min, max mathx.Vec3) bool {
 }
 
 func (r *Renderer) chunkVisible(gc *gpuChunk, cam Camera, fogEnd float32, f *frustum) bool {
-	dx := float32(gc.pos.X*ChunkSize) + ChunkSize/2 - cam.Pos.X
-	dz := float32(gc.pos.Z*ChunkSize) + ChunkSize/2 - cam.Pos.Z
-	dy := 64 - cam.Pos.Y
-	if dx*dx+dy*dy+dz*dz >= (fogEnd+40)*(fogEnd+40) {
-		return false
-	}
 	min := mathx.V3(float32(gc.pos.X*ChunkSize), 0, float32(gc.pos.Z*ChunkSize))
 	max := mathx.V3(min.X+ChunkSize, world.ChunkHeight, min.Z+ChunkSize)
+	if chunkAABBDistSq(min, max, cam.Pos) >= (fogEnd+40)*(fogEnd+40) {
+		return false
+	}
 	return f.containsAABB(min, max)
+}
+
+// chunkAABBDistSq measures the distance to the nearest point of a chunk's
+// full vertical AABB. Using a fixed y=64 centre incorrectly culled chunks
+// underneath players high on mountains.
+func chunkAABBDistSq(min, max, p mathx.Vec3) float32 {
+	axis := func(lo, hi, v float32) float32 {
+		if v < lo {
+			return lo - v
+		}
+		if v > hi {
+			return v - hi
+		}
+		return 0
+	}
+	dx := axis(min.X, max.X, p.X)
+	dy := axis(min.Y, max.Y, p.Y)
+	dz := axis(min.Z, max.Z, p.Z)
+	return dx*dx + dy*dy + dz*dz
 }
 
 func chunkDistSq(gc *gpuChunk, p mathx.Vec3) float32 {

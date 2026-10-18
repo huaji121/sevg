@@ -37,3 +37,18 @@ func TestFrustumChunkAABB(t *testing.T) {
 		t.Fatal("chunk outside side plane was not culled")
 	}
 }
+func TestChunkDistanceUsesFullVerticalBounds(t *testing.T) {
+	gc := &gpuChunk{pos: world.ChunkPos{0, 0}}
+	for _, y := range []float32{190, 191, 220, 256} {
+		cam := Camera{Pos: mathx.V3(8, y, 8), Dir: mathx.V3(0, -1, 0), Up: mathx.V3(0, 0, -1), Fov: mathx.Radians(70), Aspect: 1, Near: 0.1, Far: 500}
+		f := newFrustum(cam.ViewProj())
+		if !(&Renderer{}).chunkVisible(gc, cam, 88, &f) {
+			t.Fatalf("chunk below camera at y=%f was culled", y)
+		}
+	}
+	min := mathx.V3(0, 0, 0)
+	max := mathx.V3(16, world.ChunkHeight, 16)
+	if d := chunkAABBDistSq(min, max, mathx.V3(8, 300, 8)); d <= 0 {
+		t.Fatalf("distance above chunk = %f", d)
+	}
+}
