@@ -1,8 +1,10 @@
 package render
 
 import (
+	"bytes"
 	"fmt"
 	"image/png"
+	"os"
 	"sync"
 
 	"sevg/assets"
@@ -11,6 +13,12 @@ import (
 
 // Block textures are kept as individual PNG files in assets/textures/blocks.
 // The order here matches the core.Tile* constants.
+var customSkinPath string
+
+// SetSkinPath selects an external 16x16 skin texture used for the player model.
+// It must be called before the first BuildAtlas call.
+func SetSkinPath(path string) { customSkinPath = path }
+
 var blockTextureFiles = [core.TileTileCount]string{
 	"grass_top", "grass_side", "dirt", "stone", "cobble", "sand", "water",
 	"log_side", "log_top", "leaves", "planks", "coal_ore", "iron_ore",
@@ -20,7 +28,7 @@ var blockTextureFiles = [core.TileTileCount]string{
 	"crack_0", "crack_1", "crack_2", "crack_3", "crack_4",
 	"crack_5", "crack_6", "crack_7", "crack_8", "crack_9",
 	"white", "pig_skin", "dark", "red", "gold", "gray", "black", "brown",
-	"pink", "green", "player_skin", "player_shirt", "player_pants", "player_hair",
+	"pink", "green", "player_skin", "player_shirt", "player_pants", "player_hair", "player_skin_map",
 }
 
 // BuildAtlas assembles the embedded tile textures into the runtime atlas and
@@ -58,6 +66,32 @@ func buildAtlas() []byte {
 				i := ((tileY+y)*core.AtlasW + tileX + x) * 4
 				img[i], img[i+1], img[i+2], img[i+3] =
 					byte(r>>8), byte(g>>8), byte(b>>8), byte(a>>8)
+			}
+		}
+	}
+
+	// Optional external skin overrides the built-in bright test skin.
+	if customSkinPath != "" {
+		data, err := os.ReadFile(customSkinPath)
+		if err != nil {
+			panic(fmt.Sprintf("open skin %s: %v", customSkinPath, err))
+		}
+		src, err := png.Decode(bytes.NewReader(data))
+		if err != nil {
+			panic(fmt.Sprintf("decode skin %s: %v", customSkinPath, err))
+		}
+		b := src.Bounds()
+		tile := int(core.TilePlayerSkinMap)
+		cx, cy := tile%core.AtlasCols, tile/core.AtlasCols
+		tileX := cx*core.AtlasCell + core.AtlasPad
+		tileY := cy*core.AtlasCell + core.AtlasPad
+		for y := 0; y < core.AtlasTilePx; y++ {
+			for x := 0; x < core.AtlasTilePx; x++ {
+				sx := b.Min.X + x*b.Dx()/core.AtlasTilePx
+				sy := b.Min.Y + y*b.Dy()/core.AtlasTilePx
+				r, g, bl, a := src.At(sx, sy).RGBA()
+				i := ((tileY+y)*core.AtlasW + tileX + x) * 4
+				img[i], img[i+1], img[i+2], img[i+3] = byte(r>>8), byte(g>>8), byte(bl>>8), byte(a>>8)
 			}
 		}
 	}

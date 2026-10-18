@@ -99,3 +99,32 @@ func TestHeldBlockIgnoresHeadPitch(t *testing.T) {
 		t.Fatal("held block changed with head pitch")
 	}
 }
+func TestPlayerSkinUsesTextureTile(t *testing.T) {
+	g := newTestGame(t)
+	g.state = StatePlaying
+	g.camera = cameraThird
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{}
+	opaque, _, _ := g.buildEntityMeshes()
+	if len(opaque.Vertices) == 0 {
+		t.Fatal("player model is empty")
+	}
+	u0, v0, u1, v1 := world.TileUV(core.TilePlayerSkinMap)
+	for _, v := range opaque.Vertices {
+		if v.U < u0 || v.U > u1 || v.V < v0 || v.V > v1 {
+			t.Fatalf("vertex UV outside skin tile: %f,%f", v.U, v.V)
+		}
+	}
+}
+func TestActionSwingAnimation(t *testing.T) {
+	g := newTestGame(t)
+	g.triggerSwing()
+	g.swingT = 0.15
+	if a := g.swingAngle(); a < 0.8 {
+		t.Fatalf("mid-swing angle = %f", a)
+	}
+	g.swingT = 0
+	if a := g.swingAngle(); a != 0 {
+		t.Fatalf("finished swing angle = %f", a)
+	}
+}

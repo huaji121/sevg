@@ -23,6 +23,7 @@ func main() {
 	flag.BoolVar(&opts.Fullscreen, "fullscreen", false, "start in fullscreen")
 	flag.BoolVar(&opts.SmoothLighting, "smoothlighting", true, "smooth vertex lighting")
 	flag.BoolVar(&opts.DynamicLight, "dynamiclight", true, "held light source updates")
+	flag.StringVar(&opts.SkinPath, "skin", "", "path to a custom 16x16 player skin texture")
 	flag.BoolVar(&opts.VSync, "vsync", true, "vertical sync")
 	flag.Parse()
 

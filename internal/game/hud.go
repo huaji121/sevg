@@ -595,9 +595,19 @@ func (g *Game) buildHeldMesh() world.MeshData {
 	if g.camera != cameraFirst || g.state != StatePlaying || g.player == nil {
 		return world.MeshData{}
 	}
+	fwd := g.player.LookDir()
+	worldUp := mathx.V3(0, 1, 0)
+	right := fwd.Cross(worldUp).Normalize()
+	up := right.Cross(fwd)
+	eye := g.player.Eye()
+	bob := g.player.Bob * 1.5
+
+	var out world.MeshData
+	g.appendFirstPersonHand(&out, eye, right, up, fwd, bob)
+
 	st := g.inv.SelectedStack()
 	if st.Empty() {
-		return world.MeshData{}
+		return out
 	}
 	def := st.Item.Def()
 	var local world.MeshData
@@ -607,42 +617,79 @@ func (g *Game) buildHeldMesh() world.MeshData {
 	case entity.DropVisualBlock:
 		appendBlockBox(&local, c.Sub(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), c.Add(mathx.Vec3{X: 0.16, Y: 0.16, Z: 0.16}), def.Block)
 	case entity.DropVisualGlass:
-		return world.MeshData{}
+		return out
 	case entity.DropVisualPlant:
 		appendPlant(&local, c, 0.30, 0.38, def.Block)
 	default:
-		// Tools, food and materials are drawn as the same icon used by
-		// the inventory, so their held and inventory appearances match.
-		return world.MeshData{}
+		// Tools, food and materials use the separate icon-card pass; the
+		// hand itself still comes from this mesh.
+		return out
 	}
 	if len(local.Indices) == 0 {
-		return world.MeshData{}
+		return out
 	}
 
-	fwd := g.player.LookDir()
-	worldUp := mathx.V3(0, 1, 0)
-	right := fwd.Cross(worldUp).Normalize()
-	up := right.Cross(fwd)
-	eye := g.player.Eye()
 	offR := float32(0.32)
-	offU := float32(-0.24) + g.player.Bob*1.5
+	offU := float32(-0.24) + bob
 	offF := float32(0.52)
 	rot := float32(0.35)
 	rc, rs := float32(math.Cos(float64(rot))), float32(math.Sin(float64(rot)))
-
-	out := world.MeshData{
-		Vertices: make([]world.Vertex, len(local.Vertices)),
-		Indices:  local.Indices,
-	}
-	for i, v := range local.Vertices {
+	base := uint32(len(out.Vertices))
+	for _, v := range local.Vertices {
 		lx := (v.X*rc - v.Z*rs) * scale
 		lz := (v.X*rs + v.Z*rc) * scale
 		ly := v.Y * scale
 		p := eye.Add(right.Mul(offR + lx)).Add(up.Mul(offU + ly)).Add(fwd.Mul(offF + lz))
-		out.Vertices[i] = v
-		out.Vertices[i].X, out.Vertices[i].Y, out.Vertices[i].Z = p.X, p.Y, p.Z
+		v.X, v.Y, v.Z = p.X, p.Y, p.Z
+		out.Vertices = append(out.Vertices, v)
+	}
+	for _, idx := range local.Indices {
+		out.Indices = append(out.Indices, base+idx)
 	}
 	return out
+}
+
+// appendFirstPersonHand renders the player model's right arm in the held-item
+// camera pass, scaled and posed to enter from the bottom-right of the screen.
+func (g *Game) appendFirstPersonHand(dst *world.MeshData, eye, right, up, fwd mathx.Vec3, bob float32) {
+	if !g.inv.SelectedStack().Empty() {
+		return
+	}
+	p := g.player
+	speed := float32(math.Hypot(float64(p.Body.Vel.X), float64(p.Body.Vel.Z)))
+	move := clampF(speed/4.6, 0, 1)
+	airScale := float32(1)
+	if p.Flying || !p.Body.OnGround {
+		airScale = 0.25
+	}
+	armSwing := float32(math.Sin(float64(p.WalkPhase))) * move * 0.22 * airScale
+	var arm world.MeshData
+	appendPlayerRightArm(&arm, armSwing, g.swingAngle())
+	const (
+		armScale  = float32(0.45)
+		shoulderX = float32(0.36)
+		shoulderY = float32(1.25)
+		offR      = float32(0.32)
+		offU      = float32(-0.22)
+		offF      = float32(0.30)
+	)
+	base := uint32(len(dst.Vertices))
+	for _, v := range arm.Vertices {
+		dx := (v.X - shoulderX) * armScale
+		dy := (v.Y - shoulderY) * armScale
+		dz := v.Z * armScale
+		// Pitch the arm so its hand end points forward instead of across
+		// the screen: local down becomes camera-forward.
+		rx := dx
+		ry := dz
+		rz := -dy
+		q := eye.Add(right.Mul(offR + rx)).Add(up.Mul(offU + ry + bob)).Add(fwd.Mul(offF + rz))
+		v.X, v.Y, v.Z = q.X, q.Y, q.Z
+		dst.Vertices = append(dst.Vertices, v)
+	}
+	for _, idx := range arm.Indices {
+		dst.Indices = append(dst.Indices, base+idx)
+	}
 }
 
 // buildHeldIconMesh builds the thick sprite used for tools, food and

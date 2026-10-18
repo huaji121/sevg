@@ -72,6 +72,7 @@ func (g *Game) handleActions(dt float32) {
 			g.breakProgress = 0
 			g.breakActive = false
 			if g.attackCool <= 0 {
+				g.triggerSwing()
 				dmg := g.selectedDamage()
 				if g.mode == ModeCreative {
 					dmg = 1000
@@ -94,6 +95,7 @@ func (g *Game) handleActions(dt float32) {
 }
 
 func (g *Game) mineBlock(dt float32, hit world.RayHit) {
+	g.triggerSwing()
 	if g.mode == ModeCreative {
 		if g.breakCool > 0 {
 			return

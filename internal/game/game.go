@@ -33,6 +33,7 @@ type Options struct {
 	Fullscreen     bool
 	SmoothLighting bool
 	DynamicLight   bool
+	SkinPath       string
 	VSync          bool
 }
 
@@ -104,6 +105,8 @@ type Game struct {
 	particleTimer float32
 	targetValid   bool
 	attackCool    float32
+	swingT        float32
+	swingCooldown float32
 	placeCool     float32
 	pickCool      float32
 	breakCool     float32
@@ -171,6 +174,7 @@ func Run(opts Options) error {
 	}
 	normalizeVideoOptions(&opts)
 	i18n.Set(opts.Language)
+	render.SetSkinPath(opts.SkinPath)
 	runes := append(i18n.AllRunes(), i18n.ChatRunes()...)
 	fontAtlas := ui.BuildFontAtlas(runes, render.BuildAtlas())
 
@@ -621,6 +625,12 @@ func (g *Game) updateWorld(dt float32, allowInput bool) {
 	if g.attackCool > 0 {
 		g.attackCool -= dt
 	}
+	if g.swingT > 0 {
+		g.swingT -= dt
+	}
+	if g.swingCooldown > 0 {
+		g.swingCooldown -= dt
+	}
 	if g.placeCool > 0 {
 		g.placeCool -= dt
 	}
@@ -774,6 +784,22 @@ func (g *Game) shutdown() {
 		_ = g.saveGame()
 	}
 	g.stopWorkers()
+}
+
+func (g *Game) triggerSwing() {
+	if g.swingCooldown > 0 {
+		return
+	}
+	g.swingT = 0.30
+	g.swingCooldown = 0.30
+}
+
+func (g *Game) swingAngle() float32 {
+	if g.swingT <= 0 {
+		return 0
+	}
+	t := 1 - g.swingT/0.30
+	return float32(math.Sin(float64(t)*math.Pi)) * 0.95
 }
 
 func (g *Game) dropSelected() {

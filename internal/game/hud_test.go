@@ -62,12 +62,12 @@ func TestHeldItemMesh(t *testing.T) {
 		t.Fatal("held planks produced no mesh")
 	}
 	g.inv.Slots[0] = core.Stack{}
-	if m = g.buildHeldMesh(); len(m.Vertices) != 0 {
-		t.Fatal("empty hand should produce no mesh")
+	if m = g.buildHeldMesh(); len(m.Vertices) == 0 {
+		t.Fatal("empty hand should still render the first-person arm")
 	}
 	g.inv.Slots[0] = core.Stack{Item: core.ItemStonePickaxe, Count: 1}
 	if m = g.buildHeldMesh(); len(m.Vertices) != 0 {
-		t.Fatal("tool should use the inventory icon, not the 3D held mesh")
+		t.Fatal("arm should be hidden while holding a tool")
 	}
 }
 func TestIconCardGeometry(t *testing.T) {
