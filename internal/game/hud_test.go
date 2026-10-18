@@ -113,3 +113,30 @@ func TestPlantMeshDoubleSided(t *testing.T) {
 		t.Fatalf("plant mesh vertices=%d indices=%d", len(m.Vertices), len(m.Indices))
 	}
 }
+func TestDroppedItemUsesWorldSkyLight(t *testing.T) {
+	g := newTestGame(t)
+	g.world.SetBlock(8, 120, 8, core.Stone)
+	g.mobs.Drop(core.ItemPlanks, 1, mathx.Vec3{X: 8.5, Y: 100, Z: 8.5}, mathx.Vec3{})
+	opaque, _, _ := g.buildEntityMeshes()
+	if len(opaque.Vertices) == 0 {
+		t.Fatal("dropped item produced no mesh")
+	}
+	for _, v := range opaque.Vertices {
+		if v.Sky > 0.01 || v.Block > 0.01 {
+			t.Fatalf("dropped item not in shadow: sky=%f block=%f", v.Sky, v.Block)
+		}
+	}
+}
+
+func TestLitEntityBoxSetsBothLightChannels(t *testing.T) {
+	var m world.MeshData
+	appendEntityBoxLit(&m, mathx.Vec3{}, mathx.Vec3{X: 1, Y: 1, Z: 1}, [4]float32{1, 1, 1, 1}, 0.35, 0.6)
+	if len(m.Vertices) == 0 {
+		t.Fatal("no vertices")
+	}
+	for _, v := range m.Vertices {
+		if v.Sky != 0.35 || v.Block != 0.6 {
+			t.Fatalf("entity light = %f/%f", v.Sky, v.Block)
+		}
+	}
+}

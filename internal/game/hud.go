@@ -526,6 +526,16 @@ func worldChunkZ(z float32) int { return int(math.Floor(float64(z))) / 16 }
 
 // Entity and block-highlight geometry, rendered through the block atlas
 // pipeline so it shares fog, depth and lighting with terrain.
+func (g *Game) lightAt(p mathx.Vec3) (float32, float32) {
+	if g.world == nil {
+		return 1, 0
+	}
+	x := int(math.Floor(float64(p.X)))
+	y := int(math.Floor(float64(p.Y)))
+	z := int(math.Floor(float64(p.Z)))
+	return float32(g.world.SkyLightAt(x, y, z)) / 15, float32(g.world.BlockLightAt(x, y, z)) / 15
+}
+
 func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshData) {
 	var opaque, transparent, icons world.MeshData
 	if g.mobs != nil {
@@ -535,13 +545,14 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 			}
 			flash := clampF(mob.HitFlash/0.25, 0, 1)
 			for _, box := range mob.Boxes() {
+				sky, block := g.lightAt(box.Center)
 				col := box.Color
 				if flash > 0 {
 					col[0] = col[0] + (1-col[0])*flash*0.7
 					col[1] = col[1] * (1 - flash*0.3)
 					col[2] = col[2] * (1 - flash*0.3)
 				}
-				appendEntityBox(&opaque, box.Center.Sub(box.Size.Mul(0.5)), box.Center.Add(box.Size.Mul(0.5)), col)
+				appendEntityBoxLit(&opaque, box.Center.Sub(box.Size.Mul(0.5)), box.Center.Add(box.Size.Mul(0.5)), col, sky, block)
 			}
 		}
 		for _, d := range g.mobs.Items {
@@ -552,14 +563,15 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 			c := d.Body.Pos.Add(mathx.Vec3{Y: 0.18})
 			c.Y += bob
 			def := d.Item.Def()
+			sky, block := g.lightAt(c)
 			switch d.Visual() {
 			case entity.DropVisualBlock:
 				half := def.Block
-				appendBlockBox(&opaque, c.Sub(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), c.Add(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), half)
+				appendBlockBoxLit(&opaque, c.Sub(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), c.Add(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), half, sky, block)
 			case entity.DropVisualGlass:
-				appendBlockBox(&transparent, c.Sub(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), c.Add(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), def.Block)
+				appendBlockBoxLit(&transparent, c.Sub(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), c.Add(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), def.Block, sky, block)
 			case entity.DropVisualPlant:
-				appendPlant(&opaque, c, 0.34, 0.42, def.Block)
+				appendPlantLit(&opaque, c, 0.34, 0.42, def.Block, sky, block)
 			default:
 				if g.canv != nil {
 					if gph, ok := g.canv.Icons[d.Item]; ok {
@@ -567,7 +579,7 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 						right := mathx.Vec3{X: float32(math.Cos(float64(yaw))), Z: float32(math.Sin(float64(yaw)))}
 						up := mathx.V3(0, 1, 0)
 						normal := right.Cross(up)
-						appendIconCard(&icons, c, right, up, normal, 0.32, 0.32, 0.012, gph, g.canv.IconSides[d.Item])
+						appendIconCardLit(&icons, c, right, up, normal, 0.32, 0.32, 0.012, gph, g.canv.IconSides[d.Item], sky, block)
 					}
 				}
 			}
@@ -781,6 +793,10 @@ func (g *Game) buildHeldTransparentMesh() world.MeshData {
 // Keeping one sheet aligned avoids a mirrored second copy showing through
 // transparent pixels; the walls give the item its thickness.
 func appendIconCard(m *world.MeshData, center, right, up, normal mathx.Vec3, w, h, t float32, icon ui.Glyph, sides []ui.IconSide) {
+	appendIconCardLit(m, center, right, up, normal, w, h, t, icon, sides, 1, 0)
+}
+
+func appendIconCardLit(m *world.MeshData, center, right, up, normal mathx.Vec3, w, h, t float32, icon ui.Glyph, sides []ui.IconSide, sky, blockLight float32) {
 	hw, hh, ht := w/2, h/2, t/2
 	n := normal.Mul(ht)
 	bl := center.Sub(right.Mul(hw)).Sub(up.Mul(hh))
@@ -790,13 +806,13 @@ func appendIconCard(m *world.MeshData, center, right, up, normal mathx.Vec3, w, 
 	fbl, fbr, ftr, ftl := bl.Add(n), br.Add(n), tr.Add(n), tl.Add(n)
 
 	frontUV := [4][2]float32{{icon.U0, icon.V1}, {icon.U1, icon.V1}, {icon.U1, icon.V0}, {icon.U0, icon.V0}}
-	addIconQuad(m, fbl, fbr, ftr, ftl, frontUV, 1.0)
+	addIconQuad(m, fbl, fbr, ftr, ftl, frontUV, 1.0, sky, blockLight)
 
 	// Solid back face. It uses the same UV orientation as the front, so
 	// transparent pixels line up and cannot reveal a mirrored duplicate.
 	bbl, bbr, btr, btl := bl.Sub(n), br.Sub(n), tr.Sub(n), tl.Sub(n)
 	backUV := [4][2]float32{{icon.U0, icon.V0}, {icon.U1, icon.V0}, {icon.U1, icon.V1}, {icon.U0, icon.V1}}
-	addIconQuad(m, btl, btr, bbr, bbl, backUV, 0.92)
+	addIconQuad(m, btl, btr, bbr, bbl, backUV, 0.92, sky, blockLight)
 
 	for _, s := range sides {
 		fa := center.Add(right.Mul(s.AX * w)).Add(up.Mul(s.AY * h)).Add(n)
@@ -804,38 +820,32 @@ func appendIconCard(m *world.MeshData, center, right, up, normal mathx.Vec3, w, 
 		ba := center.Add(right.Mul(s.AX * w)).Add(up.Mul(s.AY * h)).Sub(n)
 		bb := center.Add(right.Mul(s.BX * w)).Add(up.Mul(s.BY * h)).Sub(n)
 		uv := [4][2]float32{{s.U, s.V}, {s.U, s.V}, {s.U, s.V}, {s.U, s.V}}
-		addIconQuad(m, fa, fb, bb, ba, uv, 0.78)
+		addIconQuad(m, fa, fb, bb, ba, uv, 0.78, sky, blockLight)
 	}
 }
 
-func addIconQuad(m *world.MeshData, a, b, c, d mathx.Vec3, uv [4][2]float32, light float32) {
+func addIconQuad(m *world.MeshData, a, b, c, d mathx.Vec3, uv [4][2]float32, light, sky, blockLight float32) {
 	base := uint32(len(m.Vertices))
 	for i, p := range [4]mathx.Vec3{a, b, c, d} {
 		m.Vertices = append(m.Vertices, world.Vertex{
 			X: p.X, Y: p.Y, Z: p.Z,
-			U: uv[i][0], V: uv[i][1], Light: light, Sky: 1,
+			U: uv[i][0], V: uv[i][1], Light: light, Sky: sky, Block: blockLight,
 		})
 	}
 	m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)
 }
 
 func appendPlant(m *world.MeshData, c mathx.Vec3, width, height float32, block core.BlockID) {
+	appendPlantLit(m, c, width, height, block, 1, 0)
+}
+
+func appendPlantLit(m *world.MeshData, c mathx.Vec3, width, height float32, block core.BlockID, sky, blockLight float32) {
 	u0, v0, u1, v1 := world.TileUV(block.Tile(2))
 	hx, hz := width/2, width/2
 	top, bottom := c.Y+height/2, c.Y-height/2
 	quads := [2][4]mathx.Vec3{
-		{
-			{X: c.X - hx, Y: bottom, Z: c.Z - hz},
-			{X: c.X + hx, Y: bottom, Z: c.Z + hz},
-			{X: c.X + hx, Y: top, Z: c.Z + hz},
-			{X: c.X - hx, Y: top, Z: c.Z - hz},
-		},
-		{
-			{X: c.X - hx, Y: bottom, Z: c.Z + hz},
-			{X: c.X + hx, Y: bottom, Z: c.Z - hz},
-			{X: c.X + hx, Y: top, Z: c.Z - hz},
-			{X: c.X - hx, Y: top, Z: c.Z + hz},
-		},
+		{{X: c.X - hx, Y: bottom, Z: c.Z - hz}, {X: c.X + hx, Y: bottom, Z: c.Z + hz}, {X: c.X + hx, Y: top, Z: c.Z + hz}, {X: c.X - hx, Y: top, Z: c.Z - hz}},
+		{{X: c.X - hx, Y: bottom, Z: c.Z + hz}, {X: c.X + hx, Y: bottom, Z: c.Z - hz}, {X: c.X + hx, Y: top, Z: c.Z - hz}, {X: c.X - hx, Y: top, Z: c.Z + hz}},
 	}
 	uvs := [4][2]float32{{0, 1}, {1, 1}, {1, 0}, {0, 0}}
 	for _, q := range quads {
@@ -844,7 +854,7 @@ func appendPlant(m *world.MeshData, c mathx.Vec3, width, height float32, block c
 			m.Vertices = append(m.Vertices, world.Vertex{
 				X: q[i].X, Y: q[i].Y, Z: q[i].Z,
 				U: u0 + (u1-u0)*uvs[i][0], V: v0 + (v1-v0)*uvs[i][1],
-				Light: 0.92, Sky: 1,
+				Light: 0.92, Sky: sky, Block: blockLight,
 			})
 		}
 		m.Indices = append(m.Indices,
@@ -906,17 +916,29 @@ var entityFaces = [6]entityFace{
 }
 
 func appendEntityBox(m *world.MeshData, min, max mathx.Vec3, col [4]float32) {
+	appendEntityBoxLit(m, min, max, col, 1, 0)
+}
+
+func appendEntityBoxLit(m *world.MeshData, min, max mathx.Vec3, col [4]float32, sky, block float32) {
 	tile := tileForColor(col)
-	appendBoxFaces(m, min, max, func(int) uint8 { return tile })
+	appendBoxFacesLit(m, min, max, func(int) uint8 { return tile }, sky, block)
 }
 
 // appendBlockBox renders a dropped block with the same per-face atlas tiles
 // as a block placed in the world.
 func appendBlockBox(m *world.MeshData, min, max mathx.Vec3, block core.BlockID) {
-	appendBoxFaces(m, min, max, block.Tile)
+	appendBlockBoxLit(m, min, max, block, 1, 0)
+}
+
+func appendBlockBoxLit(m *world.MeshData, min, max mathx.Vec3, block core.BlockID, sky, blockLight float32) {
+	appendBoxFacesLit(m, min, max, block.Tile, sky, blockLight)
 }
 
 func appendBoxFaces(m *world.MeshData, min, max mathx.Vec3, tileAt func(int) uint8) {
+	appendBoxFacesLit(m, min, max, tileAt, 1, 0)
+}
+
+func appendBoxFacesLit(m *world.MeshData, min, max mathx.Vec3, tileAt func(int) uint8, sky, blockLight float32) {
 	for fi, f := range entityFaces {
 		u0, v0, u1, v1 := world.TileUV(tileAt(fi))
 		base := uint32(len(m.Vertices))
@@ -929,7 +951,7 @@ func appendBoxFaces(m *world.MeshData, min, max mathx.Vec3, tileAt func(int) uin
 				X: x, Y: y, Z: z,
 				U:     u0 + (u1-u0)*f.uv[i][0],
 				V:     v0 + (v1-v0)*f.uv[i][1],
-				Light: f.light, Sky: 1,
+				Light: f.light, Sky: sky, Block: blockLight,
 			})
 		}
 		m.Indices = append(m.Indices, base, base+1, base+2, base, base+2, base+3)

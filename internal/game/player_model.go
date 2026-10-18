@@ -128,6 +128,8 @@ func (g *Game) appendPlayerModel(dst, icons, transparent *world.MeshData) {
 		return
 	}
 	p := g.player
+	sky, block := g.lightAt(p.Body.Pos.Add(mathx.Vec3{Y: 1.0}))
+	iconBase := uint32(len(icons.Vertices))
 	speed := float32(math.Hypot(float64(p.Body.Vel.X), float64(p.Body.Vel.Z)))
 	move := clampF(speed/4.6, 0, 1)
 	airScale := float32(1)
@@ -175,6 +177,14 @@ func (g *Game) appendPlayerModel(dst, icons, transparent *world.MeshData) {
 	}
 	g.appendPlayerHeldIconCard(icons, armSwing+g.swingAngle())
 	g.appendPlayerHeldBlock(dst, transparent, armSwing+g.swingAngle())
+	for i := base; i < uint32(len(dst.Vertices)); i++ {
+		dst.Vertices[i].Sky = sky
+		dst.Vertices[i].Block = block
+	}
+	for i := iconBase; i < uint32(len(icons.Vertices)); i++ {
+		icons.Vertices[i].Sky = sky
+		icons.Vertices[i].Block = block
+	}
 }
 
 // appendPlayerHeldIconCard places a thick icon card in front of the right
