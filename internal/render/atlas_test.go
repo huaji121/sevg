@@ -30,7 +30,7 @@ func TestAtlasContainsAllTiles(t *testing.T) {
 
 func TestPaletteTilesOpaque(t *testing.T) {
 	atlas := BuildAtlas()
-	for tile := core.TileWhite; tile < core.TileTileCount; tile++ {
+	for tile := core.TileWhite; tile < core.TileSun; tile++ {
 		cx := tile % core.AtlasCols
 		cy := tile / core.AtlasCols
 		px := cx*core.AtlasCell + core.AtlasPad + 8

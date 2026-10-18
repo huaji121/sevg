@@ -92,6 +92,8 @@ const (
 	TilePlayerPants
 	TilePlayerHair
 	TilePlayerSkinMap
+	TileSun
+	TileMoon
 	TileTileCount
 )
 

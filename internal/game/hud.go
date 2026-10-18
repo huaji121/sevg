@@ -120,7 +120,6 @@ func (g *Game) drawHUD(w, h float32) {
 	if eb == core.Water {
 		c.Rect(0, 0, w, h, [4]float32{0.05, 0.30, 0.50, 0.22})
 	}
-
 	// Crosshair and mining progress are only shown while playing.
 	if g.state == StatePlaying {
 		cx, cy := w/2, h/2

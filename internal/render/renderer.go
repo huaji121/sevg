@@ -47,6 +47,7 @@ type Frame struct {
 	Entity            world.MeshData
 	EntityTransparent world.MeshData
 	EntityIcon        world.MeshData
+	Sky               world.MeshData
 	Held              world.MeshData
 	HeldTransparent   world.MeshData
 	HeldIcon          world.MeshData
@@ -122,17 +123,20 @@ type Renderer struct {
 	uiVB, entVB, entIB         *sdl.GPUBuffer
 	entTransVB, entTransIB     *sdl.GPUBuffer
 	entIconVB, entIconIB       *sdl.GPUBuffer
+	skyVB, skyIB               *sdl.GPUBuffer
 	heldVB, heldIB             *sdl.GPUBuffer
 	heldTransVB, heldTransIB   *sdl.GPUBuffer
 	heldIconVB, heldIconIB     *sdl.GPUBuffer
 	uiCap, entCap, entTransCap uint32
 	entIconCap, heldCap        uint32
+	skyCap                     uint32
 	heldTransCap, heldIconCap  uint32
 	entICount, entTransICount  uint32
 	entIconICount              uint32
 	heldICount                 uint32
 	heldTransICount            uint32
 	heldIconICount             uint32
+	skyICount                  uint32
 	staging                    *sdl.GPUTransferBuffer
 	stagingCap                 uint32
 	retired                    []retiredMesh
@@ -305,6 +309,15 @@ func (r *Renderer) createResources() error {
 		return err
 	}
 	r.entTransIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.entTransCap})
+	if err != nil {
+		return err
+	}
+	r.skyCap = 4096
+	r.skyVB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: r.skyCap})
+	if err != nil {
+		return err
+	}
+	r.skyIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.skyCap})
 	if err != nil {
 		return err
 	}
@@ -741,6 +754,20 @@ func (r *Renderer) Render(f *Frame) error {
 		rp.DrawIndexedPrimitives(r.entIconICount, 1, 0, 0, 0)
 	}
 
+	// Sky bodies are ordinary far-away billboards. Depth testing lets terrain
+	// occlude them naturally and partially; fog is disabled for this pass.
+	if r.skyICount > 0 && r.skyVB != nil && r.skyIB != nil {
+		rp.BindGraphicsPipeline(r.blockTrans)
+		skyWu := wu
+		skyWu.FogParams = [4]float32{1e8, 2e8, 0, 0}
+		skyWu.Sun = [4]float32{1, 1, 1, 1}
+		cb.PushFragmentUniformData(0, bytesOf(&skyWu))
+		rp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}})
+		rp.BindVertexBuffers([]sdl.GPUBufferBinding{{Buffer: r.skyVB, Offset: 0}})
+		rp.BindIndexBuffer(&sdl.GPUBufferBinding{Buffer: r.skyIB, Offset: 0}, sdl.GPU_INDEXELEMENTSIZE_32BIT)
+		rp.DrawIndexedPrimitives(r.skyICount, 1, 0, 0, 0)
+	}
+
 	// Transparent chunk pass, back to front.
 	rp.BindGraphicsPipeline(r.blockTrans)
 	cb.PushVertexUniformData(0, bytesOf(&wu))
@@ -847,13 +874,16 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 	heldTI := meshIndexBytes(f.HeldTransparent)
 	heldIV := meshVertBytes(f.HeldIcon)
 	heldII := meshIndexBytes(f.HeldIcon)
+	skyV := meshVertBytes(f.Sky)
+	skyI := meshIndexBytes(f.Sky)
 	r.entICount = uint32(len(f.Entity.Indices))
 	r.entTransICount = uint32(len(f.EntityTransparent.Indices))
 	r.entIconICount = uint32(len(f.EntityIcon.Indices))
 	r.heldICount = uint32(len(f.Held.Indices))
 	r.heldTransICount = uint32(len(f.HeldTransparent.Indices))
 	r.heldIconICount = uint32(len(f.HeldIcon.Indices))
-	total := len(uiBytes) + len(entV) + len(entI) + len(entTV) + len(entTI) + len(entIV) + len(entII) + len(heldV) + len(heldI) + len(heldTV) + len(heldTI) + len(heldIV) + len(heldII)
+	r.skyICount = uint32(len(f.Sky.Indices))
+	total := len(uiBytes) + len(entV) + len(entI) + len(entTV) + len(entTI) + len(entIV) + len(entII) + len(heldV) + len(heldI) + len(heldTV) + len(heldTI) + len(heldIV) + len(heldII) + len(skyV) + len(skyI)
 	if total == 0 {
 		return nil
 	}
@@ -965,6 +995,21 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 			return err
 		}
 	}
+	needSky := maxInt(len(skyV), len(skyI))
+	if uint32(needSky) > r.skyCap {
+		r.Dev.ReleaseBuffer(r.skyVB)
+		r.Dev.ReleaseBuffer(r.skyIB)
+		r.skyCap = uint32(needSky * 2)
+		var err error
+		r.skyVB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_VERTEX, Size: r.skyCap})
+		if err != nil {
+			return err
+		}
+		r.skyIB, err = r.Dev.CreateBuffer(&sdl.GPUBufferCreateInfo{Usage: sdl.GPU_BUFFERUSAGE_INDEX, Size: r.skyCap})
+		if err != nil {
+			return err
+		}
+	}
 	ptr, err := r.Dev.MapTransferBuffer(r.staging, true)
 	if err != nil {
 		return err
@@ -983,6 +1028,8 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 	offHeldTI := offHeldTV + len(heldTV)
 	offHeldIV := offHeldTI + len(heldTI)
 	offHeldII := offHeldIV + len(heldIV)
+	offSkyV := offHeldII + len(heldII)
+	offSkyI := offSkyV + len(skyV)
 	copy(mem[offUI:], uiBytes)
 	copy(mem[offEntV:], entV)
 	copy(mem[offEntI:], entI)
@@ -996,6 +1043,8 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 	copy(mem[offHeldTI:], heldTI)
 	copy(mem[offHeldIV:], heldIV)
 	copy(mem[offHeldII:], heldII)
+	copy(mem[offSkyV:], skyV)
+	copy(mem[offSkyI:], skyI)
 	r.Dev.UnmapTransferBuffer(r.staging)
 	cb, err := r.Dev.AcquireCommandBuffer()
 	if err != nil {
@@ -1090,6 +1139,20 @@ func (r *Renderer) updateDynamic(f *Frame) error {
 		cp.UploadToGPUBuffer(
 			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offHeldII)},
 			&sdl.GPUBufferRegion{Buffer: r.heldIconIB, Offset: 0, Size: uint32(len(heldII))},
+			true,
+		)
+	}
+	if len(skyV) > 0 {
+		cp.UploadToGPUBuffer(
+			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offSkyV)},
+			&sdl.GPUBufferRegion{Buffer: r.skyVB, Offset: 0, Size: uint32(len(skyV))},
+			true,
+		)
+	}
+	if len(skyI) > 0 {
+		cp.UploadToGPUBuffer(
+			&sdl.GPUTransferBufferLocation{TransferBuffer: r.staging, Offset: uint32(offSkyI)},
+			&sdl.GPUBufferRegion{Buffer: r.skyIB, Offset: 0, Size: uint32(len(skyI))},
 			true,
 		)
 	}
@@ -1212,7 +1275,7 @@ func (r *Renderer) Close() {
 	r.retired = nil
 	r.retiredTransfers = nil
 	r.chunks = map[[2]int]*gpuChunk{}
-	for _, b := range []*sdl.GPUBuffer{r.uiVB, r.entVB, r.entIB, r.entTransVB, r.entTransIB, r.entIconVB, r.entIconIB, r.heldVB, r.heldIB, r.heldTransVB, r.heldTransIB, r.heldIconVB, r.heldIconIB} {
+	for _, b := range []*sdl.GPUBuffer{r.uiVB, r.entVB, r.entIB, r.entTransVB, r.entTransIB, r.entIconVB, r.entIconIB, r.heldVB, r.heldIB, r.heldTransVB, r.heldTransIB, r.heldIconVB, r.heldIconIB, r.skyVB, r.skyIB} {
 		if b != nil {
 			r.Dev.ReleaseBuffer(b)
 		}

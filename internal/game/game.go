@@ -766,6 +766,7 @@ func (g *Game) renderFrame() {
 		Entity:            opaque,
 		EntityTransparent: transparent,
 		EntityIcon:        entityIcons,
+		Sky:               g.buildSkyMesh(cam),
 		Held:              g.buildHeldMesh(),
 		HeldTransparent:   g.buildHeldTransparentMesh(),
 		HeldIcon:          g.buildHeldIconMesh(),
