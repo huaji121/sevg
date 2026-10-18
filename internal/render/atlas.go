@@ -15,7 +15,7 @@ import (
 // The order here matches the core.Tile* constants.
 var customSkinPath string
 
-// SetSkinPath selects an external 16x16 skin texture used for the player model.
+// SetSkinPath selects an external 64x64 Minecraft-layout skin texture used for the player model.
 // It must be called before the first BuildAtlas call.
 func SetSkinPath(path string) { customSkinPath = path }
 
@@ -61,9 +61,12 @@ func buildAtlas() []byte {
 		cx, cy := tile%core.AtlasCols, tile/core.AtlasCols
 		tileX := cx*core.AtlasCell + core.AtlasPad
 		tileY := cy*core.AtlasCell + core.AtlasPad
+		b := src.Bounds()
 		for y := 0; y < core.AtlasTilePx; y++ {
 			for x := 0; x < core.AtlasTilePx; x++ {
-				r, g, b, a := src.At(x, y).RGBA()
+				sx := b.Min.X + x*b.Dx()/core.AtlasTilePx
+				sy := b.Min.Y + y*b.Dy()/core.AtlasTilePx
+				r, g, b, a := src.At(sx, sy).RGBA()
 				i := ((tileY+y)*core.AtlasW + tileX + x) * 4
 				img[i], img[i+1], img[i+2], img[i+3] =
 					byte(r>>8), byte(g>>8), byte(b>>8), byte(a>>8)

@@ -154,3 +154,24 @@ func TestCrouchLowersThirdPersonModel(t *testing.T) {
 		t.Fatalf("crouched model top %f vs standing %f", maxCrouch, maxStand)
 	}
 }
+func TestStandardSkinFaceLayout(t *testing.T) {
+	if got, want := skinHead[5], skinFace(8, 8, 16, 16); got != want {
+		t.Fatalf("head front UV = %v, want %v", got, want)
+	}
+	if got, want := skinTorso[4], skinFace(32, 20, 40, 32); got != want {
+		t.Fatalf("torso back UV = %v, want %v", got, want)
+	}
+	if skinArmLeft[5][0] <= skinArmLeft[5][2] {
+		t.Fatal("left arm front UV is not mirrored")
+	}
+	if skinLegLeft[5][0] <= skinLegLeft[5][2] {
+		t.Fatal("left leg front UV is not mirrored")
+	}
+	for _, set := range []skinFaces{skinHead, skinTorso, skinArmRight, skinArmLeft, skinLegRight, skinLegLeft} {
+		for _, r := range set {
+			if r[0] < 0 || r[1] < 0 || r[2] > 1 || r[3] > 1 {
+				t.Fatalf("skin face outside texture: %v", r)
+			}
+		}
+	}
+}

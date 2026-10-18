@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"sevg/assets"
 	"sevg/internal/core"
 )
 
@@ -86,5 +87,19 @@ func TestCustomSkinOverride(t *testing.T) {
 	i := ((cy*core.AtlasCell+core.AtlasPad)*core.AtlasW + cx*core.AtlasCell + core.AtlasPad) * 4
 	if atlas[i] != 10 || atlas[i+1] != 20 || atlas[i+2] != 30 || atlas[i+3] != 255 {
 		t.Fatalf("custom skin pixel = %v", atlas[i:i+4])
+	}
+}
+func TestPlayerSkinAssetIs64x64(t *testing.T) {
+	f, err := assets.Textures.Open("textures/blocks/player_skin_map.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	img, err := png.Decode(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if img.Bounds().Dx() != 64 || img.Bounds().Dy() != 64 {
+		t.Fatalf("skin size = %v", img.Bounds())
 	}
 }

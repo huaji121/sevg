@@ -19,24 +19,76 @@ func rotateY(p mathx.Vec3, a float32) mathx.Vec3 {
 	return mathx.Vec3{X: p.X*c - p.Z*s, Y: p.Y, Z: p.X*s + p.Z*c}
 }
 
+type skinFaces [6][4]float32
+
+const skinSize = float32(64)
+
+func skinFace(x0, y0, x1, y1 float32) [4]float32 {
+	return [4]float32{x0 / skinSize, y0 / skinSize, x1 / skinSize, y1 / skinSize}
+}
+
+func skinMirror(r [4]float32) [4]float32 {
+	return [4]float32{r[2], r[1], r[0], r[3]}
+}
+
+// Face order matches entityFaces: +X, -X, +Y, -Y, +Z (back), -Z (front).
+// Coordinates follow the standard 64x64 Minecraft skin layout.
 var (
-	skinSkinUV  = [4]float32{0.00, 0.00, 0.25, 0.25}
-	skinFaceUV  = [4]float32{0.25, 0.00, 0.50, 0.25}
-	skinShirtUV = [4]float32{0.50, 0.00, 0.75, 0.25}
-	skinPantsUV = [4]float32{0.75, 0.00, 1.00, 0.25}
-	skinHairUV  = [4]float32{0.00, 0.25, 0.25, 0.50}
-	skinShoeUV  = [4]float32{0.25, 0.25, 0.50, 0.50}
+	skinHead = skinFaces{
+		skinFace(0, 8, 8, 16),
+		skinFace(16, 8, 24, 16),
+		skinFace(8, 0, 16, 8),
+		skinFace(16, 0, 24, 8),
+		skinFace(24, 8, 32, 16),
+		skinFace(8, 8, 16, 16),
+	}
+	skinTorso = skinFaces{
+		skinFace(16, 20, 20, 32),
+		skinFace(28, 20, 32, 32),
+		skinFace(20, 16, 28, 20),
+		skinFace(28, 16, 36, 20),
+		skinFace(32, 20, 40, 32),
+		skinFace(20, 20, 28, 32),
+	}
+	skinArmRight = skinFaces{
+		skinFace(40, 20, 44, 32),
+		skinFace(48, 20, 52, 32),
+		skinFace(44, 16, 48, 20),
+		skinFace(48, 16, 52, 20),
+		skinFace(52, 20, 56, 32),
+		skinFace(44, 20, 48, 32),
+	}
+	skinArmLeft = skinFaces{
+		skinMirror(skinFace(32, 52, 36, 64)),
+		skinMirror(skinFace(40, 52, 44, 64)),
+		skinMirror(skinFace(36, 48, 40, 52)),
+		skinMirror(skinFace(40, 48, 44, 52)),
+		skinMirror(skinFace(44, 52, 48, 64)),
+		skinMirror(skinFace(36, 52, 40, 64)),
+	}
+	skinLegRight = skinFaces{
+		skinFace(0, 20, 4, 32),
+		skinFace(8, 20, 12, 32),
+		skinFace(4, 16, 8, 20),
+		skinFace(8, 16, 12, 20),
+		skinFace(12, 20, 16, 32),
+		skinFace(4, 20, 8, 32),
+	}
+	skinLegLeft = skinFaces{
+		skinMirror(skinFace(16, 52, 20, 64)),
+		skinMirror(skinFace(24, 52, 28, 64)),
+		skinMirror(skinFace(20, 48, 24, 52)),
+		skinMirror(skinFace(24, 48, 28, 52)),
+		skinMirror(skinFace(28, 52, 32, 64)),
+		skinMirror(skinFace(20, 52, 24, 64)),
+	}
 )
 
-// appendPlayerSkinBox maps one texture region to every side of a player part,
-// with an optional different region for the front (-Z) face.
-func appendPlayerSkinBox(dst *world.MeshData, min, max mathx.Vec3, pivot mathx.Vec3, rotX float32, side, front [4]float32) {
+// appendPlayerSkinBox maps a separate skin region to each of the six faces.
+func appendPlayerSkinBox(dst *world.MeshData, min, max mathx.Vec3, pivot mathx.Vec3, rotX float32, faces skinFaces) {
 	tu0, tv0, tu1, tv1 := world.TileUV(core.TilePlayerSkinMap)
 	for fi, f := range entityFaces {
-		r := side
-		if fi == 5 {
-			r = front
-		}
+		r := faces[fi]
 		u0 := tu0 + (tu1-tu0)*r[0]
 		v0 := tv0 + (tv1-tv0)*r[1]
 		u1 := tu0 + (tu1-tu0)*r[2]
@@ -57,23 +109,6 @@ func appendPlayerSkinBox(dst *world.MeshData, min, max mathx.Vec3, pivot mathx.V
 			})
 		}
 		dst.Indices = append(dst.Indices, base, base+1, base+2, base, base+2, base+3)
-	}
-}
-
-// appendPlayerPart rotates one box around a local pivot before adding it to
-// the model mesh. This keeps the blocky Minecraft-style limbs articulated.
-func appendPlayerPart(dst *world.MeshData, min, max mathx.Vec3, col [4]float32, pivot mathx.Vec3, rotX float32) {
-	var part world.MeshData
-	appendEntityBox(&part, min, max, col)
-	base := uint32(len(dst.Vertices))
-	for _, v := range part.Vertices {
-		p := mathx.Vec3{X: v.X, Y: v.Y, Z: v.Z}.Sub(pivot)
-		p = rotateX(p, rotX).Add(pivot)
-		v.X, v.Y, v.Z = p.X, p.Y, p.Z
-		dst.Vertices = append(dst.Vertices, v)
-	}
-	for _, idx := range part.Indices {
-		dst.Indices = append(dst.Indices, base+idx)
 	}
 }
 
@@ -117,8 +152,7 @@ func (g *Game) appendPlayerHeldBlock(opaque, transparent *world.MeshData, swing 
 // third-person player model, in player-local coordinates.
 func appendPlayerRightArm(dst *world.MeshData, walkSwing, actionSwing float32) {
 	arm := -walkSwing - actionSwing
-	appendPlayerSkinBox(dst, mathx.V3(0.27, 0.62, -0.10), mathx.V3(0.45, 1.26, 0.10), mathx.V3(0.36, 1.25, 0), arm, skinSkinUV, skinSkinUV)
-	appendPlayerSkinBox(dst, mathx.V3(0.26, 1.05, -0.11), mathx.V3(0.46, 1.27, 0.11), mathx.V3(0.36, 1.25, 0), arm, skinShirtUV, skinShirtUV)
+	appendPlayerSkinBox(dst, mathx.V3(0.27, 0.62, -0.10), mathx.V3(0.45, 1.26, 0.10), mathx.V3(0.36, 1.25, 0), arm, skinArmRight)
 }
 
 // appendPlayerModel builds a Steve-like blocky player model at the player's
@@ -141,26 +175,21 @@ func (g *Game) appendPlayerModel(dst, icons, transparent *world.MeshData) {
 
 	var model world.MeshData
 	// Torso.
-	appendPlayerSkinBox(&model, mathx.V3(-0.25, 0.65, -0.15), mathx.V3(0.25, 1.30, 0.15), mathx.V3(0, 0.65, 0), 0, skinShirtUV, skinShirtUV)
+	appendPlayerSkinBox(&model, mathx.V3(-0.25, 0.65, -0.15), mathx.V3(0.25, 1.30, 0.15), mathx.V3(0, 0.65, 0), 0, skinTorso)
 
 	// Head, hair and face all follow head pitch around the neck.
 	neck := mathx.V3(0, 1.30, 0)
 	pitch := p.Pitch
-	appendPlayerSkinBox(&model, mathx.V3(-0.25, 1.30, -0.25), mathx.V3(0.25, 1.80, 0.25), neck, pitch, skinSkinUV, skinFaceUV)
-	appendPlayerSkinBox(&model, mathx.V3(-0.26, 1.78, -0.26), mathx.V3(0.26, 1.84, 0.26), neck, pitch, skinHairUV, skinHairUV)
-	appendPlayerSkinBox(&model, mathx.V3(-0.26, 1.40, 0.24), mathx.V3(0.26, 1.80, 0.27), neck, pitch, skinHairUV, skinHairUV)
+	appendPlayerSkinBox(&model, mathx.V3(-0.25, 1.30, -0.25), mathx.V3(0.25, 1.80, 0.25), neck, pitch, skinHead)
 	// Eyes.
 
 	// Arms. They hang from the shoulders and swing opposite to the legs.
 	appendPlayerRightArm(&model, armSwing, g.swingAngle())
-	appendPlayerSkinBox(&model, mathx.V3(-0.45, 0.62, -0.10), mathx.V3(-0.27, 1.26, 0.10), mathx.V3(-0.36, 1.25, 0), armSwing, skinSkinUV, skinSkinUV)
-	appendPlayerSkinBox(&model, mathx.V3(-0.46, 1.05, -0.11), mathx.V3(-0.26, 1.27, 0.11), mathx.V3(-0.36, 1.25, 0), armSwing, skinShirtUV, skinShirtUV)
+	appendPlayerSkinBox(&model, mathx.V3(-0.45, 0.62, -0.10), mathx.V3(-0.27, 1.26, 0.10), mathx.V3(-0.36, 1.25, 0), armSwing, skinArmLeft)
 
 	// Legs with darker shoes.
-	appendPlayerSkinBox(&model, mathx.V3(0.01, 0.08, -0.12), mathx.V3(0.24, 0.66, 0.12), mathx.V3(0.125, 0.65, 0), legSwing, skinPantsUV, skinPantsUV)
-	appendPlayerSkinBox(&model, mathx.V3(0.01, 0.0, -0.13), mathx.V3(0.24, 0.08, 0.13), mathx.V3(0.125, 0.65, 0), legSwing, skinShoeUV, skinShoeUV)
-	appendPlayerSkinBox(&model, mathx.V3(-0.24, 0.08, -0.12), mathx.V3(-0.01, 0.66, 0.12), mathx.V3(-0.125, 0.65, 0), -legSwing, skinPantsUV, skinPantsUV)
-	appendPlayerSkinBox(&model, mathx.V3(-0.24, 0.0, -0.13), mathx.V3(-0.01, 0.08, 0.13), mathx.V3(-0.125, 0.65, 0), -legSwing, skinShoeUV, skinShoeUV)
+	appendPlayerSkinBox(&model, mathx.V3(0.01, 0.0, -0.12), mathx.V3(0.24, 0.66, 0.12), mathx.V3(0.125, 0.65, 0), legSwing, skinLegRight)
+	appendPlayerSkinBox(&model, mathx.V3(-0.24, 0.0, -0.12), mathx.V3(-0.01, 0.66, 0.12), mathx.V3(-0.125, 0.65, 0), -legSwing, skinLegLeft)
 
 	// Rotate the whole model to the player's yaw and move it to the feet.
 	base := uint32(len(dst.Vertices))

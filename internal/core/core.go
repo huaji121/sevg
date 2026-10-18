@@ -104,7 +104,7 @@ const (
 const (
 	AtlasCols   = 8
 	AtlasRows   = 8
-	AtlasTilePx = 16
+	AtlasTilePx = 64
 	AtlasPad    = 4
 	AtlasCell   = AtlasTilePx + AtlasPad*2
 	AtlasW      = AtlasCols * AtlasCell
