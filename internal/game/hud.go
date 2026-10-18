@@ -986,16 +986,17 @@ func (g *Game) appendFallingBlocks(m *world.MeshData) {
 		}
 	}
 }
-func (g *Game) drawCenteredLabel(r ui.Rect, text string, scale float32, col [4]float32) {
+func (g *Game) labelY(r ui.Rect, text string, scale float32) float32 {
 	top, bottom := g.canv.TextInkBounds(text, scale)
-	y := r.Y + (r.H-(bottom-top))/2 - top
-	g.canv.TextCentered(r.X+r.W/2, y, text, scale, col)
+	return r.Y + (r.H-(bottom-top))/2 - top
+}
+
+func (g *Game) drawCenteredLabel(r ui.Rect, text string, scale float32, col [4]float32) {
+	g.canv.TextCentered(r.X+r.W/2, g.labelY(r, text, scale), text, scale, col)
 }
 
 func (g *Game) drawLeftLabel(x float32, r ui.Rect, text string, scale float32, col [4]float32) {
-	top, bottom := g.canv.TextInkBounds(text, scale)
-	y := r.Y + (r.H-(bottom-top))/2 - top
-	g.canv.Text(x, y, text, scale, col)
+	g.canv.Text(x, g.labelY(r, text, scale), text, scale, col)
 }
 
 func (g *Game) drawItemTooltip(name string) {
