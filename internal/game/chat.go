@@ -209,8 +209,8 @@ func (g *Game) drawChat(w, h float32) {
 		return
 	}
 	c := g.canv
-	const scale = float32(1.0)
-	const lineH = float32(20)
+	const scale = float32(1.2)
+	const lineH = float32(24)
 
 	if g.chatOpen {
 		pw := float32(720)
@@ -271,7 +271,9 @@ func (g *Game) drawChat(w, h float32) {
 		if inputSample == "" {
 			inputSample = i18n.T("chat.placeholder")
 		}
-		inputTextY := g.labelY(ui.Rect{Y: inputY - 6, H: y + ph - (inputY - 6)}, inputSample, 1.2)
+		inputTop := inputY - 6
+		inputH := y + ph - inputTop
+		inputTextY := g.labelY(ui.Rect{Y: inputTop, H: inputH}, inputSample, 1.2)
 		c.Rect(x+12, inputY-6, pw-24, 1, [4]float32{1, 1, 1, 0.20})
 		prompt := "> "
 		comp := g.chatComposition
