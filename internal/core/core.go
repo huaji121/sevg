@@ -227,39 +227,42 @@ type ItemDef struct {
 
 var blockItems [BlockCount]ItemID
 
+// StackLimit is the maximum stack size for stackable items.
+const StackLimit = 64
+
 var ItemDefs = [ItemCount]ItemDef{
 	ItemNone:          {},
-	ItemGrass:         {Name: "Grass Block", Kind: KindBlock, Block: Grass, MaxStack: 99, Color: [3]float32{0.42, 0.68, 0.30}},
-	ItemDirt:          {Name: "Dirt", Kind: KindBlock, Block: Dirt, MaxStack: 99, Color: [3]float32{0.48, 0.33, 0.22}},
-	ItemStone:         {Name: "Stone", Kind: KindBlock, Block: Stone, MaxStack: 99, Color: [3]float32{0.52, 0.52, 0.54}},
-	ItemCobble:        {Name: "Cobblestone", Kind: KindBlock, Block: Cobble, MaxStack: 99, Color: [3]float32{0.46, 0.46, 0.48}},
-	ItemSand:          {Name: "Sand", Kind: KindBlock, Block: Sand, MaxStack: 99, Color: [3]float32{0.83, 0.76, 0.52}},
-	ItemLog:           {Name: "Oak Log", Kind: KindBlock, Block: Log, MaxStack: 99, Color: [3]float32{0.45, 0.31, 0.17}},
-	ItemLeaves:        {Name: "Leaves", Kind: KindBlock, Block: Leaves, MaxStack: 99, Color: [3]float32{0.24, 0.52, 0.20}},
-	ItemPlanks:        {Name: "Oak Planks", Kind: KindBlock, Block: Planks, MaxStack: 99, Color: [3]float32{0.66, 0.48, 0.27}},
-	ItemCoalOre:       {Name: "Coal Ore", Kind: KindBlock, Block: CoalOre, MaxStack: 99, Color: [3]float32{0.30, 0.30, 0.32}},
-	ItemIronOre:       {Name: "Iron Ore", Kind: KindBlock, Block: IronOre, MaxStack: 99, Color: [3]float32{0.62, 0.55, 0.49}},
-	ItemSnow:          {Name: "Snow", Kind: KindBlock, Block: Snow, MaxStack: 99, Color: [3]float32{0.92, 0.95, 0.98}},
-	ItemCactus:        {Name: "Cactus", Kind: KindBlock, Block: Cactus, MaxStack: 99, Color: [3]float32{0.24, 0.55, 0.25}},
-	ItemGlass:         {Name: "Glass", Kind: KindBlock, Block: Glass, MaxStack: 99, Color: [3]float32{0.72, 0.85, 0.88}},
-	ItemGravel:        {Name: "Gravel", Kind: KindBlock, Block: Gravel, MaxStack: 99, Color: [3]float32{0.48, 0.45, 0.43}},
-	ItemFlower:        {Name: "Flower", Kind: KindBlock, Block: Flower, MaxStack: 99, Color: [3]float32{0.92, 0.35, 0.55}},
-	ItemTallGrass:     {Name: "Tall Grass", Kind: KindBlock, Block: TallGrass, MaxStack: 99, Color: [3]float32{0.38, 0.62, 0.28}},
-	ItemBrick:         {Name: "Bricks", Kind: KindBlock, Block: Brick, MaxStack: 99, Color: [3]float32{0.66, 0.30, 0.24}},
-	ItemStoneBrick:    {Name: "Stone Bricks", Kind: KindBlock, Block: StoneBrick, MaxStack: 99, Color: [3]float32{0.50, 0.50, 0.48}},
-	ItemIce:           {Name: "Ice", Kind: KindBlock, Block: Ice, MaxStack: 99, Color: [3]float32{0.62, 0.82, 0.95}},
-	ItemObsidian:      {Name: "Obsidian", Kind: KindBlock, Block: Obsidian, MaxStack: 99, Color: [3]float32{0.16, 0.10, 0.23}},
-	ItemStick:         {Name: "Stick", Kind: KindMaterial, MaxStack: 99, Color: [3]float32{0.55, 0.40, 0.22}},
-	ItemApple:         {Name: "Apple", Kind: KindFood, MaxStack: 16, Color: [3]float32{0.82, 0.12, 0.13}, Food: 4},
-	ItemCoal:          {Name: "Coal", Kind: KindMaterial, MaxStack: 99, Color: [3]float32{0.12, 0.12, 0.13}},
-	ItemIronIngot:     {Name: "Iron Ingot", Kind: KindMaterial, MaxStack: 99, Color: [3]float32{0.78, 0.78, 0.82}},
+	ItemGrass:         {Name: "Grass Block", Kind: KindBlock, Block: Grass, MaxStack: StackLimit, Color: [3]float32{0.42, 0.68, 0.30}},
+	ItemDirt:          {Name: "Dirt", Kind: KindBlock, Block: Dirt, MaxStack: StackLimit, Color: [3]float32{0.48, 0.33, 0.22}},
+	ItemStone:         {Name: "Stone", Kind: KindBlock, Block: Stone, MaxStack: StackLimit, Color: [3]float32{0.52, 0.52, 0.54}},
+	ItemCobble:        {Name: "Cobblestone", Kind: KindBlock, Block: Cobble, MaxStack: StackLimit, Color: [3]float32{0.46, 0.46, 0.48}},
+	ItemSand:          {Name: "Sand", Kind: KindBlock, Block: Sand, MaxStack: StackLimit, Color: [3]float32{0.83, 0.76, 0.52}},
+	ItemLog:           {Name: "Oak Log", Kind: KindBlock, Block: Log, MaxStack: StackLimit, Color: [3]float32{0.45, 0.31, 0.17}},
+	ItemLeaves:        {Name: "Leaves", Kind: KindBlock, Block: Leaves, MaxStack: StackLimit, Color: [3]float32{0.24, 0.52, 0.20}},
+	ItemPlanks:        {Name: "Oak Planks", Kind: KindBlock, Block: Planks, MaxStack: StackLimit, Color: [3]float32{0.66, 0.48, 0.27}},
+	ItemCoalOre:       {Name: "Coal Ore", Kind: KindBlock, Block: CoalOre, MaxStack: StackLimit, Color: [3]float32{0.30, 0.30, 0.32}},
+	ItemIronOre:       {Name: "Iron Ore", Kind: KindBlock, Block: IronOre, MaxStack: StackLimit, Color: [3]float32{0.62, 0.55, 0.49}},
+	ItemSnow:          {Name: "Snow", Kind: KindBlock, Block: Snow, MaxStack: StackLimit, Color: [3]float32{0.92, 0.95, 0.98}},
+	ItemCactus:        {Name: "Cactus", Kind: KindBlock, Block: Cactus, MaxStack: StackLimit, Color: [3]float32{0.24, 0.55, 0.25}},
+	ItemGlass:         {Name: "Glass", Kind: KindBlock, Block: Glass, MaxStack: StackLimit, Color: [3]float32{0.72, 0.85, 0.88}},
+	ItemGravel:        {Name: "Gravel", Kind: KindBlock, Block: Gravel, MaxStack: StackLimit, Color: [3]float32{0.48, 0.45, 0.43}},
+	ItemFlower:        {Name: "Flower", Kind: KindBlock, Block: Flower, MaxStack: StackLimit, Color: [3]float32{0.92, 0.35, 0.55}},
+	ItemTallGrass:     {Name: "Tall Grass", Kind: KindBlock, Block: TallGrass, MaxStack: StackLimit, Color: [3]float32{0.38, 0.62, 0.28}},
+	ItemBrick:         {Name: "Bricks", Kind: KindBlock, Block: Brick, MaxStack: StackLimit, Color: [3]float32{0.66, 0.30, 0.24}},
+	ItemStoneBrick:    {Name: "Stone Bricks", Kind: KindBlock, Block: StoneBrick, MaxStack: StackLimit, Color: [3]float32{0.50, 0.50, 0.48}},
+	ItemIce:           {Name: "Ice", Kind: KindBlock, Block: Ice, MaxStack: StackLimit, Color: [3]float32{0.62, 0.82, 0.95}},
+	ItemObsidian:      {Name: "Obsidian", Kind: KindBlock, Block: Obsidian, MaxStack: StackLimit, Color: [3]float32{0.16, 0.10, 0.23}},
+	ItemStick:         {Name: "Stick", Kind: KindMaterial, MaxStack: StackLimit, Color: [3]float32{0.55, 0.40, 0.22}},
+	ItemApple:         {Name: "Apple", Kind: KindFood, MaxStack: StackLimit, Color: [3]float32{0.82, 0.12, 0.13}, Food: 4},
+	ItemCoal:          {Name: "Coal", Kind: KindMaterial, MaxStack: StackLimit, Color: [3]float32{0.12, 0.12, 0.13}},
+	ItemIronIngot:     {Name: "Iron Ingot", Kind: KindMaterial, MaxStack: StackLimit, Color: [3]float32{0.78, 0.78, 0.82}},
 	ItemWoodSword:     {Name: "Wooden Sword", Kind: KindTool, MaxStack: 1, Color: [3]float32{0.62, 0.45, 0.24}, Damage: 4, Mining: 1.2},
 	ItemStonePickaxe:  {Name: "Stone Pickaxe", Kind: KindTool, MaxStack: 1, Color: [3]float32{0.53, 0.53, 0.56}, Damage: 2, Mining: 2.4},
 	ItemIronSword:     {Name: "Iron Sword", Kind: KindTool, MaxStack: 1, Color: [3]float32{0.82, 0.82, 0.86}, Damage: 7, Mining: 1.2},
 	ItemIronPickaxe:   {Name: "Iron Pickaxe", Kind: KindTool, MaxStack: 1, Color: [3]float32{0.84, 0.84, 0.88}, Damage: 3, Mining: 4.0},
-	ItemWool:          {Name: "Wool", Kind: KindBlock, Block: Wool, MaxStack: 99, Color: [3]float32{0.92, 0.92, 0.90}},
-	ItemTorch:         {Name: "Torch", Kind: KindBlock, Block: Torch, MaxStack: 99, Color: [3]float32{0.95, 0.58, 0.18}},
-	ItemCraftingTable: {Name: "Crafting Table", Kind: KindBlock, Block: CraftingTable, MaxStack: 99, Color: [3]float32{0.55, 0.38, 0.22}},
+	ItemWool:          {Name: "Wool", Kind: KindBlock, Block: Wool, MaxStack: StackLimit, Color: [3]float32{0.92, 0.92, 0.90}},
+	ItemTorch:         {Name: "Torch", Kind: KindBlock, Block: Torch, MaxStack: StackLimit, Color: [3]float32{0.95, 0.58, 0.18}},
+	ItemCraftingTable: {Name: "Crafting Table", Kind: KindBlock, Block: CraftingTable, MaxStack: StackLimit, Color: [3]float32{0.55, 0.38, 0.22}},
 }
 
 func init() {
@@ -453,9 +456,41 @@ func (inv *Inventory) Swap(a, b int) {
 }
 
 func (inv *Inventory) Normalize() {
+	var spill []Stack
 	for i := range inv.Slots {
-		if inv.Slots[i].Count <= 0 || inv.Slots[i].Item == ItemNone {
-			inv.Slots[i] = Stack{}
+		s := &inv.Slots[i]
+		if s.Count <= 0 || s.Item == ItemNone {
+			*s = Stack{}
+			continue
+		}
+		if max := s.Item.MaxStack(); s.Count > max {
+			spill = append(spill, Stack{Item: s.Item, Count: s.Count - max})
+			s.Count = max
+		}
+	}
+	// Redistribute stacks from older saves that exceeded the new limit.
+	for _, extra := range spill {
+		remaining := extra.Count
+		max := extra.Item.MaxStack()
+		for i := 0; i < InventorySlots && remaining > 0; i++ {
+			s := &inv.Slots[i]
+			if s.Empty() {
+				n := remaining
+				if n > max {
+					n = max
+				}
+				*s = Stack{Item: extra.Item, Count: n}
+				remaining -= n
+				continue
+			}
+			if s.Item == extra.Item && s.Count < max {
+				n := max - s.Count
+				if n > remaining {
+					n = remaining
+				}
+				s.Count += n
+				remaining -= n
+			}
 		}
 	}
 	if inv.Selected < 0 || inv.Selected >= HotbarSlots {

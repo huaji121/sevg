@@ -71,3 +71,47 @@ func TestBlockFaceTiles(t *testing.T) {
 		t.Fatal("log face tiles are wrong")
 	}
 }
+func TestStackLimitIs64(t *testing.T) {
+	if got := ItemPlanks.MaxStack(); got != 64 {
+		t.Fatalf("planks max stack = %d", got)
+	}
+	if got := ItemApple.MaxStack(); got != 64 {
+		t.Fatalf("apple max stack = %d", got)
+	}
+	if got := ItemWoodSword.MaxStack(); got != 1 {
+		t.Fatalf("sword max stack = %d", got)
+	}
+	var inv Inventory
+	if left := inv.Add(ItemPlanks, 100); left != 0 {
+		t.Fatalf("leftover = %d", left)
+	}
+	if got := inv.Count(ItemPlanks); got != 100 {
+		t.Fatalf("count = %d", got)
+	}
+	maxSeen := 0
+	nonEmpty := 0
+	for _, s := range inv.Slots {
+		if s.Item == ItemPlanks {
+			if s.Count > maxSeen {
+				maxSeen = s.Count
+			}
+			nonEmpty++
+		}
+	}
+	if maxSeen != 64 || nonEmpty != 2 {
+		t.Fatalf("planks slots = %d, max = %d", nonEmpty, maxSeen)
+	}
+}
+func TestNormalizeSplitsLegacyOverstacks(t *testing.T) {
+	var inv Inventory
+	inv.Slots[0] = Stack{Item: ItemPlanks, Count: 99}
+	inv.Normalize()
+	if got := inv.Count(ItemPlanks); got != 99 {
+		t.Fatalf("count after normalize = %d", got)
+	}
+	for _, s := range inv.Slots {
+		if s.Item == ItemPlanks && s.Count > 64 {
+			t.Fatalf("overstack remains: %+v", s)
+		}
+	}
+}

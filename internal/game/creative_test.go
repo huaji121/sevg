@@ -114,7 +114,7 @@ func TestCreativeClickCountsAndShiftStack(t *testing.T) {
 	g.shiftDown = true
 	g.handleUIClick(false)
 	g.shiftDown = false
-	if g.heldStack.Item != core.ItemPlanks || g.heldStack.Count != 65 {
+	if g.heldStack.Item != core.ItemPlanks || g.heldStack.Count != 64 {
 		t.Fatalf("shift click stack = %+v", g.heldStack)
 	}
 }

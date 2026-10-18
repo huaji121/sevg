@@ -55,7 +55,7 @@ func (g *Game) creativeItemAt(x, y float32) core.ItemID {
 func creativeTakeCount(item core.ItemID, bulk bool) int {
 	count := 1
 	if bulk {
-		count = 64
+		count = core.StackLimit
 	}
 	max := item.MaxStack()
 	if max <= 0 {
