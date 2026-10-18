@@ -52,19 +52,37 @@ func (g *Game) creativeItemAt(x, y float32) core.ItemID {
 	return core.ItemNone
 }
 
-func (g *Game) giveCreativeItem(item core.ItemID) {
+func (g *Game) giveCreativeItem(item core.ItemID, bulk bool) {
 	if item == core.ItemNone || item >= core.ItemCount {
 		return
 	}
-	count := item.Def().MaxStack
-	if count <= 0 {
+	count := 1
+	if bulk {
 		count = 64
 	}
-	// The creative catalog is an infinite source: the picked stack stays on
-	// the cursor until it is placed into a slot.
-	g.heldStack = core.Stack{Item: item, Count: count}
+	max := item.MaxStack()
+	if max <= 0 {
+		max = 64
+	}
+	if count > max {
+		count = max
+	}
+	if !g.heldStack.Empty() && g.heldStack.Item != item {
+		// The infinite creative catalog only destroys a held item when a
+		// different catalog entry is clicked. It does not also take the item
+		// that was clicked; the next click (with an empty cursor) does that.
+		g.heldStack = core.Stack{}
+		return
+	}
+	if g.heldStack.Empty() {
+		g.heldStack = core.Stack{Item: item, Count: count}
+		return
+	}
+	g.heldStack.Count += count
+	if g.heldStack.Count > max {
+		g.heldStack.Count = max
+	}
 }
-
 func (g *Game) drawCreativeInventory(w, h float32) {
 	c := g.canv
 	c.Rect(0, 0, w, h, [4]float32{0, 0, 0, 0.48})

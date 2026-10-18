@@ -83,6 +83,7 @@ type Game struct {
 	mouseX, mouseY float32
 	mouseLeft      bool
 	mouseRight     bool
+	shiftDown      bool
 	heldStack      core.Stack
 
 	breakPos      [3]int
@@ -362,6 +363,9 @@ func (g *Game) poll() {
 			}
 		case sdl.EVENT_KEY_DOWN:
 			ke := e.KeyboardEvent()
+			if ke.Scancode == sdl.SCANCODE_LSHIFT || ke.Scancode == sdl.SCANCODE_RSHIFT {
+				g.shiftDown = true
+			}
 			if ke.Repeat {
 				if g.chatOpen {
 					switch ke.Key {
@@ -372,6 +376,11 @@ func (g *Game) poll() {
 				continue
 			}
 			g.onKey(ke.Key)
+		case sdl.EVENT_KEY_UP:
+			ke := e.KeyboardEvent()
+			if ke.Scancode == sdl.SCANCODE_LSHIFT || ke.Scancode == sdl.SCANCODE_RSHIFT {
+				g.shiftDown = false
+			}
 		case sdl.EVENT_MOUSE_MOTION:
 			me := e.MouseMotionEvent()
 			g.mouseX, g.mouseY = g.toUI(me.X, me.Y)

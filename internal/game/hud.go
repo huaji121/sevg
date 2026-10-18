@@ -418,7 +418,7 @@ func (g *Game) drawItemIcon(x, y, size float32, st core.Stack, alpha float32) {
 	} else {
 		c.Icon(st.Item, x+1, y+1, size-2, size-2, alpha)
 	}
-	if st.Count > 1 && g.mode != ModeCreative {
+	if st.Count > 1 {
 		cnt := fmt.Sprint(st.Count)
 		c.Text(x+size-c.TextWidth(cnt, 0.75)-2, y+size-16, cnt, 0.75, ui.TextColor)
 	}

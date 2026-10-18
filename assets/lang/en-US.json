@@ -91,7 +91,7 @@
   "inventory.crafting_table": "CRAFTING TABLE",
   "inventory.crafting_table_hint": "3x3 CRAFTING",
   "inventory.creative_get": "Click an item to pick it up - click a slot to place/swap - 1-9 select",
-  "inventory.creative_hint": "Pick an item with the mouse, then click a hotbar slot to place it",
+  "inventory.creative_hint": "CLICK: 1 · SHIFT+CLICK: STACK · CLICKING A DIFFERENT ITEM DESTROYS THE HELD ITEM",
   "inventory.creative_title": "CREATIVE INVENTORY",
   "inventory.handmade": "2x2 CRAFTING",
   "inventory.hint": "LMB MOVE · RMB SPLIT · R RECIPE BOOK · E CLOSE",

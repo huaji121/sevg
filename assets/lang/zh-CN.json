@@ -91,7 +91,7 @@
   "inventory.crafting_table": "工作台",
   "inventory.crafting_table_hint": "3x3 合成栏",
   "inventory.creative_get": "点击物品拾取 · 点击槽位放置/交换 · 1-9 选择快捷栏",
-  "inventory.creative_hint": "点击物品拿到鼠标上，再点击快捷栏槽位放置",
+  "inventory.creative_hint": "左键取 1 个 · Shift + 左键取一组 · 点击不同物品会销毁手持物品",
   "inventory.creative_title": "创造模式物品栏",
   "inventory.handmade": "2x2 合成栏",
   "inventory.hint": "左键移动 · 右键拆分 · R 配方书 · E 关闭",

@@ -412,14 +412,12 @@ func (g *Game) handleUIClick(right bool) {
 			}
 			for i := 0; i < 9; i++ {
 				if g.creativeHotbarRect(i).Contains(g.mouseX, g.mouseY) {
-					// Same slot interaction as the survival inventory:
-					// pick up, place, merge, split, or swap.
 					g.clickSlot(i, right)
 					return
 				}
 			}
 			if item := g.creativeItemAt(g.mouseX, g.mouseY); item != core.ItemNone {
-				g.giveCreativeItem(item)
+				g.giveCreativeItem(item, g.shiftDown)
 			}
 			return
 		}

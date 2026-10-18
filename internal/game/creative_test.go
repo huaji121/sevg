@@ -20,7 +20,7 @@ func TestCreativeInventoryClick(t *testing.T) {
 	g.mouseX = first.X + first.W/2
 	g.mouseY = first.Y + first.H/2
 	g.handleUIClick(false)
-	if g.heldStack.Item != core.ItemID(1) || g.heldStack.Count != g.heldStack.Item.Def().MaxStack {
+	if g.heldStack.Item != core.ItemID(1) || g.heldStack.Count != 1 {
 		t.Fatalf("creative cursor stack = %+v", g.heldStack)
 	}
 	if g.inv.Slots[2] != before {
@@ -95,5 +95,50 @@ func TestClosingCreativeReturnsHeldStack(t *testing.T) {
 	}
 	if got := g.inv.Count(core.ItemPlanks); got != 7 {
 		t.Fatalf("returned planks = %d", got)
+	}
+}
+func TestCreativeClickCountsAndShiftStack(t *testing.T) {
+	g := newTestGame(t)
+	g.gfx = &render.Renderer{W: 1280, H: 720}
+	g.state = StateInventory
+	g.mode = ModeCreative
+	g.inventoryTab = 1
+	planks := g.creativeItemRect(int(core.ItemPlanks) - 1)
+	g.mouseX = planks.X + planks.W/2
+	g.mouseY = planks.Y + planks.H/2
+
+	g.handleUIClick(false)
+	if g.heldStack.Count != 1 {
+		t.Fatalf("single click count = %d", g.heldStack.Count)
+	}
+	g.shiftDown = true
+	g.handleUIClick(false)
+	g.shiftDown = false
+	if g.heldStack.Item != core.ItemPlanks || g.heldStack.Count != 65 {
+		t.Fatalf("shift click stack = %+v", g.heldStack)
+	}
+}
+
+func TestCreativeCatalogDifferentItemDestroysHeld(t *testing.T) {
+	g := newTestGame(t)
+	g.gfx = &render.Renderer{W: 1280, H: 720}
+	g.state = StateInventory
+	g.mode = ModeCreative
+	g.inventoryTab = 1
+	first := g.creativeItemRect(0)
+	g.mouseX = first.X + first.W/2
+	g.mouseY = first.Y + first.H/2
+	g.handleUIClick(false)
+	second := g.creativeItemRect(1)
+	g.mouseX = second.X + second.W/2
+	g.mouseY = second.Y + second.H/2
+	g.handleUIClick(false)
+	if !g.heldStack.Empty() {
+		t.Fatalf("different catalog item should destroy held stack: %+v", g.heldStack)
+	}
+	// The clicked item is not taken on the destroying click.
+	g.handleUIClick(false)
+	if g.heldStack.Item != core.ItemID(2) || g.heldStack.Count != 1 {
+		t.Fatalf("clicked item should be taken on the next click: %+v", g.heldStack)
 	}
 }
