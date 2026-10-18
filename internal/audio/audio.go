@@ -104,6 +104,19 @@ func (e *Engine) Play(name string) {
 	})
 }
 
+// SetMasterVolume sets the mixed output gain in the range [0,1].
+func (e *Engine) SetMasterVolume(v float32) {
+	if e == nil {
+		return
+	}
+	if v < 0 {
+		v = 0
+	} else if v > 1 {
+		v = 1
+	}
+	e.master = v
+}
+
 // Update tops up the device queue with mixed samples. Called once per frame.
 func (e *Engine) Update() {
 	if e == nil || e.stream == nil || len(e.voices) == 0 {

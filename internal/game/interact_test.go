@@ -18,10 +18,13 @@ func newTestGame(t *testing.T) *Game {
 	w.EnsureChunk(world.ChunkPos{})
 	p := player.New(mathx.Vec3{X: 8.5, Y: 80, Z: 8.5})
 	g := &Game{
-		world:  w,
-		player: p,
-		mobs:   entity.NewManager(123),
-		canv:   nil,
+		world:         w,
+		player:        p,
+		mobs:          entity.NewManager(123),
+		canv:          nil,
+		keys:          DefaultKeybinds(),
+		bindingAction: -1,
+		dragSlider:    -1,
 	}
 	g.inv.FillStarter()
 	return g

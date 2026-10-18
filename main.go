@@ -24,9 +24,11 @@ func main() {
 	flag.BoolVar(&opts.SmoothLighting, "smoothlighting", true, "smooth vertex lighting")
 	flag.BoolVar(&opts.DynamicLight, "dynamiclight", true, "held light source updates")
 	flag.StringVar(&opts.SkinPath, "skin", "", "path to a custom 16x16 player skin texture")
+	flag.IntVar(&opts.MasterVolume, "volume", 70, "master volume (0-100)")
 	flag.BoolVar(&opts.VSync, "vsync", true, "vertical sync")
 	flag.Parse()
 
+	opts.Keys = game.DefaultKeybinds()
 	if err := game.Run(opts); err != nil {
 		fmt.Fprintln(os.Stderr, "SEVG:", err)
 		os.Exit(1)

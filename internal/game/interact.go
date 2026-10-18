@@ -360,34 +360,64 @@ func (g *Game) handleUIClick(right bool) {
 			return
 		}
 		l := g.settingsRects()
+		for i, r := range l.tabs {
+			if r.Contains(g.mouseX, g.mouseY) {
+				g.settingsTab = i
+				g.bindingAction = -1
+				return
+			}
+		}
 		if l.back.Contains(g.mouseX, g.mouseY) {
+			g.bindingAction = -1
 			g.setState(g.settingsBack)
 			return
 		}
-		if l.full.Contains(g.mouseX, g.mouseY) {
-			g.applyVideoChange(3, 0)
-			return
-		}
-		if l.smooth.Contains(g.mouseX, g.mouseY) {
-			g.applyVideoChange(4, 0)
-			return
-		}
-		if l.vsync.Contains(g.mouseX, g.mouseY) {
-			g.applyVideoChange(5, 0)
-			return
-		}
-		if l.dynamic.Contains(g.mouseX, g.mouseY) {
-			g.applyVideoChange(6, 0)
-			return
-		}
-		for i := 0; i < 3; i++ {
-			if l.minus[i].Contains(g.mouseX, g.mouseY) {
-				g.applyVideoChange(i, -1)
+		switch g.settingsTab {
+		case 0:
+			for i := 0; i < 3; i++ {
+				if l.sliders[i].Contains(g.mouseX, g.mouseY) {
+					g.dragSlider = i
+					g.updateSliderDrag()
+					return
+				}
+			}
+			if l.full.Contains(g.mouseX, g.mouseY) {
+				g.applyVideoChange(3, 0)
 				return
 			}
-			if l.plus[i].Contains(g.mouseX, g.mouseY) {
-				g.applyVideoChange(i, 1)
+			if l.smooth.Contains(g.mouseX, g.mouseY) {
+				g.applyVideoChange(4, 0)
 				return
+			}
+			if l.vsync.Contains(g.mouseX, g.mouseY) {
+				g.applyVideoChange(5, 0)
+				return
+			}
+			if l.dynamic.Contains(g.mouseX, g.mouseY) {
+				g.applyVideoChange(6, 0)
+				return
+			}
+		case 1:
+			if l.audioSlider.Contains(g.mouseX, g.mouseY) {
+				g.dragSlider = 3
+				g.updateSliderDrag()
+				return
+			}
+		case 2:
+			if l.lang[0].Contains(g.mouseX, g.mouseY) {
+				g.setLanguage(i18n.ZH)
+				return
+			}
+			if l.lang[1].Contains(g.mouseX, g.mouseY) {
+				g.setLanguage(i18n.EN)
+				return
+			}
+		case 3:
+			for i, r := range l.keyButtons {
+				if r.Contains(g.mouseX, g.mouseY) {
+					g.bindingAction = i
+					return
+				}
 			}
 		}
 	case StateDead:

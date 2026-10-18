@@ -33,7 +33,9 @@ type Options struct {
 	Fullscreen     bool
 	SmoothLighting bool
 	DynamicLight   bool
+	MasterVolume   int
 	SkinPath       string
+	Keys           Keybinds
 	VSync          bool
 }
 
@@ -76,7 +78,11 @@ type Game struct {
 	audio *audio.Engine
 
 	state          State
+	settingsTab    int
+	bindingAction  int
+	dragSlider     int
 	settingsBack   State
+	keys           Keybinds
 	mode           GameMode
 	seed           int64
 	world          *world.World
@@ -169,6 +175,9 @@ func Run(opts Options) error {
 	if opts.FOV <= 0 {
 		opts.FOV = 72
 	}
+	if opts.Keys.Forward == 0 {
+		opts.Keys = DefaultKeybinds()
+	}
 	if opts.SmokeFrames == 0 {
 		loadVideoSettings(&opts)
 	}
@@ -211,16 +220,19 @@ func Run(opts Options) error {
 		}
 	}
 	g := &Game{
-		opts:       opts,
-		Win:        win,
-		gfx:        gfx,
-		canv:       ui.NewCanvas(opts.Width, opts.Height, fontAtlas),
-		state:      StateMenu,
-		saveAt:     opts.SavePath,
-		pending:    make(map[[2]int]bool),
-		meshed:     make(map[[2]int]bool),
-		lastTime:   time.Now(),
-		fullscreen: opts.Fullscreen,
+		opts:          opts,
+		Win:           win,
+		gfx:           gfx,
+		canv:          ui.NewCanvas(opts.Width, opts.Height, fontAtlas),
+		state:         StateMenu,
+		saveAt:        opts.SavePath,
+		keys:          opts.Keys,
+		bindingAction: -1,
+		dragSlider:    -1,
+		pending:       make(map[[2]int]bool),
+		meshed:        make(map[[2]int]bool),
+		lastTime:      time.Now(),
+		fullscreen:    opts.Fullscreen,
 	}
 	g.seed = opts.Seed
 	if g.opts.Fullscreen {
@@ -228,6 +240,7 @@ func Run(opts Options) error {
 	}
 	if err := sdl.InitSubSystem(sdl.INIT_AUDIO); err == nil {
 		g.audio = audio.Open()
+		g.audio.SetMasterVolume(float32(opts.MasterVolume) / 100)
 	}
 	defer func() { g.audio.Close() }()
 	if g.seed == 0 {
@@ -402,6 +415,9 @@ func (g *Game) poll() {
 		case sdl.EVENT_MOUSE_MOTION:
 			me := e.MouseMotionEvent()
 			g.mouseX, g.mouseY = g.toUI(me.X, me.Y)
+			if g.dragSlider >= 0 {
+				g.updateSliderDrag()
+			}
 			if g.state == StatePlaying && !g.chatOpen {
 				g.player.Rotate(me.Xrel, me.Yrel, 0.0022)
 			}
@@ -443,7 +459,7 @@ func (g *Game) onKey(k sdl.Keycode) {
 		g.openChatWith("/")
 		return
 	}
-	if g.state == StatePlaying && (k == sdl.K_T || k == sdl.K_RETURN || k == sdl.K_KP_ENTER) {
+	if g.state == StatePlaying && (k == g.keys.Chat || k == sdl.K_RETURN || k == sdl.K_KP_ENTER) {
 		g.openChat()
 		return
 	}
@@ -462,7 +478,7 @@ func (g *Game) onKey(k sdl.Keycode) {
 		switch k {
 		case sdl.K_ESCAPE:
 			g.setState(StatePaused)
-		case sdl.K_E:
+		case g.keys.Inventory:
 			g.openInventory()
 		case sdl.K_F5:
 			g.camera = (g.camera + 1) % 3
@@ -503,7 +519,7 @@ func (g *Game) onKey(k sdl.Keycode) {
 			g.toggleLanguage()
 		case sdl.K_F11:
 			g.setFullscreen(!g.fullscreen)
-		case sdl.K_Q:
+		case g.keys.Drop:
 			g.dropSelected()
 		case sdl.K_1, sdl.K_2, sdl.K_3, sdl.K_4, sdl.K_5, sdl.K_6, sdl.K_7, sdl.K_8, sdl.K_9:
 			g.inv.Select(int(k - sdl.K_1))
@@ -523,6 +539,15 @@ func (g *Game) onKey(k sdl.Keycode) {
 			g.setState(StatePlaying)
 		}
 	case StateSettings:
+		if g.bindingAction >= 0 {
+			if k == sdl.K_ESCAPE {
+				g.bindingAction = -1
+			} else {
+				g.setBinding(g.bindingAction, k)
+				g.bindingAction = -1
+			}
+			return
+		}
 		if k == sdl.K_ESCAPE {
 			g.setState(g.settingsBack)
 		} else if k == sdl.K_F11 {
@@ -566,6 +591,10 @@ func (g *Game) onMouseDown(button uint8) {
 
 func (g *Game) onMouseUp(button uint8) {
 	if int(button) == int(sdl.BUTTON_LEFT) {
+		if g.dragSlider >= 0 {
+			g.dragSlider = -1
+			saveVideoSettings(g.opts)
+		}
 		g.mouseLeft = false
 		g.breakActive = false
 		g.breakProgress = 0
@@ -599,9 +628,15 @@ func (g *Game) updateWorld(dt float32, allowInput bool) {
 	if allowInput && !g.chatOpen {
 		ks := sdl.GetKeyboardState()
 		down := func(code sdl.Scancode) bool { return int(code) < len(ks) && ks[code] }
-		in.Forward = float32(boolToInt(down(sdl.SCANCODE_W))) - float32(boolToInt(down(sdl.SCANCODE_S)))
-		in.Strafe = float32(boolToInt(down(sdl.SCANCODE_D))) - float32(boolToInt(down(sdl.SCANCODE_A)))
-		in.Jump = down(sdl.SCANCODE_SPACE)
+		bindDown := func(k sdl.Keycode) bool {
+			if k == 0 {
+				return false
+			}
+			return down(k.ScancodeFromKey(nil))
+		}
+		in.Forward = float32(boolToInt(bindDown(g.keys.Forward))) - float32(boolToInt(bindDown(g.keys.Back)))
+		in.Strafe = float32(boolToInt(bindDown(g.keys.Right))) - float32(boolToInt(bindDown(g.keys.Left)))
+		in.Jump = bindDown(g.keys.Jump)
 		in.Descend = down(sdl.SCANCODE_LCTRL) || down(sdl.SCANCODE_RCTRL)
 		in.Sprint = down(sdl.SCANCODE_LSHIFT) || down(sdl.SCANCODE_RSHIFT)
 	}
@@ -768,10 +803,7 @@ func (g *Game) sky() render.WorldUniforms {
 
 func (g *Game) toggleLanguage() {
 	next := i18n.Next()
-	i18n.Set(next)
-	if g.Win != nil {
-		_ = g.Win.SetTitle(i18n.T("window.title"))
-	}
+	g.setLanguage(next)
 	g.notify(i18n.T("toast.language", i18n.LocaleName(next)), 2)
 }
 
