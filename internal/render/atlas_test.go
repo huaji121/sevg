@@ -90,7 +90,7 @@ func TestCustomSkinOverride(t *testing.T) {
 	}
 }
 func TestPlayerSkinAssetIs64x64(t *testing.T) {
-	f, err := assets.Textures.Open("textures/blocks/player_skin_map.png")
+	f, err := assets.Textures.Open("textures/entities/player_skin_map.png")
 	if err != nil {
 		t.Fatal(err)
 	}

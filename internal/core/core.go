@@ -88,10 +88,6 @@ const (
 	TileBrown
 	TilePink
 	TileGreen
-	TilePlayerSkin
-	TilePlayerShirt
-	TilePlayerPants
-	TilePlayerHair
 	TilePlayerSkinMap
 	TileSun
 	TileMoon

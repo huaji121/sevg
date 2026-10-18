@@ -31,7 +31,7 @@ SEVG 的目标不是复刻完整的 Minecraft，而是提供一个 **结构清�
 - 区块级顶点/索引缓冲
 - 为每个区块构建 18 × 18 的邻域快照，用于面剔除和 AO
 - 环境光遮蔽、方向面明暗、距离雾
-- 8 × 8 材质图集（16 px 贴图 + 4 px 防渗色边距），贴图素材存放在 `assets/textures/` 并嵌入二进制
+- 8 × 8 材质图集（64 px 图集格 + 4 px 防渗色边距），原生 64×64 玩家皮肤、16 px 方块贴图按最近邻缩放，素材存放在 `assets/textures/` 并嵌入二进制
 - 水/玻璃/冰使用透明通道，水面从远到近排序
 - 深度纹理、窗口缩放、高 DPI 鼠标坐标换算
 - 第一人称手持物品使用独立清空深度缓冲的视图模型通道，始终位于世界之上，同时保持自身前后遮挡
@@ -102,7 +102,7 @@ SEVG 的目标不是复刻完整的 Minecraft，而是提供一个 **结构清�
 - 实体受击闪白、击退、生命值和死亡掉落
 - 物品掉落物：弹跳、浮动、靠近玩家自动拾取；玩家主动丢出的物品有 1.25 秒拾取延迟，避免立即捡回
 - 第一/第二/第三人称玩家模型：Steve 风格的方块头、身体、四肢、脸部、头发、手持方块或工具/食物贴图卡片，行走时手臂与腿摆动
-- 自定义玩家皮肤：运行时使用 `-skin <64x64 图片>` 覆盖标准 Minecraft 皮肤；默认测试皮肤位于 `assets/textures/blocks/player_skin_map.png`
+- 自定义玩家皮肤：运行时使用 `-skin <64x64 图片>` 覆盖标准 Minecraft 皮肤；默认测试皮肤位于 `assets/textures/entities/player_skin_map.png`
 - 皮肤 UV 布局：标准 64×64 Minecraft 皮肤布局，包含头部、躯干、左右手臂和左右腿的全部六个面；左右肢体按 Minecraft 规则镜像采样；贴图按最近邻采样缩放，未使用区域保持透明
 - 方块掉落物使用与放置方块一致的逐面贴图；高草/花使用十字模型；剑与镐使用小型 3D 模型；玻璃/冰掉落物保持透明
 - 实体与地形共用深度/雾/光照管线
@@ -294,14 +294,18 @@ py run.py -seed 12345 -renderdist 8
 │   ├── entity/                 # 猪/羊 AI、物品掉落、攻击拾取
 │   ├── render/
 │   │   ├── renderer.go         # SDL_GPU 设备、管线、缓冲、绘制
-│   │   ├── atlas.go            # 从 assets/textures/blocks 装载材质图集
+│   │   ├── atlas.go            # 从 assets/textures/ 分类目录装载材质图集
 │   │   └── shaders/            # GLSL + 预编译 SPIR-V
 │   ├── i18n/                   # 多语言文本、方块/物品/群系名称
 │   ├── ui/                     # CJK 系统字体图集与 2D 画布
 │   └── game/                   # 游戏循环、输入、HUD、菜单、存档、流式调度、语言切换
 ├── assets/textures/            # 可编辑贴图素材
-│   ├── blocks/                 # 16 × 16 方块、裂纹、火把、调色板贴图
-│   └── items/                  # 40 × 40 纯贴图物品图标（工具、食物、材料）
+│   ├── blocks/                 # 方块贴图（16 × 16）
+│   ├── entities/               # 猪皮肤、64 × 64 玩家皮肤
+│   ├── sky/                    # 太阳、月亮
+│   ├── palette/                # 实体调色板纯色贴图
+│   ├── effects/                # 方块裂纹 0–9
+│   └── items/                  # 纯贴图物品图标（工具、食物、材料）
 ├── assets/sounds/              # WAV 音效素材，嵌入二进制并由软件混音
 ├── assets/lang/                # 多语言 JSON 文本，嵌入二进制
 ├── settings.json               # 运行时自动生成的视频设置
@@ -347,7 +351,7 @@ py shaders.py
 ### 添加一个方块
 
 1. 在 `internal/core/core.go` 添加 `BlockID` 常量、`BlockDefs` 条目和对应 `ItemID`。
-2. 把 16 × 16 PNG 放入 `assets/textures/blocks/`，并在 `internal/render/atlas.go` 的 `blockTextureFiles` 中登记文件名。
+2. 把 16 × 16 PNG 放入 `assets/textures/blocks/`，并在 `internal/render/atlas.go` 的 `blockTextureFiles` 中登记相对路径。
 3. 在 `internal/core` 的 `init` 中把方块映射到物品。
 4. 重新编译即可；网格、碰撞、掉落、存档会自动支持。
 

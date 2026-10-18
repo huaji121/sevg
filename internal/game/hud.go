@@ -905,10 +905,6 @@ var entityPalette = []entityPaletteEntry{
 	{core.TileBrown, [3]float32{0.44, 0.31, 0.18}},
 	{core.TilePink, [3]float32{0.91, 0.29, 0.42}},
 	{core.TileGreen, [3]float32{0.25, 0.55, 0.24}},
-	{core.TilePlayerSkin, [3]float32{0.76, 0.55, 0.36}},
-	{core.TilePlayerShirt, [3]float32{0.18, 0.63, 0.61}},
-	{core.TilePlayerPants, [3]float32{0.20, 0.28, 0.59}},
-	{core.TilePlayerHair, [3]float32{0.18, 0.12, 0.08}},
 }
 
 func tileForColor(c [4]float32) uint8 {

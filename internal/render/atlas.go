@@ -11,7 +11,7 @@ import (
 	"sevg/internal/core"
 )
 
-// Block textures are kept as individual PNG files in assets/textures/blocks.
+// Textures are kept as individual PNG files in categorized assets/textures folders.
 // The order here matches the core.Tile* constants.
 var customSkinPath string
 
@@ -20,16 +20,16 @@ var customSkinPath string
 func SetSkinPath(path string) { customSkinPath = path }
 
 var blockTextureFiles = [core.TileTileCount]string{
-	"grass_top", "grass_side", "dirt", "stone", "cobble", "sand", "water",
-	"log_side", "log_top", "leaves", "planks", "coal_ore", "iron_ore",
-	"snow", "snow_side", "cactus_side", "cactus_top", "glass", "bedrock",
-	"gravel", "flower", "tall_grass", "brick", "stone_brick", "ice",
-	"obsidian", "wool", "torch", "crafting_table",
-	"crack_0", "crack_1", "crack_2", "crack_3", "crack_4",
-	"crack_5", "crack_6", "crack_7", "crack_8", "crack_9",
-	"white", "pig_skin", "dark", "red", "gold", "gray", "black", "brown",
-	"pink", "green", "player_skin", "player_shirt", "player_pants", "player_hair", "player_skin_map",
-	"sun", "moon", "chest",
+	"blocks/grass_top", "blocks/grass_side", "blocks/dirt", "blocks/stone", "blocks/cobble", "blocks/sand", "blocks/water",
+	"blocks/log_side", "blocks/log_top", "blocks/leaves", "blocks/planks", "blocks/coal_ore", "blocks/iron_ore",
+	"blocks/snow", "blocks/snow_side", "blocks/cactus_side", "blocks/cactus_top", "blocks/glass", "blocks/bedrock",
+	"blocks/gravel", "blocks/flower", "blocks/tall_grass", "blocks/brick", "blocks/stone_brick", "blocks/ice",
+	"blocks/obsidian", "blocks/wool", "blocks/torch", "blocks/crafting_table",
+	"effects/crack_0", "effects/crack_1", "effects/crack_2", "effects/crack_3", "effects/crack_4",
+	"effects/crack_5", "effects/crack_6", "effects/crack_7", "effects/crack_8", "effects/crack_9",
+	"palette/white", "entities/pig_skin", "palette/dark", "palette/red", "palette/gold", "palette/gray",
+	"palette/black", "palette/brown", "palette/pink", "palette/green", "entities/player_skin_map",
+	"sky/sun", "sky/moon", "blocks/chest",
 }
 
 // BuildAtlas assembles the embedded tile textures into the runtime atlas and
@@ -48,7 +48,7 @@ func buildAtlas() []byte {
 	const size = core.AtlasW * core.AtlasH
 	img := make([]byte, size*4)
 	for tile, name := range blockTextureFiles {
-		path := "textures/blocks/" + name + ".png"
+		path := "textures/" + name + ".png"
 		f, err := assets.Textures.Open(path)
 		if err != nil {
 			panic(fmt.Sprintf("open texture %s: %v", path, err))
