@@ -737,6 +737,12 @@ func appendIconCard(m *world.MeshData, center, right, up, normal mathx.Vec3, w, 
 	frontUV := [4][2]float32{{icon.U0, icon.V1}, {icon.U1, icon.V1}, {icon.U1, icon.V0}, {icon.U0, icon.V0}}
 	addIconQuad(m, fbl, fbr, ftr, ftl, frontUV, 1.0)
 
+	// Solid back face. It uses the same UV orientation as the front, so
+	// transparent pixels line up and cannot reveal a mirrored duplicate.
+	bbl, bbr, btr, btl := bl.Sub(n), br.Sub(n), tr.Sub(n), tl.Sub(n)
+	backUV := [4][2]float32{{icon.U0, icon.V0}, {icon.U1, icon.V0}, {icon.U1, icon.V1}, {icon.U0, icon.V1}}
+	addIconQuad(m, btl, btr, bbr, bbl, backUV, 0.92)
+
 	for _, s := range sides {
 		fa := center.Add(right.Mul(s.AX * w)).Add(up.Mul(s.AY * h)).Add(n)
 		fb := center.Add(right.Mul(s.BX * w)).Add(up.Mul(s.BY * h)).Add(n)

@@ -74,7 +74,7 @@ func TestIconCardGeometry(t *testing.T) {
 	var m world.MeshData
 	icon := ui.Glyph{U0: 0.1, V0: 0.2, U1: 0.3, V1: 0.4}
 	appendIconCard(&m, mathx.Vec3{X: 0.5, Y: 64, Z: 0.5}, mathx.V3(1, 0, 0), mathx.V3(0, 1, 0), mathx.V3(0, 0, 1), 0.3, 0.3, 0.012, icon, []ui.IconSide{{AX: -0.5, AY: -0.5, BX: -0.5, BY: 0.5, U: 0.2, V: 0.3}})
-	if len(m.Vertices) != 8 || len(m.Indices) != 12 {
+	if len(m.Vertices) != 12 || len(m.Indices) != 18 {
 		t.Fatalf("icon card vertices=%d indices=%d", len(m.Vertices), len(m.Indices))
 	}
 	if m.Vertices[0].U != icon.U0 || m.Vertices[0].V != icon.V1 {

@@ -112,10 +112,9 @@ func (g *Game) appendPlayerHeldIconCard(dst *world.MeshData, swing float32) {
 		return
 	}
 	center := mathx.V3(0.55, 0.65, -0.20)
-	// Local-space composition requested by the player:
-	// 1. yaw 90 degrees back to the front-facing card,
-	// 2. pitch 90 degrees forward around the horizontal X axis.
-	// The resulting card lies horizontally with its front facing up.
+	// Requested local-space composition:
+	// 1. yaw 90 degrees around vertical Y back to the front-facing card,
+	// 2. pitch 90 degrees forward around horizontal X, making it horizontal.
 	right := mathx.V3(1, 0, 0)
 	up := mathx.V3(0, 0, -1)
 	normal := right.Cross(up)
@@ -166,7 +165,7 @@ func (g *Game) appendFirstPersonHeld(opaque, icons, transparent *world.MeshData)
 	local = rotateX(local.Sub(pivot), -swing).Add(pivot)
 	target = rotateY(local, p.Yaw).Add(pos)
 
-	appendHeldAt := func(dst *world.MeshData, src world.MeshData) {
+	appendHeldAt := func(dst *world.MeshData, src world.MeshData, flip bool) {
 		if len(src.Vertices) == 0 {
 			return
 		}
@@ -183,10 +182,16 @@ func (g *Game) appendFirstPersonHeld(opaque, icons, transparent *world.MeshData)
 			v.Z += delta.Z
 			dst.Vertices = append(dst.Vertices, v)
 		}
-		for _, idx := range src.Indices {
-			dst.Indices = append(dst.Indices, base+idx)
+		for i := 0; i < len(src.Indices); i += 3 {
+			a, b, cidx := base+src.Indices[i], base+src.Indices[i+1], base+src.Indices[i+2]
+			if flip {
+				// The first-person view model uses a mirrored camera basis.
+				// Reverse its triangle winding when reusing it in world space.
+				b, cidx = cidx, b
+			}
+			dst.Indices = append(dst.Indices, a, b, cidx)
 		}
 	}
-	appendHeldAt(opaque, held)
-	appendHeldAt(transparent, heldTrans)
+	appendHeldAt(opaque, held, true)
+	appendHeldAt(transparent, heldTrans, false)
 }

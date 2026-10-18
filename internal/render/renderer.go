@@ -252,7 +252,7 @@ func (r *Renderer) createResources() error {
 	}
 	// Icon cards are single quads with silhouette sides. They are visible from
 	// both faces, so render them without culling.
-	r.blockIcon, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, false, true, true, sdl.GPU_CULLMODE_NONE)
+	r.blockIcon, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, false, true, true, sdl.GPU_CULLMODE_BACK)
 	if err != nil {
 		r.Dev.ReleaseShader(blockVS)
 		r.Dev.ReleaseShader(blockFS)
