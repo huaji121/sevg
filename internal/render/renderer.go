@@ -5,6 +5,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"unsafe"
 
@@ -687,6 +688,7 @@ func (r *Renderer) Render(f *Frame) error {
 	aspect := w / h
 	f.Camera.Aspect = aspect
 	viewProj := f.Camera.ViewProj()
+	frustum := newFrustum(viewProj)
 
 	wu := worldUBO{
 		ViewProj:  viewProj,
@@ -717,7 +719,7 @@ func (r *Renderer) Render(f *Frame) error {
 	cb.PushFragmentUniformData(0, bytesOf(&wu))
 	rp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}})
 	for _, gc := range r.chunks {
-		if !r.chunkVisible(gc, f.Camera, f.World.FogEnd) {
+		if !r.chunkVisible(gc, f.Camera, f.World.FogEnd, &frustum) {
 			continue
 		}
 		if gc.opaque.count == 0 {
@@ -746,7 +748,7 @@ func (r *Renderer) Render(f *Frame) error {
 	rp.BindFragmentSamplers([]sdl.GPUTextureSamplerBinding{{Texture: r.atlasTex, Sampler: r.sampler}})
 	trans := make([]*gpuChunk, 0, len(r.chunks))
 	for _, gc := range r.chunks {
-		if gc.transparent.count > 0 && r.chunkVisible(gc, f.Camera, f.World.FogEnd) {
+		if gc.transparent.count > 0 && r.chunkVisible(gc, f.Camera, f.World.FogEnd, &frustum) {
 			trans = append(trans, gc)
 		}
 	}
@@ -1122,11 +1124,68 @@ func (r *Renderer) drawMesh(rp *sdl.GPURenderPass, m *gpuMesh) {
 	rp.DrawIndexedPrimitives(m.count, 1, 0, 0, 0)
 }
 
-func (r *Renderer) chunkVisible(gc *gpuChunk, cam Camera, fogEnd float32) bool {
+type frustum struct {
+	planes [6][4]float32
+}
+
+// newFrustum extracts the six clip planes from a column-major view-projection
+// matrix using the Vulkan/SDL_GPU clip convention (z in [0, w]).
+func newFrustum(m mathx.Mat4) frustum {
+	row := func(r int) [4]float32 {
+		return [4]float32{m[r], m[4+r], m[8+r], m[12+r]}
+	}
+	r0, r1, r2, r3 := row(0), row(1), row(2), row(3)
+	add := func(a, b [4]float32) [4]float32 {
+		return [4]float32{a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3]}
+	}
+	sub := func(a, b [4]float32) [4]float32 {
+		return [4]float32{a[0] - b[0], a[1] - b[1], a[2] - b[2], a[3] - b[3]}
+	}
+	var f frustum
+	f.planes[0] = add(r3, r0) // left
+	f.planes[1] = sub(r3, r0) // right
+	f.planes[2] = add(r3, r1) // bottom
+	f.planes[3] = sub(r3, r1) // top
+	f.planes[4] = r2          // near
+	f.planes[5] = sub(r3, r2) // far
+	for i, p := range f.planes {
+		l := float32(math.Sqrt(float64(p[0]*p[0] + p[1]*p[1] + p[2]*p[2])))
+		if l > 0 {
+			f.planes[i] = [4]float32{p[0] / l, p[1] / l, p[2] / l, p[3] / l}
+		}
+	}
+	return f
+}
+
+func (f *frustum) containsAABB(min, max mathx.Vec3) bool {
+	for _, p := range f.planes {
+		x, y, z := min.X, min.Y, min.Z
+		if p[0] >= 0 {
+			x = max.X
+		}
+		if p[1] >= 0 {
+			y = max.Y
+		}
+		if p[2] >= 0 {
+			z = max.Z
+		}
+		if p[0]*x+p[1]*y+p[2]*z+p[3] < 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func (r *Renderer) chunkVisible(gc *gpuChunk, cam Camera, fogEnd float32, f *frustum) bool {
 	dx := float32(gc.pos.X*ChunkSize) + ChunkSize/2 - cam.Pos.X
 	dz := float32(gc.pos.Z*ChunkSize) + ChunkSize/2 - cam.Pos.Z
 	dy := 64 - cam.Pos.Y
-	return dx*dx+dy*dy+dz*dz < (fogEnd+40)*(fogEnd+40)
+	if dx*dx+dy*dy+dz*dz >= (fogEnd+40)*(fogEnd+40) {
+		return false
+	}
+	min := mathx.V3(float32(gc.pos.X*ChunkSize), 0, float32(gc.pos.Z*ChunkSize))
+	max := mathx.V3(min.X+ChunkSize, world.ChunkHeight, min.Z+ChunkSize)
+	return f.containsAABB(min, max)
 }
 
 func chunkDistSq(gc *gpuChunk, p mathx.Vec3) float32 {
