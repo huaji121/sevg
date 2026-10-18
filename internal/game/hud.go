@@ -577,7 +577,7 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 	g.appendFallingBlocks(&opaque)
 	g.appendParticleMeshes(&opaque, &transparent)
 	g.appendBreakOverlay(&transparent)
-	if g.thirdPerson && g.player != nil {
+	if g.camera != cameraFirst && g.player != nil {
 		g.appendPlayerModel(&opaque)
 	}
 	if g.player != nil && g.targetValid {
@@ -592,7 +592,7 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 // buildHeldMesh creates a small first-person view model for the selected
 // item. It is built in camera space and drawn with depth testing disabled.
 func (g *Game) buildHeldMesh() world.MeshData {
-	if g.thirdPerson || g.state != StatePlaying || g.player == nil {
+	if g.camera != cameraFirst || g.state != StatePlaying || g.player == nil {
 		return world.MeshData{}
 	}
 	st := g.inv.SelectedStack()
@@ -649,7 +649,7 @@ func (g *Game) buildHeldMesh() world.MeshData {
 // materials. It is drawn with the UI atlas so its artwork exactly matches
 // the inventory icon.
 func (g *Game) buildHeldIconMesh() world.MeshData {
-	if g.thirdPerson || g.state != StatePlaying || g.player == nil || g.canv == nil {
+	if g.camera != cameraFirst || g.state != StatePlaying || g.player == nil || g.canv == nil {
 		return world.MeshData{}
 	}
 	st := g.inv.SelectedStack()
@@ -687,7 +687,7 @@ func (g *Game) buildHeldIconMesh() world.MeshData {
 // It is drawn after opaque held items with depth writes disabled so adjacent
 // edges do not occlude each other.
 func (g *Game) buildHeldTransparentMesh() world.MeshData {
-	if g.thirdPerson || g.state != StatePlaying || g.player == nil {
+	if g.camera != cameraFirst || g.state != StatePlaying || g.player == nil {
 		return world.MeshData{}
 	}
 	st := g.inv.SelectedStack()

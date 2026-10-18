@@ -36,6 +36,14 @@ type Options struct {
 	VSync          bool
 }
 
+type cameraMode int
+
+const (
+	cameraFirst cameraMode = iota
+	cameraThird
+	cameraSecond
+)
+
 type State int
 
 const (
@@ -111,12 +119,12 @@ type Game struct {
 	chatScroll        int
 	chatMessages      []chatMessage
 
-	toasts      []toastEntry
-	heldLightT  float32
-	helpTime    float32
-	debug       bool
-	fullscreen  bool
-	thirdPerson bool
+	toasts     []toastEntry
+	heldLightT float32
+	helpTime   float32
+	debug      bool
+	fullscreen bool
+	camera     cameraMode
 
 	fps        float64
 	frameMs    float64
@@ -453,7 +461,15 @@ func (g *Game) onKey(k sdl.Keycode) {
 		case sdl.K_E:
 			g.openInventory()
 		case sdl.K_F5:
-			g.thirdPerson = !g.thirdPerson
+			g.camera = (g.camera + 1) % 3
+			switch g.camera {
+			case cameraThird:
+				g.notify(i18n.T("camera.third"), 1.2)
+			case cameraSecond:
+				g.notify(i18n.T("camera.second"), 1.2)
+			default:
+				g.notify(i18n.T("camera.first"), 1.2)
+			}
 		case sdl.K_SPACE:
 			if g.mode == ModeCreative {
 				if g.spaceTapTimer > 0 {
@@ -649,11 +665,16 @@ func (g *Game) renderFrame() {
 	dir := g.player.LookDir()
 	eye := g.player.Eye()
 	camPos := eye
-	if g.thirdPerson {
+	switch g.camera {
+	case cameraThird:
 		// Pull the camera behind the player and aim at the torso/head.
 		target := eye.Add(dir.Mul(1.2))
 		camPos = eye.Sub(dir.Mul(3.6)).Add(mathx.Vec3{Y: 0.45})
 		dir = target.Sub(camPos).Normalize()
+	case cameraSecond:
+		// Place the camera in front of the player and look back at the face.
+		camPos = eye.Add(dir.Mul(3.6)).Add(mathx.Vec3{Y: 0.35})
+		dir = eye.Sub(camPos).Normalize()
 	}
 	cam := render.Camera{
 		Pos: camPos, Dir: dir, Up: mathx.V3(0, 1, 0),

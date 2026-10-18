@@ -228,19 +228,22 @@ func (r *Renderer) createResources() error {
 		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT, Location: 4, Offset: 28},
 	}
 	blockLayout.VertexBufferDescriptions[0].Pitch = blockVertexSize
-	r.blockOpaque, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, false, true, true)
+	r.blockOpaque, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, false, true, true, sdl.GPU_CULLMODE_BACK)
 	if err != nil {
 		r.Dev.ReleaseShader(blockVS)
 		r.Dev.ReleaseShader(blockFS)
 		return err
 	}
-	r.blockTrans, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, true, false, true)
+	r.blockTrans, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, true, false, true, sdl.GPU_CULLMODE_NONE)
 	if err != nil {
 		r.Dev.ReleaseShader(blockVS)
 		r.Dev.ReleaseShader(blockFS)
 		return err
 	}
-	r.blockView, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, true, true, true)
+	// Held view models are built in a mirrored camera basis (right/up/forward
+	// has a negative determinant), so their winding is reversed compared to
+	// world geometry. Cull front faces to keep the outward-facing surfaces.
+	r.blockView, err = r.makePipeline(blockVS, blockFS, blockLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, true, true, true, true, sdl.GPU_CULLMODE_FRONT)
 	if err != nil {
 		r.Dev.ReleaseShader(blockVS)
 		r.Dev.ReleaseShader(blockFS)
@@ -265,7 +268,7 @@ func (r *Renderer) createResources() error {
 		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT2, Location: 1, Offset: 8},
 		{BufferSlot: 0, Format: sdl.GPU_VERTEXELEMENTFORMAT_FLOAT4, Location: 2, Offset: 16},
 	}
-	r.uiPipeline, err = r.makePipeline(uiVS, uiFS, uiLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, false, true, false, false)
+	r.uiPipeline, err = r.makePipeline(uiVS, uiFS, uiLayout, sdl.GPU_PRIMITIVETYPE_TRIANGLELIST, false, true, false, false, sdl.GPU_CULLMODE_NONE)
 	r.Dev.ReleaseShader(uiVS)
 	r.Dev.ReleaseShader(uiFS)
 	if err != nil {
@@ -348,7 +351,7 @@ func vertexLayout(formatA, formatB sdl.GPUVertexElementFormat) sdl.GPUVertexInpu
 	}
 }
 
-func (r *Renderer) makePipeline(vs, fs *sdl.GPUShader, layout sdl.GPUVertexInputState, prim sdl.GPUPrimitiveType, depthTarget, blend, depthWrite, depthTest bool) (*sdl.GPUGraphicsPipeline, error) {
+func (r *Renderer) makePipeline(vs, fs *sdl.GPUShader, layout sdl.GPUVertexInputState, prim sdl.GPUPrimitiveType, depthTarget, blend, depthWrite, depthTest bool, cull sdl.GPUCullMode) (*sdl.GPUGraphicsPipeline, error) {
 	blendState := sdl.GPUColorTargetBlendState{}
 	if blend {
 		blendState = sdl.GPUColorTargetBlendState{
@@ -373,7 +376,7 @@ func (r *Renderer) makePipeline(vs, fs *sdl.GPUShader, layout sdl.GPUVertexInput
 		},
 		RasterizerState: sdl.GPURasterizerState{
 			FillMode:        sdl.GPU_FILLMODE_FILL,
-			CullMode:        sdl.GPU_CULLMODE_NONE,
+			CullMode:        cull,
 			FrontFace:       sdl.GPU_FRONTFACE_COUNTER_CLOCKWISE,
 			EnableDepthClip: true,
 		},
