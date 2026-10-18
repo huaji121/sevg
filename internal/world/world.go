@@ -886,6 +886,67 @@ func (w *World) rebuildBlockLightLocked() {
 	}
 }
 
+// SmoothLightAt samples the light volume at a continuous world position and
+// trilinearly interpolates between the eight surrounding cells. Entities use
+// this instead of a single-cell lookup so lighting changes smoothly as they
+// move across block boundaries.
+func (w *World) SmoothLightAt(x, y, z float32) (float32, float32) {
+	if w == nil {
+		return 1, 0
+	}
+	// Interpolate between light-cell centres, not block boundaries, so a
+	// point at the middle of a covered block does not bleed in light from an
+	// uncovered neighbouring column.
+	x0 := int(math.Floor(float64(x - 0.5)))
+	y0 := int(math.Floor(float64(y - 0.5)))
+	z0 := int(math.Floor(float64(z - 0.5)))
+	fx := x - 0.5 - float32(x0)
+	fy := y - 0.5 - float32(y0)
+	fz := z - 0.5 - float32(z0)
+
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	sample := func(bx, by, bz int) (float32, float32) {
+		if by < 0 || by >= ChunkHeight {
+			return 0, 0
+		}
+		c := w.chunks[ChunkOf(bx, bz).Key()]
+		if c == nil {
+			return 15, 0
+		}
+		i := index(Mod(bx, ChunkSize), by, Mod(bz, ChunkSize))
+		bl := c.BlockLight[i]
+		if c.DynLight[i] > bl {
+			bl = c.DynLight[i]
+		}
+		return float32(c.SkyLight[i]), float32(bl)
+	}
+	var sky, block float32
+	for ix := 0; ix < 2; ix++ {
+		wx := 1 - fx
+		if ix == 1 {
+			wx = fx
+		}
+		for iy := 0; iy < 2; iy++ {
+			wy := 1 - fy
+			if iy == 1 {
+				wy = fy
+			}
+			for iz := 0; iz < 2; iz++ {
+				wz := 1 - fz
+				if iz == 1 {
+					wz = fz
+				}
+				s, b := sample(x0+ix, y0+iy, z0+iz)
+				wgt := wx * wy * wz
+				sky += s * wgt
+				block += b * wgt
+			}
+		}
+	}
+	return sky / 15, block / 15
+}
+
 func (w *World) SkyLightAt(wx, wy, wz int) uint8 {
 	if wy < 0 || wy >= ChunkHeight {
 		return 0

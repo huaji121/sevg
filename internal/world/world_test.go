@@ -472,3 +472,18 @@ func TestCactusStackBreaksWhenBaseRemoved(t *testing.T) {
 		t.Fatalf("upper cactus remains: %v", b)
 	}
 }
+func TestSmoothLightAtInterpolatesCellCentres(t *testing.T) {
+	w := New(88)
+	c, _ := w.EnsureChunk(ChunkPos{0, 0})
+	c.SkyLight[index(0, 64, 0)] = 0
+	c.SkyLight[index(1, 64, 0)] = 15
+	if v, _ := w.SmoothLightAt(0.5, 64.5, 0.5); v != 0 {
+		t.Fatalf("light at first centre = %f", v)
+	}
+	if v, _ := w.SmoothLightAt(1.5, 64.5, 0.5); v != 1 {
+		t.Fatalf("light at second centre = %f", v)
+	}
+	if v, _ := w.SmoothLightAt(1.0, 64.5, 0.5); v < 0.49 || v > 0.51 {
+		t.Fatalf("midpoint light = %f", v)
+	}
+}

@@ -115,7 +115,11 @@ func TestPlantMeshDoubleSided(t *testing.T) {
 }
 func TestDroppedItemUsesWorldSkyLight(t *testing.T) {
 	g := newTestGame(t)
-	g.world.SetBlock(8, 120, 8, core.Stone)
+	for x := 4; x <= 12; x++ {
+		for z := 4; z <= 12; z++ {
+			g.world.SetBlock(x, 120, z, core.Stone)
+		}
+	}
 	g.mobs.Drop(core.ItemPlanks, 1, mathx.Vec3{X: 8.5, Y: 100, Z: 8.5}, mathx.Vec3{})
 	opaque, _, _ := g.buildEntityMeshes()
 	if len(opaque.Vertices) == 0 {
@@ -147,7 +151,11 @@ func TestFirstPersonHeldUsesWorldLight(t *testing.T) {
 	g.player.Body.Pos = mathx.Vec3{X: 8.5, Y: 100, Z: 8.5}
 	g.inv.Selected = 0
 	g.inv.Slots[0] = core.Stack{Item: core.ItemPlanks, Count: 1}
-	g.world.SetBlock(8, 120, 8, core.Stone)
+	for x := 4; x <= 12; x++ {
+		for z := 4; z <= 12; z++ {
+			g.world.SetBlock(x, 120, z, core.Stone)
+		}
+	}
 	held := g.buildHeldMesh()
 	if len(held.Vertices) == 0 {
 		t.Fatal("held mesh is empty")

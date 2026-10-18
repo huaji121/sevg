@@ -526,14 +526,19 @@ func worldChunkZ(z float32) int { return int(math.Floor(float64(z))) / 16 }
 
 // Entity and block-highlight geometry, rendered through the block atlas
 // pipeline so it shares fog, depth and lighting with terrain.
-func (g *Game) lightAt(p mathx.Vec3) (float32, float32) {
-	if g.world == nil {
-		return 1, 0
+func (g *Game) applySmoothLightRange(m *world.MeshData, start int) {
+	if g.world == nil || len(m.Vertices) == 0 {
+		return
 	}
-	x := int(math.Floor(float64(p.X)))
-	y := int(math.Floor(float64(p.Y)))
-	z := int(math.Floor(float64(p.Z)))
-	return float32(g.world.SkyLightAt(x, y, z)) / 15, float32(g.world.BlockLightAt(x, y, z)) / 15
+	if start < 0 {
+		start = 0
+	}
+	for i := start; i < len(m.Vertices); i++ {
+		v := &m.Vertices[i]
+		sky, block := g.world.SmoothLightAt(v.X, v.Y, v.Z)
+		v.Sky = sky
+		v.Block = block
+	}
 }
 
 func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshData) {
@@ -545,14 +550,13 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 			}
 			flash := clampF(mob.HitFlash/0.25, 0, 1)
 			for _, box := range mob.Boxes() {
-				sky, block := g.lightAt(box.Center)
 				col := box.Color
 				if flash > 0 {
 					col[0] = col[0] + (1-col[0])*flash*0.7
 					col[1] = col[1] * (1 - flash*0.3)
 					col[2] = col[2] * (1 - flash*0.3)
 				}
-				appendEntityBoxLit(&opaque, box.Center.Sub(box.Size.Mul(0.5)), box.Center.Add(box.Size.Mul(0.5)), col, sky, block)
+				appendEntityBox(&opaque, box.Center.Sub(box.Size.Mul(0.5)), box.Center.Add(box.Size.Mul(0.5)), col)
 			}
 		}
 		for _, d := range g.mobs.Items {
@@ -563,15 +567,14 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 			c := d.Body.Pos.Add(mathx.Vec3{Y: 0.18})
 			c.Y += bob
 			def := d.Item.Def()
-			sky, block := g.lightAt(c)
 			switch d.Visual() {
 			case entity.DropVisualBlock:
 				half := def.Block
-				appendBlockBoxLit(&opaque, c.Sub(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), c.Add(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), half, sky, block)
+				appendBlockBox(&opaque, c.Sub(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), c.Add(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), half)
 			case entity.DropVisualGlass:
-				appendBlockBoxLit(&transparent, c.Sub(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), c.Add(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), def.Block, sky, block)
+				appendBlockBox(&transparent, c.Sub(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), c.Add(mathx.Vec3{X: 0.14, Y: 0.14, Z: 0.14}), def.Block)
 			case entity.DropVisualPlant:
-				appendPlantLit(&opaque, c, 0.34, 0.42, def.Block, sky, block)
+				appendPlant(&opaque, c, 0.34, 0.42, def.Block)
 			default:
 				if g.canv != nil {
 					if gph, ok := g.canv.Icons[d.Item]; ok {
@@ -579,13 +582,18 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 						right := mathx.Vec3{X: float32(math.Cos(float64(yaw))), Z: float32(math.Sin(float64(yaw)))}
 						up := mathx.V3(0, 1, 0)
 						normal := right.Cross(up)
-						appendIconCardLit(&icons, c, right, up, normal, 0.32, 0.32, 0.012, gph, g.canv.IconSides[d.Item], sky, block)
+						appendIconCard(&icons, c, right, up, normal, 0.32, 0.32, 0.012, gph, g.canv.IconSides[d.Item])
 					}
 				}
 			}
 		}
 	}
+	g.applySmoothLightRange(&opaque, 0)
+	g.applySmoothLightRange(&transparent, 0)
+	g.applySmoothLightRange(&icons, 0)
+	fallBase := len(opaque.Vertices)
 	g.appendFallingBlocks(&opaque)
+	g.applySmoothLightRange(&opaque, fallBase)
 	g.appendParticleMeshes(&opaque, &transparent)
 	g.appendBreakOverlay(&transparent)
 	if g.camera != cameraFirst && g.player != nil {
@@ -604,10 +612,11 @@ func (g *Game) applyHeldLight(m *world.MeshData) {
 	if g.player == nil || g.world == nil || len(m.Vertices) == 0 {
 		return
 	}
-	sky, block := g.lightAt(g.player.Eye())
 	for i := range m.Vertices {
-		m.Vertices[i].Sky = sky
-		m.Vertices[i].Block = block
+		v := &m.Vertices[i]
+		sky, block := g.world.SmoothLightAt(v.X, v.Y, v.Z)
+		v.Sky = sky
+		v.Block = block
 	}
 }
 
