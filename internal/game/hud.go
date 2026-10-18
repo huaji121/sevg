@@ -577,6 +577,9 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 	g.appendFallingBlocks(&opaque)
 	g.appendParticleMeshes(&opaque, &transparent)
 	g.appendBreakOverlay(&transparent)
+	if g.thirdPerson && g.player != nil {
+		g.appendPlayerModel(&opaque)
+	}
 	if g.player != nil && g.targetValid {
 		x, y, z := g.targetPos[0], g.targetPos[1], g.targetPos[2]
 		min := mathx.V3(float32(x)-0.003, float32(y)-0.003, float32(z)-0.003)
@@ -589,7 +592,7 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 // buildHeldMesh creates a small first-person view model for the selected
 // item. It is built in camera space and drawn with depth testing disabled.
 func (g *Game) buildHeldMesh() world.MeshData {
-	if g.state != StatePlaying || g.player == nil {
+	if g.thirdPerson || g.state != StatePlaying || g.player == nil {
 		return world.MeshData{}
 	}
 	st := g.inv.SelectedStack()
@@ -646,7 +649,7 @@ func (g *Game) buildHeldMesh() world.MeshData {
 // materials. It is drawn with the UI atlas so its artwork exactly matches
 // the inventory icon.
 func (g *Game) buildHeldIconMesh() world.MeshData {
-	if g.state != StatePlaying || g.player == nil || g.canv == nil {
+	if g.thirdPerson || g.state != StatePlaying || g.player == nil || g.canv == nil {
 		return world.MeshData{}
 	}
 	st := g.inv.SelectedStack()
@@ -684,7 +687,7 @@ func (g *Game) buildHeldIconMesh() world.MeshData {
 // It is drawn after opaque held items with depth writes disabled so adjacent
 // edges do not occlude each other.
 func (g *Game) buildHeldTransparentMesh() world.MeshData {
-	if g.state != StatePlaying || g.player == nil {
+	if g.thirdPerson || g.state != StatePlaying || g.player == nil {
 		return world.MeshData{}
 	}
 	st := g.inv.SelectedStack()
@@ -803,6 +806,10 @@ var entityPalette = []entityPaletteEntry{
 	{core.TileBrown, [3]float32{0.44, 0.31, 0.18}},
 	{core.TilePink, [3]float32{0.91, 0.29, 0.42}},
 	{core.TileGreen, [3]float32{0.25, 0.55, 0.24}},
+	{core.TilePlayerSkin, [3]float32{0.76, 0.55, 0.36}},
+	{core.TilePlayerShirt, [3]float32{0.18, 0.63, 0.61}},
+	{core.TilePlayerPants, [3]float32{0.20, 0.28, 0.59}},
+	{core.TilePlayerHair, [3]float32{0.18, 0.12, 0.08}},
 }
 
 func tileForColor(c [4]float32) uint8 {

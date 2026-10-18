@@ -20,7 +20,7 @@ var blockTextureFiles = [core.TileTileCount]string{
 	"crack_0", "crack_1", "crack_2", "crack_3", "crack_4",
 	"crack_5", "crack_6", "crack_7", "crack_8", "crack_9",
 	"white", "pig_skin", "dark", "red", "gold", "gray", "black", "brown",
-	"pink", "green",
+	"pink", "green", "player_skin", "player_shirt", "player_pants", "player_hair",
 }
 
 // BuildAtlas assembles the embedded tile textures into the runtime atlas and

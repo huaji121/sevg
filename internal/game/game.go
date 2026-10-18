@@ -111,11 +111,12 @@ type Game struct {
 	chatScroll        int
 	chatMessages      []chatMessage
 
-	toasts     []toastEntry
-	heldLightT float32
-	helpTime   float32
-	debug      bool
-	fullscreen bool
+	toasts      []toastEntry
+	heldLightT  float32
+	helpTime    float32
+	debug       bool
+	fullscreen  bool
+	thirdPerson bool
 
 	fps        float64
 	frameMs    float64
@@ -451,6 +452,8 @@ func (g *Game) onKey(k sdl.Keycode) {
 			g.setState(StatePaused)
 		case sdl.K_E:
 			g.openInventory()
+		case sdl.K_F5:
+			g.thirdPerson = !g.thirdPerson
 		case sdl.K_SPACE:
 			if g.mode == ModeCreative {
 				if g.spaceTapTimer > 0 {
@@ -470,7 +473,7 @@ func (g *Game) onKey(k sdl.Keycode) {
 			} else {
 				g.helpTime = 10
 			}
-		case sdl.K_F5:
+		case sdl.K_F9:
 			if err := g.saveGame(); err != nil {
 				g.notify(i18n.T("toast.save_failed", err.Error()), 3)
 			} else {
@@ -644,13 +647,20 @@ func (g *Game) renderFrame() {
 		return
 	}
 	dir := g.player.LookDir()
+	eye := g.player.Eye()
+	camPos := eye
+	if g.thirdPerson {
+		// Pull the camera behind the player and aim at the torso/head.
+		target := eye.Add(dir.Mul(1.2))
+		camPos = eye.Sub(dir.Mul(3.6)).Add(mathx.Vec3{Y: 0.45})
+		dir = target.Sub(camPos).Normalize()
+	}
 	cam := render.Camera{
-		Pos: g.player.Eye(), Dir: dir, Up: mathx.V3(0, 1, 0),
+		Pos: camPos, Dir: dir, Up: mathx.V3(0, 1, 0),
 		Fov: mathx.Radians(float32(g.opts.FOV)), Near: 0.06, Far: 500,
 		Aspect: float32(g.gfx.W) / float32(g.gfx.H),
 	}
 	sky := g.sky()
-	eye := g.player.Eye()
 	eyeBlock := g.world.GetBlock(int(math.Floor(float64(eye.X))), int(math.Floor(float64(eye.Y))), int(math.Floor(float64(eye.Z))))
 	if eyeBlock == core.Water {
 		sky.FogColor = [3]float32{0.04, 0.20, 0.33}

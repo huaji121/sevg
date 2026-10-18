@@ -142,7 +142,7 @@
   "menu.ctrl_inv": "E ........... 背包        F3 ...... 调试",
   "menu.ctrl_mine": "左键 ........ 挖掘/攻击   右键 .... 放置",
   "menu.ctrl_move": "WASD ........ 移动        SPACE ... 跳跃",
-  "menu.ctrl_pause": "ESC ......... 暂停        F5 ...... 保存",
+  "menu.ctrl_pause": "ESC ......... 暂停        F5 ...... 视角        F9 ...... 保存",
   "menu.ctrl_pick": "中键 ........ 选取方块    1-9 ..... 快捷栏",
   "menu.ctrl_sprint": "SHIFT 疾跑    SPACE x2 飞行",
   "menu.enter_hint": "ENTER：新世界    ESC：退出    L：切换语言",

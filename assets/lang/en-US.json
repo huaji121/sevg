@@ -142,7 +142,7 @@
   "menu.ctrl_inv": "E ........... INVENTORY   F3 ...... DEBUG",
   "menu.ctrl_mine": "LMB ......... MINE/ATTACK RMB ..... PLACE",
   "menu.ctrl_move": "WASD ........ MOVE        SPACE ... JUMP",
-  "menu.ctrl_pause": "ESC ......... PAUSE       F5 ...... SAVE",
+  "menu.ctrl_pause": "ESC ......... PAUSE       F5 ...... VIEW        F9 ...... SAVE",
   "menu.ctrl_pick": "MMB ......... PICK BLOCK  1-9 ..... HOTBAR",
   "menu.ctrl_sprint": "SHIFT SPRINT    SPACE x2 FLY",
   "menu.enter_hint": "ENTER: NEW WORLD    ESC: QUIT    L: LANGUAGE",

@@ -32,6 +32,7 @@ type Player struct {
 	hurtCooldown float32
 	stepTimer    float32
 	Bob          float32
+	WalkPhase    float32
 }
 
 func New(spawn mathx.Vec3) *Player {
@@ -189,7 +190,8 @@ func (p *Player) Update(dt float32, w *world.World, in Input) {
 	// Head bob while walking on the ground.
 	hs := float32(math.Sqrt(float64(p.Body.Vel.X*p.Body.Vel.X + p.Body.Vel.Z*p.Body.Vel.Z)))
 	if grounded && hs > 0.5 && !p.Flying {
-		p.stepTimer += dt * hs * 1.7
+		p.WalkPhase += dt * hs * 1.7
+		p.stepTimer = p.WalkPhase
 		p.Bob = float32(math.Sin(float64(p.stepTimer*2))) * 0.035
 	} else {
 		p.Bob *= 0.85

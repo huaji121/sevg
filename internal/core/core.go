@@ -87,6 +87,10 @@ const (
 	TileBrown
 	TilePink
 	TileGreen
+	TilePlayerSkin
+	TilePlayerShirt
+	TilePlayerPants
+	TilePlayerHair
 	TileTileCount
 )
 
