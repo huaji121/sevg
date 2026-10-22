@@ -550,16 +550,7 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 			if mob.Dead {
 				continue
 			}
-			flash := clampF(mob.HitFlash/0.25, 0, 1)
-			for _, box := range mob.Boxes() {
-				col := box.Color
-				if flash > 0 {
-					col[0] = col[0] + (1-col[0])*flash*0.7
-					col[1] = col[1] * (1 - flash*0.3)
-					col[2] = col[2] * (1 - flash*0.3)
-				}
-				appendEntityBox(&opaque, box.Center.Sub(box.Size.Mul(0.5)), box.Center.Add(box.Size.Mul(0.5)), col)
-			}
+			appendMobModel(&opaque, mob)
 		}
 		for _, d := range g.mobs.Items {
 			if d.Dead {
@@ -896,7 +887,6 @@ type entityPaletteEntry struct {
 
 var entityPalette = []entityPaletteEntry{
 	{core.TileWhite, [3]float32{0.93, 0.93, 0.90}},
-	{core.TilePig, [3]float32{0.94, 0.52, 0.56}},
 	{core.TileDark, [3]float32{0.18, 0.14, 0.13}},
 	{core.TileRed, [3]float32{0.80, 0.19, 0.19}},
 	{core.TileGold, [3]float32{1.00, 0.86, 0.36}},

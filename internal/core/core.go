@@ -92,6 +92,8 @@ const (
 	TileSun
 	TileMoon
 	TileChest
+	TileSheepSkin
+	TileSheepWool
 	TileTileCount
 )
 

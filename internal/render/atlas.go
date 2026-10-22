@@ -29,7 +29,7 @@ var blockTextureFiles = [core.TileTileCount]string{
 	"effects/crack_5", "effects/crack_6", "effects/crack_7", "effects/crack_8", "effects/crack_9",
 	"palette/white", "entities/pig_skin", "palette/dark", "palette/red", "palette/gold", "palette/gray",
 	"palette/black", "palette/brown", "palette/pink", "palette/green", "entities/player_skin_map",
-	"sky/sun", "sky/moon", "blocks/chest",
+	"sky/sun", "sky/moon", "blocks/chest", "entities/sheep_skin", "entities/sheep_wool",
 }
 
 // BuildAtlas assembles the embedded tile textures into the runtime atlas and

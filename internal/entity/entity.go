@@ -46,6 +46,18 @@ type Mob struct {
 	WanderYaw   float32
 	JumpTimer   float32
 	OnGround    bool
+	// WalkPhase advances with horizontal speed and drives the leg/head
+	// animation, mirroring the player model's gait cycle.
+	WalkPhase float32
+}
+
+// mobBody returns the AABB dimensions for a kind, matching Minecraft hitboxes
+// (pig 0.9x0.9, sheep 0.9x1.3).
+func mobBody(k Kind) (width, height float32) {
+	if k == Sheep {
+		return 0.9, 1.3
+	}
+	return 0.9, 0.9
 }
 
 func (m *Mob) Forward() mathx.Vec3 {
@@ -57,43 +69,6 @@ func (m *Mob) Right() mathx.Vec3 {
 }
 
 func (m *Mob) Bounds() (mathx.Vec3, mathx.Vec3) { return m.Body.Min(), m.Body.Max() }
-
-func (m *Mob) Boxes() []Box {
-	p := m.Body.Pos
-	f, r := m.Forward(), m.Right()
-	dark := [4]float32{0.18, 0.14, 0.13, 1}
-	if m.Kind == Pig {
-		body := [4]float32{0.94, 0.52, 0.56, 1}
-		snout := [4]float32{0.86, 0.38, 0.44, 1}
-		head := p.Add(f.Mul(0.52)).Add(mathx.Vec3{Y: 0.72})
-		boxes := []Box{
-			{Center: p.Add(mathx.Vec3{Y: 0.55}), Size: mathx.Vec3{X: 0.9, Y: 0.55, Z: 0.66}, Color: body},
-			{Center: head, Size: mathx.Vec3{X: 0.5, Y: 0.48, Z: 0.5}, Color: body},
-			{Center: head.Add(f.Mul(0.3)).Add(mathx.Vec3{Y: -0.04}), Size: mathx.Vec3{X: 0.22, Y: 0.18, Z: 0.28}, Color: snout},
-		}
-		for _, sx := range []float32{-1, 1} {
-			for _, sz := range []float32{-1, 1} {
-				c := p.Add(r.Mul(sx * 0.26)).Add(f.Mul(sz * 0.21)).Add(mathx.Vec3{Y: 0.18})
-				boxes = append(boxes, Box{Center: c, Size: mathx.Vec3{X: 0.18, Y: 0.38, Z: 0.18}, Color: dark})
-			}
-		}
-		return boxes
-	}
-	body := [4]float32{0.92, 0.92, 0.88, 1}
-	face := [4]float32{0.78, 0.74, 0.67, 1}
-	head := p.Add(f.Mul(0.52)).Add(mathx.Vec3{Y: 0.74})
-	boxes := []Box{
-		{Center: p.Add(mathx.Vec3{Y: 0.57}), Size: mathx.Vec3{X: 0.92, Y: 0.62, Z: 0.68}, Color: body},
-		{Center: head, Size: mathx.Vec3{X: 0.44, Y: 0.46, Z: 0.44}, Color: face},
-	}
-	for _, sx := range []float32{-1, 1} {
-		for _, sz := range []float32{-1, 1} {
-			c := p.Add(r.Mul(sx * 0.26)).Add(f.Mul(sz * 0.22)).Add(mathx.Vec3{Y: 0.17})
-			boxes = append(boxes, Box{Center: c, Size: mathx.Vec3{X: 0.16, Y: 0.36, Z: 0.16}, Color: [4]float32{0.55, 0.53, 0.5, 1}})
-		}
-	}
-	return boxes
-}
 
 type DropVisual uint8
 
@@ -198,7 +173,8 @@ func (m *Manager) SpawnAt(kind Kind, pos mathx.Vec3) *Mob {
 		WanderYaw: m.rng.Float32() * mathx.Radians(360),
 	}
 	m.nextID++
-	mob.Body = physics.Body{Pos: pos, Width: 0.7, Height: 0.95}
+	w, h := mobBody(kind)
+	mob.Body = physics.Body{Pos: pos, Width: w, Height: h}
 	m.Mobs = append(m.Mobs, mob)
 	return mob
 }
@@ -234,10 +210,11 @@ func (m *Manager) trySpawn(w *world.World, center mathx.Vec3, minR, maxR float32
 			WanderYaw: m.rng.Float32() * mathx.Radians(360),
 		}
 		m.nextID++
+		bw, bh := mobBody(kind)
 		mob.Body = physics.Body{
 			Pos:    mathx.Vec3{X: float32(x) + 0.5, Y: float32(h) + 1.02, Z: float32(z) + 0.5},
-			Width:  0.7,
-			Height: 0.95,
+			Width:  bw,
+			Height: bh,
 		}
 		m.Mobs = append(m.Mobs, mob)
 		_ = minR
@@ -301,6 +278,10 @@ func (m *Manager) Update(dt float32, w *world.World, playerPos mathx.Vec3, inv *
 		}
 		if mob.Body.Pos.Y < -5 {
 			mob.Dead = true
+		}
+		hs := float32(math.Hypot(float64(mob.Body.Vel.X), float64(mob.Body.Vel.Z)))
+		if mob.Body.OnGround && hs > 0.15 {
+			mob.WalkPhase += dt * hs * 2.4
 		}
 	}
 
