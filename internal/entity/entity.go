@@ -324,6 +324,7 @@ func (m *Manager) Update(dt float32, w *world.World, playerPos mathx.Vec3, inv *
 			d.Dead = true
 		}
 	}
+	m.mergeItems()
 
 	// Compact slices and spawn new animals while the herd is small.
 	live := m.Mobs[:0]
@@ -370,13 +371,97 @@ func (m *Manager) DropPlayer(item core.ItemID, count int, pos mathx.Vec3, vel ma
 	m.drop(item, count, pos, vel, 1.25)
 }
 
+// dropMergeRadius is the horizontal distance within which dropped items of the
+// same type combine into a single stack, matching Minecraft's item merging.
+const dropMergeRadius = float32(0.75)
+
+// dropStackLimit is the maximum count a single dropped stack may hold.
+func dropStackLimit(item core.ItemID) int {
+	if !item.Valid() {
+		return core.StackLimit
+	}
+	limit := item.Def().MaxStack
+	if limit <= 0 {
+		limit = core.StackLimit
+	}
+	return limit
+}
+
 func (m *Manager) drop(item core.ItemID, count int, pos mathx.Vec3, vel mathx.Vec3, pickupDelay float32) {
 	if item == core.ItemNone || count <= 0 {
 		return
 	}
+	// Fold into a nearby stack of the same item so mined drops pile up instead
+	// of spawning one entity per item. The merged stack keeps the longest
+	// pickup delay so thrown items still cannot be grabbed immediately.
+	if limit := dropStackLimit(item); limit > 1 {
+		mergeSq := dropMergeRadius * dropMergeRadius
+		for _, d := range m.Items {
+			if d.Dead || d.Item != item || d.Count >= limit {
+				continue
+			}
+			if d.Body.Pos.Sub(pos).LengthSq() > mergeSq {
+				continue
+			}
+			take := count
+			if room := limit - d.Count; take > room {
+				take = room
+			}
+			d.Count += take
+			if d.PickupDelay < pickupDelay {
+				d.PickupDelay = pickupDelay
+			}
+			count -= take
+			if count <= 0 {
+				return
+			}
+		}
+	}
 	d := &ItemDrop{ID: m.nextID, Item: item, Count: count, PickupDelay: pickupDelay, Body: physics.Body{Pos: pos, Vel: vel, Width: 0.25, Height: 0.25}}
 	m.nextID++
 	m.Items = append(m.Items, d)
+}
+
+// mergeItems combines nearby drops of the same type into stacks up to the
+// item's stack limit. Items that drifted apart after spawning still merge once
+// they settle next to each other.
+func (m *Manager) mergeItems() {
+	mergeSq := dropMergeRadius * dropMergeRadius
+	for i := 0; i < len(m.Items); i++ {
+		a := m.Items[i]
+		if a.Dead {
+			continue
+		}
+		limit := dropStackLimit(a.Item)
+		if a.Count >= limit {
+			continue
+		}
+		for j := i + 1; j < len(m.Items); j++ {
+			b := m.Items[j]
+			if b.Dead || b.Item != a.Item {
+				continue
+			}
+			if a.Body.Pos.Sub(b.Body.Pos).LengthSq() > mergeSq {
+				continue
+			}
+			room := limit - a.Count
+			if room <= 0 {
+				break
+			}
+			take := b.Count
+			if take > room {
+				take = room
+			}
+			a.Count += take
+			if a.PickupDelay < b.PickupDelay {
+				a.PickupDelay = b.PickupDelay
+			}
+			b.Count -= take
+			if b.Count <= 0 {
+				b.Dead = true
+			}
+		}
+	}
 }
 
 // PickMob finds the nearest mob along a ray without damaging it.

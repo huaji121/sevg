@@ -110,7 +110,19 @@ func TestCreativeCatalogQDrop(t *testing.T) {
 	}
 	g.shiftDown = true
 	g.onKey(sdl.K_Q)
-	if got := g.mobs.Items[len(g.mobs.Items)-1].Count; got != 64 {
-		t.Fatalf("catalog shift Q count = %d", got)
+	// The full stack drops next to the single plank and the two merge into a
+	// 64-item stack plus a one-item remainder.
+	total, maxStack := 0, 0
+	for _, d := range g.mobs.Items[before:] {
+		if d.Item != core.ItemPlanks {
+			continue
+		}
+		total += d.Count
+		if d.Count > maxStack {
+			maxStack = d.Count
+		}
+	}
+	if total != 65 || maxStack != 64 {
+		t.Fatalf("catalog shift Q stacks: total=%d max=%d", total, maxStack)
 	}
 }

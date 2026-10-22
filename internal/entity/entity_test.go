@@ -89,3 +89,66 @@ func TestPlayerDropPickupDelay(t *testing.T) {
 		t.Fatalf("player drop was not picked up: items=%d inv=%d", m.ItemCount(), inv.Count(core.ItemPlanks))
 	}
 }
+
+func TestDropsStackOnSpawn(t *testing.T) {
+	m := NewManager(1)
+	pos := mathx.Vec3{X: 0.5, Y: 64, Z: 0.5}
+	for i := 0; i < 5; i++ {
+		m.Drop(core.ItemCobble, 1, pos, mathx.Vec3{})
+	}
+	if m.ItemCount() != 1 {
+		t.Fatalf("same-type drops did not stack: %d entities", m.ItemCount())
+	}
+	if m.Items[0].Count != 5 {
+		t.Fatalf("stack count = %d, want 5", m.Items[0].Count)
+	}
+}
+
+func TestDropsRespectStackLimit(t *testing.T) {
+	m := NewManager(1)
+	pos := mathx.Vec3{X: 0.5, Y: 64, Z: 0.5}
+	m.Drop(core.ItemCobble, 40, pos, mathx.Vec3{})
+	m.Drop(core.ItemCobble, 40, pos, mathx.Vec3{})
+	if m.ItemCount() != 2 {
+		t.Fatalf("overflow should create a second stack, got %d", m.ItemCount())
+	}
+	if got := m.Items[0].Count; got != core.StackLimit {
+		t.Fatalf("first stack = %d, want %d", got, core.StackLimit)
+	}
+	if total := m.Items[0].Count + m.Items[1].Count; total != 80 {
+		t.Fatalf("total count = %d, want 80", total)
+	}
+}
+
+func TestUnstackableToolsDoNotMerge(t *testing.T) {
+	m := NewManager(1)
+	pos := mathx.Vec3{X: 0.5, Y: 64, Z: 0.5}
+	m.Drop(core.ItemIronSword, 1, pos, mathx.Vec3{})
+	m.Drop(core.ItemIronSword, 1, pos, mathx.Vec3{})
+	if m.ItemCount() != 2 {
+		t.Fatalf("unstackable tools merged: %d entities", m.ItemCount())
+	}
+}
+
+func TestDropsMergeWhenTheySettleTogether(t *testing.T) {
+	m := NewManager(1)
+	w := world.New(1)
+	w.EnsureChunk(world.ChunkPos{})
+	var inv core.Inventory
+	player := mathx.Vec3{X: 100, Y: 64, Z: 100}
+	m.Drop(core.ItemCobble, 3, mathx.Vec3{X: 0.5, Y: 64, Z: 0.5}, mathx.Vec3{})
+	m.Drop(core.ItemCobble, 4, mathx.Vec3{X: 5.5, Y: 64, Z: 0.5}, mathx.Vec3{})
+	if m.ItemCount() != 2 {
+		t.Fatalf("far-apart drops merged on spawn: %d", m.ItemCount())
+	}
+	// Nudge the second drop next to the first; the per-tick merge should fold
+	// them into one seven-item stack.
+	m.Items[1].Body.Pos = mathx.Vec3{X: 0.7, Y: 64, Z: 0.5}
+	m.Update(0.05, w, player, &inv)
+	if m.ItemCount() != 1 {
+		t.Fatalf("nearby drops did not merge: %d", m.ItemCount())
+	}
+	if m.Items[0].Count != 7 {
+		t.Fatalf("merged count = %d, want 7", m.Items[0].Count)
+	}
+}
