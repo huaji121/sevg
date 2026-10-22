@@ -50,6 +50,9 @@ func TestItemForBlock(t *testing.T) {
 	if ItemForBlock(Wool) != ItemWool {
 		t.Fatal("wool item mismatch")
 	}
+	if ItemForBlock(Leaves) != ItemLeaves {
+		t.Fatal("leaves should have a placeable item form")
+	}
 }
 func TestBlockFaceTiles(t *testing.T) {
 	grass := BlockDefs[Grass]

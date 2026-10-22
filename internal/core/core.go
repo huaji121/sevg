@@ -337,6 +337,9 @@ func init() {
 	// Flowers and tall grass are picked up and placeable.
 	blockItems[Flower] = ItemFlower
 	blockItems[TallGrass] = ItemTallGrass
+	// Leaves have a placeable item form even though breaking them drops
+	// nothing, so middle-click pick block still works on them.
+	blockItems[Leaves] = ItemLeaves
 }
 
 func ItemForBlock(b BlockID) ItemID {

@@ -398,6 +398,20 @@ func (g *Game) pickBlock() {
 			return
 		}
 	}
+	// Creative mode copies the picked block into the hand as a full stack,
+	// like Minecraft's pick block. Any stack already in that slot is stashed
+	// back into the inventory (dropped if there is no room).
+	if g.mode == ModeCreative {
+		old := g.inv.Slots[g.inv.Selected]
+		g.inv.Slots[g.inv.Selected] = core.Stack{}
+		if !old.Empty() {
+			if left := g.inv.Add(old.Item, old.Count); left > 0 && g.mobs != nil {
+				g.mobs.Drop(old.Item, left, g.player.Body.Pos, mathx.Vec3{Y: 3})
+			}
+		}
+		g.inv.Slots[g.inv.Selected] = core.Stack{Item: item, Count: item.MaxStack()}
+		return
+	}
 	g.notify(i18n.T("toast.no_item", i18n.ItemName(item)), 1.3)
 }
 

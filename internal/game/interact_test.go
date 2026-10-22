@@ -196,6 +196,55 @@ func TestPlacePassThroughBlockInsidePlayer(t *testing.T) {
 	}
 }
 
+func TestCreativePickBlockCopiesBlock(t *testing.T) {
+	g := newTestGame(t)
+	g.mode = ModeCreative
+	g.player.Creative = true
+	g.inv = core.Inventory{}
+	g.inv.Selected = 2
+	g.world.SetBlock(8, 101, 8, core.Stone)
+	g.player.Body.Pos = mathx.Vec3{X: 8.5, Y: 100, Z: 10.5}
+	g.player.Yaw = 0
+	g.player.Pitch = 0
+	g.pickBlock()
+	got := g.inv.Slots[2]
+	if got.Item != core.ItemStone || got.Count != core.ItemStone.MaxStack() {
+		t.Fatalf("creative pick block = %+v", got)
+	}
+}
+
+func TestCreativePickBlockWorksOnLeaves(t *testing.T) {
+	g := newTestGame(t)
+	g.mode = ModeCreative
+	g.player.Creative = true
+	g.inv = core.Inventory{}
+	g.inv.Selected = 0
+	g.world.SetBlock(8, 101, 8, core.Leaves)
+	g.player.Body.Pos = mathx.Vec3{X: 8.5, Y: 100, Z: 10.5}
+	g.player.Yaw = 0
+	g.player.Pitch = 0
+	g.pickBlock()
+	if got := g.inv.Slots[0]; got.Item != core.ItemLeaves {
+		t.Fatalf("creative pick on leaves = %+v", got)
+	}
+}
+
+func TestSurvivalPickBlockNeedsTheItem(t *testing.T) {
+	g := newTestGame(t)
+	g.mode = ModeSurvival
+	g.player.Creative = false
+	g.inv = core.Inventory{}
+	g.inv.Selected = 2
+	g.world.SetBlock(8, 101, 8, core.Stone)
+	g.player.Body.Pos = mathx.Vec3{X: 8.5, Y: 100, Z: 10.5}
+	g.player.Yaw = 0
+	g.player.Pitch = 0
+	g.pickBlock()
+	if !g.inv.Slots[2].Empty() {
+		t.Fatalf("survival pick block created an item: %+v", g.inv.Slots[2])
+	}
+}
+
 func TestEatingTakesTime(t *testing.T) {
 	g := newTestGame(t)
 	g.inv.Selected = 0
