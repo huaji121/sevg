@@ -91,13 +91,89 @@ func (g *Game) handleActions(dt float32) {
 		g.breakActive = false
 	}
 
+	st := g.inv.SelectedStack()
+	// Containers take priority over using the held item.
+	if g.mouseRight && blockHit.Hit && !mobFirst && blockHit.Block == core.Chest && g.placeCool <= 0 {
+		g.cancelUse()
+		g.openChest(blockHit.Pos)
+		return
+	}
+	// Food is eaten over its use duration rather than instantly.
+	if g.mouseRight && !st.Empty() && st.Item.Def().Kind == core.KindFood {
+		g.updateEating(dt, st.Item)
+		return
+	}
+	g.cancelUse()
 	if g.mouseRight && g.placeCool <= 0 && blockHit.Hit && !mobFirst {
-		if blockHit.Block == core.Chest {
-			g.openChest(blockHit.Pos)
-			return
-		}
 		g.useItem(blockHit)
 	}
+}
+
+// useProgress returns how far the held item's use is complete (0..1), or 0 when
+// no timed use is active for that item.
+func (g *Game) useProgress(item core.ItemID) float32 {
+	if !g.useActive || g.usingItem != item {
+		return 0
+	}
+	dur := item.Def().UseTime
+	if dur <= 0 {
+		return 0
+	}
+	return clampF(g.useTimer/dur, 0, 1)
+}
+
+// cancelUse aborts any in-progress timed use.
+func (g *Game) cancelUse() {
+	g.useActive = false
+	g.usingItem = core.ItemNone
+	g.useTimer = 0
+	g.useParticleTimer = 0
+}
+
+// updateEating advances a held use of a food item, spawning chew particles and
+// finishing the meal once the item's use time elapses.
+func (g *Game) updateEating(dt float32, item core.ItemID) {
+	if g.mode == ModeCreative && g.player.Food >= g.player.MaxFood {
+		g.cancelUse()
+		return
+	}
+	if g.player.Food >= g.player.MaxFood {
+		g.cancelUse()
+		if g.placeCool <= 0 {
+			g.notify(i18n.T("toast.full_hunger"), 1.2)
+			g.placeCool = 1.0
+		}
+		return
+	}
+	dur := item.Def().UseTime
+	if dur <= 0 {
+		dur = 0.05
+	}
+	if !g.useActive || g.usingItem != item {
+		g.useActive = true
+		g.usingItem = item
+		g.useTimer = 0
+		g.useParticleTimer = 0
+	}
+	g.useTimer += dt
+	g.useParticleTimer -= dt
+	if g.useParticleTimer <= 0 {
+		g.spawnEatParticles(item, 1)
+		g.useParticleTimer = 0.10
+	}
+	if g.useTimer >= dur {
+		g.finishEating(item)
+	}
+}
+
+func (g *Game) finishEating(item core.ItemID) {
+	def := item.Def()
+	g.player.Eat(def.Food, def.Saturation)
+	g.playSound("eat")
+	g.inv.TakeSelected(1)
+	g.placeCool = 0.35
+	g.notify(i18n.T("toast.ate", i18n.ItemName(item)), 1.2)
+	g.cancelUse()
 }
 
 func (g *Game) mineBlock(dt float32, hit world.RayHit) {
@@ -250,18 +326,6 @@ func (g *Game) useItem(hit world.RayHit) {
 		return
 	}
 	def := s.Item.Def()
-	if def.Kind == core.KindFood {
-		if g.player.Food >= g.player.MaxFood {
-			g.notify(i18n.T("toast.full_hunger"), 1.2)
-			return
-		}
-		g.player.Eat(def.Food, def.Saturation)
-		g.playSound("eat")
-		g.inv.TakeSelected(1)
-		g.placeCool = 0.35
-		g.notify(i18n.T("toast.ate", i18n.ItemName(s.Item)), 1.2)
-		return
-	}
 	if def.Kind != core.KindBlock || def.Block == core.Air {
 		return
 	}

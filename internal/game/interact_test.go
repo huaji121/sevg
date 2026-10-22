@@ -196,15 +196,33 @@ func TestPlacePassThroughBlockInsidePlayer(t *testing.T) {
 	}
 }
 
-func TestEatingRestoresHunger(t *testing.T) {
+func TestEatingTakesTime(t *testing.T) {
 	g := newTestGame(t)
 	g.inv.Selected = 0
 	g.inv.Slots[0] = core.Stack{Item: core.ItemApple, Count: 2}
 	g.player.Food = 8
 	g.player.Saturation = 0
 	before := g.inv.Count(core.ItemApple)
-	hit := world.RayHit{Hit: true, Block: core.Dirt, Pos: [3]int{1, 1, 1}, Normal: mathx.Vec3{Y: 1}}
-	g.useItem(hit)
+
+	// A single frame of use must not consume the item.
+	g.updateEating(0.05, core.ItemApple)
+	if g.inv.Count(core.ItemApple) != before {
+		t.Fatal("item was consumed instantly")
+	}
+	if len(g.particles) == 0 {
+		t.Fatal("no chewing particles spawned")
+	}
+	if !g.useActive {
+		t.Fatal("use is not active while holding the item")
+	}
+
+	// Holding until the use time elapses finishes the first apple.
+	for guard := 0; g.useActive && guard < 200; guard++ {
+		g.updateEating(0.05, core.ItemApple)
+	}
+	if g.useActive {
+		t.Fatal("use did not finish after the use time elapsed")
+	}
 	if g.player.Food <= 8 {
 		t.Fatalf("eating did not restore hunger: %f", g.player.Food)
 	}
@@ -220,10 +238,14 @@ func TestEatingBlockedWhenFull(t *testing.T) {
 	g.player.Food = g.player.MaxFood
 	g.player.Health = 10
 	before := g.inv.Count(core.ItemApple)
-	hit := world.RayHit{Hit: true, Block: core.Dirt, Pos: [3]int{1, 1, 1}, Normal: mathx.Vec3{Y: 1}}
-	g.useItem(hit)
+	for i := 0; i < 10; i++ {
+		g.updateEating(0.05, core.ItemApple)
+	}
 	if got := g.inv.Count(core.ItemApple); got != before {
 		t.Fatalf("apple consumed while full: %d", got)
+	}
+	if g.useActive {
+		t.Fatal("use should not start while full")
 	}
 }
 

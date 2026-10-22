@@ -110,19 +110,25 @@ type Game struct {
 	breakActive   bool
 	particles     []breakParticle
 	particleTimer float32
-	targetValid   bool
-	attackCool    float32
-	swingT        float32
-	swingCooldown float32
-	placeCool     float32
-	pickCool      float32
-	breakCool     float32
-	spaceTapTimer float32
-	stepTimer     float32
-	stepCooldown  float32
-	chests        map[[3]int]*[27]core.Stack
-	chestPos      [3]int
-	fluidTimer    float32
+
+	// Timed item use (eating) state.
+	useActive        bool
+	usingItem        core.ItemID
+	useTimer         float32
+	useParticleTimer float32
+	targetValid      bool
+	attackCool       float32
+	swingT           float32
+	swingCooldown    float32
+	placeCool        float32
+	pickCool         float32
+	breakCool        float32
+	spaceTapTimer    float32
+	stepTimer        float32
+	stepCooldown     float32
+	chests           map[[3]int]*[27]core.Stack
+	chestPos         [3]int
+	fluidTimer       float32
 
 	chatOpen          bool
 	chatInput         []rune

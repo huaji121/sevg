@@ -131,6 +131,17 @@ func (g *Game) drawHUD(w, h float32) {
 			c.Rect(r.X+1, r.Y+1, r.W, r.H, shadow)
 			c.Rect(r.X, r.Y, r.W, r.H, col)
 		}
+		// Timed item use progress.
+		if g.useActive {
+			if dur := g.usingItem.Def().UseTime; dur > 0 {
+				p := clampF(g.useTimer/dur, 0, 1)
+				const bw = float32(110)
+				bx, by := w/2-bw/2, h/2+20
+				c.Rect(bx-1, by-1, bw+2, 8, ui.RGBA(0, 0, 0, 170))
+				c.Rect(bx, by, bw, 6, ui.RGBA(40, 46, 52, 230))
+				c.Rect(bx, by, bw*p, 6, ui.Accent)
+			}
+		}
 	}
 
 	hx, hy := float32(24), float32(22)
@@ -754,12 +765,21 @@ func (g *Game) buildHeldIconMesh() world.MeshData {
 	rotRight := right.Mul(cy).Add(normal.Mul(sy))
 	rotNormal := normal.Mul(cy).Sub(right.Mul(sy))
 	swing := g.swingAngle()
-	roll := float32(-0.10) + swing*0.55
+	// Timed use (eating) raises and tilts the card toward the mouth and adds a
+	// chew wobble.
+	use := g.useProgress(st.Item)
+	roll := float32(-0.10) + swing*0.55 + use*0.55
 	cr, sr := float32(math.Cos(float64(roll))), float32(math.Sin(float64(roll)))
 	cardRight := rotRight.Mul(cr).Add(up.Mul(sr))
 	cardUp := up.Mul(cr).Sub(rotRight.Mul(sr))
 	eye := g.player.Eye()
-	c := eye.Add(right.Mul(0.28 - swing*0.06)).Add(up.Mul(-0.19 - swing*0.08 + g.player.Bob*1.5)).Add(fwd.Mul(0.50 + swing*0.04))
+	offR := float32(0.28) - swing*0.06 - use*0.12
+	offU := float32(-0.19) - swing*0.08 + g.player.Bob*1.5 + use*0.24
+	offF := float32(0.50) + swing*0.04 - use*0.18
+	if use > 0 {
+		offU += float32(math.Sin(float64(g.useTimer*18))) * 0.02 * use
+	}
+	c := eye.Add(right.Mul(offR)).Add(up.Mul(offU)).Add(fwd.Mul(offF))
 	var held world.MeshData
 	appendIconCard(&held, c, cardRight, cardUp, rotNormal, 0.30, 0.30, 0.012, icon, g.canv.IconSides[st.Item])
 	g.applyHeldLight(&held)

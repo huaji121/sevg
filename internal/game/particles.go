@@ -15,11 +15,31 @@ type breakParticle struct {
 	life     float32
 	size     float32
 	block    core.BlockID
-	sky      float32
-	light    float32
+	// tile overrides the block tile when non-zero (used by item/food crumbs
+	// that have no source block). cross renders the particle as a crossed pair
+	// of quads instead of a cube.
+	tile  uint8
+	cross bool
+	sky   float32
+	light float32
 }
 
 const maxBreakParticles = 320
+
+// addParticle appends a particle and keeps the pool bounded.
+func (g *Game) addParticle(p breakParticle) {
+	g.particles = append(g.particles, p)
+	if len(g.particles) > maxBreakParticles {
+		g.particles = g.particles[len(g.particles)-maxBreakParticles:]
+	}
+}
+
+func particleTile(p breakParticle, face int) uint8 {
+	if p.tile != 0 {
+		return p.tile
+	}
+	return p.block.Tile(face)
+}
 
 // spawnBlockParticles creates small whole-block fragments. The source block is
 // not modified; this is purely a visual effect.
@@ -46,18 +66,48 @@ func (g *Game) spawnBlockParticles(block core.BlockID, pos [3]int, normal mathx.
 		vel = vel.Add(mathx.V3(rand.Float32()-0.5, rand.Float32()*1.8, rand.Float32()-0.5).Mul(1.4))
 		sky := float32(g.world.SkyLightAt(int(math.Floor(float64(base.X))), int(math.Floor(float64(base.Y))), int(math.Floor(float64(base.Z))))) / 15
 		blk := float32(g.world.BlockLightAt(int(math.Floor(float64(base.X))), int(math.Floor(float64(base.Y))), int(math.Floor(float64(base.Z))))) / 15
-		g.particles = append(g.particles, breakParticle{
+		g.addParticle(breakParticle{
 			pos:   base,
 			vel:   vel,
 			life:  0.35 + rand.Float32()*0.55,
 			size:  0.07 + rand.Float32()*0.08,
 			block: block,
+			cross: block.Cross(),
 			sky:   sky,
 			light: blk,
 		})
 	}
-	if len(g.particles) > maxBreakParticles {
-		g.particles = append([]breakParticle(nil), g.particles[len(g.particles)-maxBreakParticles:]...)
+}
+
+// spawnEatParticles spits small coloured crumbs from near the mouth while a
+// food item is being used, echoing the block-break debris.
+func (g *Game) spawnEatParticles(item core.ItemID, count int) {
+	if g.world == nil || g.player == nil || count <= 0 {
+		return
+	}
+	def := item.Def()
+	tile := tileForColor([4]float32{def.Color[0], def.Color[1], def.Color[2], 1})
+	eye := g.player.Eye()
+	dir := g.player.LookDir()
+	base := eye.Add(dir.Mul(0.30)).Add(mathx.V3(0, -0.06, 0))
+	for i := 0; i < count; i++ {
+		pos := base.Add(mathx.V3(rand.Float32()-0.5, rand.Float32()-0.5, rand.Float32()-0.5).Mul(0.14))
+		vel := dir.Mul(0.5 + rand.Float32()*0.9)
+		vel = vel.Add(mathx.V3((rand.Float32()-0.5)*0.8, -0.5+rand.Float32()*0.5, (rand.Float32()-0.5)*0.8))
+		x := int(math.Floor(float64(pos.X)))
+		y := int(math.Floor(float64(pos.Y)))
+		z := int(math.Floor(float64(pos.Z)))
+		sky := float32(g.world.SkyLightAt(x, y, z)) / 15
+		blk := float32(g.world.BlockLightAt(x, y, z)) / 15
+		g.addParticle(breakParticle{
+			pos:   pos,
+			vel:   vel,
+			life:  0.35 + rand.Float32()*0.35,
+			size:  0.045 + rand.Float32()*0.045,
+			tile:  tile,
+			sky:   sky,
+			light: blk,
+		})
 	}
 }
 
@@ -102,7 +152,7 @@ func (g *Game) appendParticleMeshes(opaque, transparent *world.MeshData) {
 		half := p.size * shr * 0.5
 		min := p.pos.Sub(mathx.V3(half, half, half))
 		max := p.pos.Add(mathx.V3(half, half, half))
-		if p.block.Cross() {
+		if p.cross {
 			appendParticleCross(target, p, min, max)
 		} else {
 			appendParticleCube(target, p, min, max)
@@ -112,7 +162,7 @@ func (g *Game) appendParticleMeshes(opaque, transparent *world.MeshData) {
 
 func appendParticleCube(m *world.MeshData, p breakParticle, min, max mathx.Vec3) {
 	for fi, f := range entityFaces {
-		u0, v0, u1, v1 := world.TileUV(p.block.Tile(fi))
+		u0, v0, u1, v1 := world.TileUV(particleTile(p, fi))
 		base := uint32(len(m.Vertices))
 		for i := 0; i < 4; i++ {
 			c := f.corners[i]
@@ -130,7 +180,7 @@ func appendParticleCube(m *world.MeshData, p breakParticle, min, max mathx.Vec3)
 }
 
 func appendParticleCross(m *world.MeshData, p breakParticle, min, max mathx.Vec3) {
-	u0, v0, u1, v1 := world.TileUV(p.block.Tile(2))
+	u0, v0, u1, v1 := world.TileUV(particleTile(p, 2))
 	quads := [2][4]mathx.Vec3{
 		{
 			{X: min.X, Y: min.Y, Z: min.Z},

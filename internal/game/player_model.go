@@ -259,7 +259,12 @@ func (g *Game) appendPlayerHeldIconCard(dst *world.MeshData, swing float32) {
 	if !ok {
 		return
 	}
-	center := mathx.V3(0.55, 0.65, -0.20)
+	// While eating, raise the item from the waist toward the mouth.
+	use := g.useProgress(st.Item)
+	center := mathx.V3(0.55-use*0.13, 0.65+use*0.8, -0.20-use*0.10)
+	if use > 0 {
+		center.Y += float32(math.Sin(float64(g.useTimer*18))) * 0.04 * use
+	}
 	// Requested local-space composition:
 	// 1. yaw 90 degrees around vertical Y back to the front-facing card,
 	// 2. pitch 90 degrees forward around horizontal X, making it horizontal.
