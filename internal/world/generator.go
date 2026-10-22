@@ -226,6 +226,7 @@ func (g *Generator) GenerateChunk(cp ChunkPos) []core.BlockID {
 	for lx := 0; lx < ChunkSize; lx++ {
 		for lz := 0; lz < ChunkSize; lz++ {
 			wx, wz := baseX+lx, baseZ+lz
+			h, _ := g.HeightAt(wx, wz)
 			for y := 2; y < ChunkHeight-1; y++ {
 				i := index(lx, y, lz)
 				b := blocks[i]
@@ -237,7 +238,9 @@ func (g *Generator) GenerateChunk(cp ChunkPos) []core.BlockID {
 					blocks[i] = core.Air
 					continue
 				}
-				if y < SeaLevel+24 {
+				// Ores only replace buried stone so no ore ever shows up as the
+				// terrain surface (e.g. coal in grass).
+				if b == core.Stone && y < h && y < SeaLevel+24 {
 					r := g.ore.Unit3(wx, y, wz)
 					if y < SeaLevel && r < 0.010 {
 						blocks[i] = core.IronOre
