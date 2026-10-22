@@ -592,6 +592,7 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 	if g.camera != cameraFirst && g.player != nil {
 		g.appendPlayerModel(&opaque, &icons, &transparent)
 	}
+	g.appendEntityShadows(&transparent)
 	if g.player != nil && g.targetValid {
 		x, y, z := g.targetPos[0], g.targetPos[1], g.targetPos[2]
 		min := mathx.V3(float32(x)-0.003, float32(y)-0.003, float32(z)-0.003)

@@ -4,6 +4,7 @@ layout(location = 1) in vec2 aUV;
 layout(location = 2) in float aLight;
 layout(location = 3) in float aSky;
 layout(location = 4) in float aBlock;
+layout(location = 5) in float aAlpha;
 
 layout(set = 1, binding = 0) uniform UBO {
     mat4 uViewProj;
@@ -18,6 +19,7 @@ layout(location = 1) out float vLight;
 layout(location = 2) out float vDist;
 layout(location = 3) out float vSky;
 layout(location = 4) out float vBlock;
+layout(location = 5) out float vAlpha;
 
 void main() {
     gl_Position = u.uViewProj * vec4(aPos, 1.0);
@@ -26,4 +28,5 @@ void main() {
     vDist = length(aPos - u.uCam.xyz);
     vSky = aSky;
     vBlock = aBlock;
+    vAlpha = aAlpha;
 }

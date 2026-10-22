@@ -13,6 +13,10 @@ type Vertex struct {
 	Light   float32
 	Sky     float32
 	Block   float32
+	// Alpha scales the texture alpha for this vertex. Zero keeps the texture
+	// alpha unchanged (the default for all opaque geometry); values in (0,1]
+	// multiply it, which is how ground shadows fade with height.
+	Alpha float32
 }
 
 type MeshData struct {

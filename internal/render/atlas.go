@@ -30,6 +30,7 @@ var blockTextureFiles = [core.TileTileCount]string{
 	"palette/white", "entities/pig_skin", "palette/dark", "palette/red", "palette/gold", "palette/gray",
 	"palette/black", "palette/brown", "palette/pink", "palette/green", "entities/player_skin_map",
 	"sky/sun", "sky/moon", "blocks/chest", "entities/sheep_skin", "entities/sheep_wool",
+	"effects/shadow",
 }
 
 // BuildAtlas assembles the embedded tile textures into the runtime atlas and

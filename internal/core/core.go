@@ -94,6 +94,7 @@ const (
 	TileChest
 	TileSheepSkin
 	TileSheepWool
+	TileShadow
 	TileTileCount
 )
 
