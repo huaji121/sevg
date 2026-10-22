@@ -1,11 +1,13 @@
 package entity
 
 import (
+	"math"
 	"testing"
 
 	"sevg/internal/core"
 
 	"sevg/internal/mathx"
+	"sevg/internal/physics"
 	"sevg/internal/world"
 )
 
@@ -127,6 +129,36 @@ func TestUnstackableToolsDoNotMerge(t *testing.T) {
 	m.Drop(core.ItemIronSword, 1, pos, mathx.Vec3{})
 	if m.ItemCount() != 2 {
 		t.Fatalf("unstackable tools merged: %d entities", m.ItemCount())
+	}
+}
+
+func TestMobsPushApart(t *testing.T) {
+	m := NewManager(1)
+	w := world.New(1)
+	w.EnsureChunk(world.ChunkPos{})
+	a := m.SpawnAt(Pig, mathx.Vec3{X: 0.5, Y: 100, Z: 0.5})
+	b := m.SpawnAt(Pig, mathx.Vec3{X: 0.7, Y: 100, Z: 0.5})
+	before := math.Abs(float64(a.Body.Pos.X - b.Body.Pos.X))
+	m.separateMobs(w)
+	after := math.Abs(float64(a.Body.Pos.X - b.Body.Pos.X))
+	if after <= before {
+		t.Fatalf("overlapping mobs were not pushed apart: %f -> %f", before, after)
+	}
+	if after < 0.89 {
+		t.Fatalf("mobs still overlap after separation: %f", after)
+	}
+}
+
+func TestPlayerIsPushedByMob(t *testing.T) {
+	m := NewManager(1)
+	w := world.New(1)
+	w.EnsureChunk(world.ChunkPos{})
+	m.SpawnAt(Pig, mathx.Vec3{X: 1.0, Y: 100, Z: 0.5})
+	player := physics.Body{Pos: mathx.Vec3{X: 0.5, Y: 100, Z: 0.5}, Width: 0.6, Height: 1.8}
+	before := player.Pos.X
+	m.PushPlayer(w, &player)
+	if player.Pos.X >= before {
+		t.Fatalf("player was not pushed away from the mob: %f", player.Pos.X)
 	}
 }
 

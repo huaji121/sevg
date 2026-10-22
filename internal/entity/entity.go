@@ -288,6 +288,7 @@ func (m *Manager) Update(dt float32, w *world.World, playerPos mathx.Vec3, inv *
 			mob.WalkPhase += dt * hs * 2.4
 		}
 	}
+	m.separateMobs(w)
 
 	m.UpdateFalling(w, dt)
 	m.UpdateProjectiles(w, dt)

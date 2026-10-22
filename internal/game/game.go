@@ -670,6 +670,7 @@ func (g *Game) updateWorld(dt float32, allowInput bool) {
 	}
 	g.updateFootsteps(dt)
 	g.mobs.Update(dt, g.world, g.player.Body.Pos, &g.inv)
+	g.mobs.PushPlayer(g.world, &g.player.Body)
 	if g.mobs.PickupEvents > 0 {
 		g.playSound("pickup")
 		g.mobs.PickupEvents = 0
