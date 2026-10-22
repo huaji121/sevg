@@ -19,10 +19,11 @@ import (
 const saveVersion = 2
 
 type playerSave struct {
-	X, Y, Z    float32
-	Yaw, Pitch float32
-	Health     float32
-	Flying     bool
+	X, Y, Z          float32
+	Yaw, Pitch       float32
+	Health           float32
+	Food, Saturation float32
+	Flying           bool
 }
 
 type SaveGame struct {
@@ -110,6 +111,14 @@ func (g *Game) startWorld(load bool) error {
 		p.Health = sv.Player.Health
 		if p.Health <= 0 {
 			p.Health = p.MaxHP
+		}
+		// Legacy saves have no hunger fields; default them to full.
+		if sv.Player.Food <= 0 {
+			p.Food = p.MaxFood
+			p.Saturation = 0
+		} else {
+			p.Food = sv.Player.Food
+			p.Saturation = sv.Player.Saturation
 		}
 		p.Flying = sv.Player.Flying
 	} else {
@@ -415,6 +424,7 @@ func (g *Game) saveGame() error {
 		Player: playerSave{
 			X: g.player.Body.Pos.X, Y: g.player.Body.Pos.Y, Z: g.player.Body.Pos.Z,
 			Yaw: g.player.Yaw, Pitch: g.player.Pitch, Health: g.player.Health,
+			Food: g.player.Food, Saturation: g.player.Saturation,
 			Flying: g.player.Flying,
 		},
 		Inventory: g.inv,

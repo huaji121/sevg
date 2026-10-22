@@ -29,21 +29,135 @@ type Player struct {
 	Crouching bool
 	Spawning  mathx.Vec3
 
+	// Hunger, modelled on Minecraft's food system.
+	Food       float32 // 0..MaxFood, shown as the hunger bar
+	MaxFood    float32
+	Saturation float32 // hidden buffer spent before Food
+	Exhaustion float32 // accumulates with activity; every 4 points drain 1 food
+	Sprinting  bool
+
 	fallStart    float32
 	falling      bool
 	hurtCooldown float32
 	stepTimer    float32
+	regenTimer   float32
+	starveTimer  float32
 	Bob          float32
 	WalkPhase    float32
 }
 
+const (
+	maxFood             = float32(20)
+	startSaturation     = float32(5)
+	sprintFoodMin       = float32(6)
+	exhaustionPerDrain  = float32(4)
+	regenExhaustionCost = float32(6)
+	regenSlowInterval   = float32(4)
+	regenFastInterval   = float32(0.5)
+	starveInterval      = float32(4)
+)
+
 func New(spawn mathx.Vec3) *Player {
-	p := &Player{Health: 20, MaxHP: 20, Spawning: spawn}
+	p := &Player{Health: 20, MaxHP: 20, Food: maxFood, MaxFood: maxFood, Saturation: startSaturation, Spawning: spawn}
 	p.Body = physics.Body{
 		Pos: spawn, Width: 0.6, Height: 1.8,
 	}
 	p.fallStart = spawn.Y
 	return p
+}
+
+// AddExhaustion records activity that consumes hunger. Every four points drain
+// one saturation, then one food point, mirroring Minecraft.
+func (p *Player) AddExhaustion(v float32) {
+	if p.Creative || v <= 0 {
+		return
+	}
+	p.Exhaustion += v
+	if p.Exhaustion > 40 {
+		p.Exhaustion = 40
+	}
+}
+
+// CanSprint reports whether the player is fed enough to sprint.
+func (p *Player) CanSprint() bool {
+	return p.Creative || p.Food > sprintFoodMin
+}
+
+// Eat restores hunger and saturation from a food item.
+func (p *Player) Eat(food, saturation float32) {
+	p.Food += food
+	if p.Food > p.MaxFood {
+		p.Food = p.MaxFood
+	}
+	p.Saturation += saturation
+	if p.Saturation > p.Food {
+		p.Saturation = p.Food
+	}
+}
+
+// updateFood performs the hunger tick: drain exhaustion, regenerate health
+// while well fed, and starve when out of food.
+func (p *Player) updateFood(dt float32) {
+	if p.MaxFood <= 0 {
+		p.MaxFood = maxFood
+	}
+	if p.Creative {
+		p.Food = p.MaxFood
+		p.Saturation = 0
+		p.Exhaustion = 0
+		p.regenTimer, p.starveTimer = 0, 0
+		return
+	}
+	for p.Exhaustion >= exhaustionPerDrain {
+		p.Exhaustion -= exhaustionPerDrain
+		if p.Saturation > 0 {
+			p.Saturation -= 1
+			if p.Saturation < 0 {
+				p.Saturation = 0
+			}
+		} else if p.Food > 0 {
+			p.Food -= 1
+		} else {
+			break
+		}
+	}
+
+	// Regeneration: fast while full and saturated, slow while merely well fed.
+	if p.Health < p.MaxHP {
+		interval := float32(0)
+		switch {
+		case p.Food >= p.MaxFood && p.Saturation > 0:
+			interval = regenFastInterval
+		case p.Food >= 18:
+			interval = regenSlowInterval
+		}
+		if interval > 0 {
+			p.regenTimer += dt
+			if p.regenTimer >= interval {
+				p.regenTimer -= interval
+				p.Health += 1
+				if p.Health > p.MaxHP {
+					p.Health = p.MaxHP
+				}
+				p.AddExhaustion(regenExhaustionCost)
+			}
+		} else {
+			p.regenTimer = 0
+		}
+	} else {
+		p.regenTimer = 0
+	}
+
+	// Starvation: keep at least 1 health, like Minecraft's normal difficulty.
+	if p.Food <= 0 && p.Health > 1 {
+		p.starveTimer += dt
+		if p.starveTimer >= starveInterval {
+			p.starveTimer -= starveInterval
+			p.Damage(1)
+		}
+	} else {
+		p.starveTimer = 0
+	}
 }
 
 func (p *Player) Eye() mathx.Vec3 {
@@ -79,6 +193,7 @@ func (p *Player) Damage(amount float32) bool {
 	p.Health -= amount
 	p.hurtCooldown = 0.4
 	p.HurtPulse = true
+	p.AddExhaustion(0.1)
 	if p.Health < 0 {
 		p.Health = 0
 	}
@@ -96,6 +211,10 @@ func (p *Player) Respawn() {
 	p.Body.Pos = p.Spawning
 	p.Body.Vel = mathx.Vec3{}
 	p.Health = p.MaxHP
+	p.Food = p.MaxFood
+	p.Saturation = startSaturation
+	p.Exhaustion = 0
+	p.regenTimer, p.starveTimer = 0, 0
 	p.FallingReset()
 }
 
@@ -174,14 +293,18 @@ func (p *Player) Update(dt float32, w *world.World, in Input) {
 	if move.LengthSq() > 1 {
 		move = move.Normalize()
 	}
+	sprint := in.Sprint && p.CanSprint()
+	p.Sprinting = sprint
 	speed := float32(4.6)
 	if p.Crouching {
 		speed *= 0.35
-	} else if in.Sprint {
+		p.Sprinting = false
+	} else if sprint {
 		speed = 7.0
 	}
 	if p.Flying {
 		speed = 11.0
+		p.Sprinting = false
 	}
 	if p.InWater && !p.Flying {
 		speed *= 0.65
@@ -219,6 +342,11 @@ func (p *Player) Update(dt float32, w *world.World, in Input) {
 			p.Body.Vel.Y = 8.4
 			p.Body.OnGround = false
 			grounded = false
+			if p.Sprinting {
+				p.AddExhaustion(0.2)
+			} else {
+				p.AddExhaustion(0.05)
+			}
 		}
 	}
 
@@ -278,6 +406,10 @@ func (p *Player) Update(dt float32, w *world.World, in Input) {
 	} else {
 		p.Bob *= 0.85
 	}
+	if p.Sprinting && hs > 0 {
+		p.AddExhaustion(0.1 * hs * dt)
+	}
+	p.updateFood(dt)
 
 	if p.Body.Pos.Y < -10 {
 		p.Respawn()

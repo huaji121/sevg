@@ -79,6 +79,7 @@ func (g *Game) handleActions(dt float32) {
 					dmg = 1000
 				}
 				g.mobs.DamageMob(mob, dmg, g.player.Body.Pos)
+				g.player.AddExhaustion(0.1)
 				g.playSound("hit")
 				g.attackCool = 0.32
 			}
@@ -166,6 +167,7 @@ func (g *Game) mineBlock(dt float32, hit world.RayHit) {
 	g.spawnBlockParticles(b, hit.Pos, hit.Normal, 18)
 	g.playSound(breakSound(b))
 	g.world.SetBlock(x, y, z, core.Air)
+	g.player.AddExhaustion(0.005)
 	if b == core.Chest {
 		g.dropChest([3]int{x, y, z})
 	}
@@ -249,11 +251,11 @@ func (g *Game) useItem(hit world.RayHit) {
 	}
 	def := s.Item.Def()
 	if def.Kind == core.KindFood {
-		if g.player.Health >= g.player.MaxHP {
-			g.notify(i18n.T("toast.full_health"), 1.2)
+		if g.player.Food >= g.player.MaxFood {
+			g.notify(i18n.T("toast.full_hunger"), 1.2)
 			return
 		}
-		g.player.Heal(def.Food)
+		g.player.Eat(def.Food, def.Saturation)
 		g.playSound("eat")
 		g.inv.TakeSelected(1)
 		g.placeCool = 0.35

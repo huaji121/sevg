@@ -196,6 +196,37 @@ func TestPlacePassThroughBlockInsidePlayer(t *testing.T) {
 	}
 }
 
+func TestEatingRestoresHunger(t *testing.T) {
+	g := newTestGame(t)
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{Item: core.ItemApple, Count: 2}
+	g.player.Food = 8
+	g.player.Saturation = 0
+	before := g.inv.Count(core.ItemApple)
+	hit := world.RayHit{Hit: true, Block: core.Dirt, Pos: [3]int{1, 1, 1}, Normal: mathx.Vec3{Y: 1}}
+	g.useItem(hit)
+	if g.player.Food <= 8 {
+		t.Fatalf("eating did not restore hunger: %f", g.player.Food)
+	}
+	if got := g.inv.Count(core.ItemApple); got != before-1 {
+		t.Fatalf("apple count = %d, want %d", got, before-1)
+	}
+}
+
+func TestEatingBlockedWhenFull(t *testing.T) {
+	g := newTestGame(t)
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{Item: core.ItemApple, Count: 2}
+	g.player.Food = g.player.MaxFood
+	g.player.Health = 10
+	before := g.inv.Count(core.ItemApple)
+	hit := world.RayHit{Hit: true, Block: core.Dirt, Pos: [3]int{1, 1, 1}, Normal: mathx.Vec3{Y: 1}}
+	g.useItem(hit)
+	if got := g.inv.Count(core.ItemApple); got != before {
+		t.Fatalf("apple consumed while full: %d", got)
+	}
+}
+
 func TestSolidBlockStillRequiresSpace(t *testing.T) {
 	g := newTestGame(t)
 	g.player.Body.Pos = mathx.Vec3{X: 12.5, Y: 72, Z: 12.5}

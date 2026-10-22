@@ -139,12 +139,16 @@ func (g *Game) drawHUD(w, h float32) {
 		// only show the active mode.
 		c.Text(hx, hy+4, i18n.T("hud.mode", g.modeName()), 1.1, ui.Accent)
 	} else {
-		c.Panel(hx, hy, 214, 48, ui.RGBA(12, 16, 20, 190), ui.RGBA(70, 90, 100, 180))
+		c.Panel(hx, hy, 214, 76, ui.RGBA(12, 16, 20, 190), ui.RGBA(70, 90, 100, 180))
 		c.Text(hx+12, hy+6, i18n.T("hud.health"), 1.1, ui.MutedColor)
-		c.Rect(hx+12, hy+27, 180, 10, ui.RGBA(60, 20, 20, 255))
-		c.Rect(hx+12, hy+27, 180*clampF(g.player.Health/g.player.MaxHP, 0, 1), 10, ui.RGBA(220, 55, 60, 255))
+		c.Rect(hx+12, hy+24, 180, 10, ui.RGBA(60, 20, 20, 255))
+		c.Rect(hx+12, hy+24, 180*clampF(g.player.Health/g.player.MaxHP, 0, 1), 10, ui.RGBA(220, 55, 60, 255))
 		c.Text(hx+196-c.TextWidth(fmt.Sprintf("%.0f", g.player.Health), 1), hy+6, fmt.Sprintf("%.0f", g.player.Health), 1, ui.TextColor)
-		c.Text(hx+224, hy+16, i18n.T("hud.mode", g.modeName()), 1.0, ui.MutedColor)
+		c.Text(hx+12, hy+40, i18n.T("hud.hunger"), 1.1, ui.MutedColor)
+		c.Rect(hx+12, hy+58, 180, 10, ui.RGBA(50, 34, 12, 255))
+		c.Rect(hx+12, hy+58, 180*clampF(g.player.Food/g.player.MaxFood, 0, 1), 10, ui.RGBA(210, 140, 45, 255))
+		c.Text(hx+196-c.TextWidth(fmt.Sprintf("%.0f", g.player.Food), 1), hy+40, fmt.Sprintf("%.0f", g.player.Food), 1, ui.TextColor)
+		c.Text(hx+224, hy+32, i18n.T("hud.mode", g.modeName()), 1.0, ui.MutedColor)
 	}
 
 	// Time and chunk progress.

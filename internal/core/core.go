@@ -232,7 +232,10 @@ type ItemDef struct {
 	Color    [3]float32
 	Mining   float32 // mining speed multiplier while held
 	Damage   float32
-	Food     float32
+	Food     float32 // hunger points restored when eaten
+	// Saturation is the hidden buffer restored alongside food, spent before the
+	// visible hunger bar.
+	Saturation float32
 }
 
 var blockItems [BlockCount]ItemID
@@ -263,7 +266,7 @@ var ItemDefs = [ItemCount]ItemDef{
 	ItemIce:           {Name: "Ice", Kind: KindBlock, Block: Ice, MaxStack: StackLimit, Color: [3]float32{0.62, 0.82, 0.95}},
 	ItemObsidian:      {Name: "Obsidian", Kind: KindBlock, Block: Obsidian, MaxStack: StackLimit, Color: [3]float32{0.16, 0.10, 0.23}},
 	ItemStick:         {Name: "Stick", Kind: KindMaterial, MaxStack: StackLimit, Color: [3]float32{0.55, 0.40, 0.22}},
-	ItemApple:         {Name: "Apple", Kind: KindFood, MaxStack: StackLimit, Color: [3]float32{0.82, 0.12, 0.13}, Food: 4},
+	ItemApple:         {Name: "Apple", Kind: KindFood, MaxStack: StackLimit, Color: [3]float32{0.82, 0.12, 0.13}, Food: 4, Saturation: 2.4},
 	ItemCoal:          {Name: "Coal", Kind: KindMaterial, MaxStack: StackLimit, Color: [3]float32{0.12, 0.12, 0.13}},
 	ItemIronIngot:     {Name: "Iron Ingot", Kind: KindMaterial, MaxStack: StackLimit, Color: [3]float32{0.78, 0.78, 0.82}},
 	ItemWoodSword:     {Name: "Wooden Sword", Kind: KindTool, MaxStack: 1, Color: [3]float32{0.62, 0.45, 0.24}, Damage: 4, Mining: 1.2},
