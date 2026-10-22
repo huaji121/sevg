@@ -147,6 +147,7 @@ const (
 	ItemTorch
 	ItemCraftingTable
 	ItemChest
+	ItemSnowball
 	ItemCount
 )
 
@@ -239,6 +240,8 @@ type ItemDef struct {
 	// UseTime is how many seconds the item must be used before its effect
 	// applies. Zero means instant use.
 	UseTime float32
+	// Throwable items are launched as a projectile when used.
+	Throwable bool
 }
 
 var blockItems [BlockCount]ItemID
@@ -280,6 +283,7 @@ var ItemDefs = [ItemCount]ItemDef{
 	ItemTorch:         {Name: "Torch", Kind: KindBlock, Block: Torch, MaxStack: StackLimit, Color: [3]float32{0.95, 0.58, 0.18}},
 	ItemCraftingTable: {Name: "Crafting Table", Kind: KindBlock, Block: CraftingTable, MaxStack: StackLimit, Color: [3]float32{0.55, 0.38, 0.22}},
 	ItemChest:         {Name: "Chest", Kind: KindBlock, Block: Chest, MaxStack: StackLimit, Color: [3]float32{0.62, 0.40, 0.18}},
+	ItemSnowball:      {Name: "Snowball", Kind: KindMaterial, MaxStack: 16, Color: [3]float32{0.93, 0.95, 0.98}, Throwable: true},
 }
 
 func init() {

@@ -130,6 +130,28 @@ func TestUnstackableToolsDoNotMerge(t *testing.T) {
 	}
 }
 
+func TestProjectileHitsGround(t *testing.T) {
+	m := NewManager(1)
+	w := world.New(1)
+	w.EnsureChunk(world.ChunkPos{})
+	w.SetBlock(8, 100, 8, core.Stone)
+	m.SpawnProjectile(core.ItemSnowball, mathx.Vec3{X: 8.5, Y: 106, Z: 8.5}, mathx.Vec3{Y: -5})
+	for i := 0; i < 300 && len(m.Projectiles) > 0; i++ {
+		m.UpdateProjectiles(w, 0.05)
+	}
+	if len(m.Projectiles) != 0 {
+		t.Fatal("projectile never landed")
+	}
+	if len(m.ProjectileImpacts) == 0 {
+		t.Fatal("landing did not record an impact")
+	}
+	for _, pos := range m.ProjectileImpacts {
+		if pos.Y < 100 || pos.Y > 102 {
+			t.Fatalf("impact at unexpected height: %f", pos.Y)
+		}
+	}
+}
+
 func TestDropsMergeWhenTheySettleTogether(t *testing.T) {
 	m := NewManager(1)
 	w := world.New(1)

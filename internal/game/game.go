@@ -122,6 +122,7 @@ type Game struct {
 	swingCooldown    float32
 	placeCool        float32
 	pickCool         float32
+	throwCool        float32
 	breakCool        float32
 	spaceTapTimer    float32
 	stepTimer        float32
@@ -673,6 +674,7 @@ func (g *Game) updateWorld(dt float32, allowInput bool) {
 		g.playSound("pickup")
 		g.mobs.PickupEvents = 0
 	}
+	g.flushProjectileImpacts()
 	g.updateParticles(dt)
 	g.time += float64(dt) / 600.0
 	if g.time >= 1 {
@@ -692,6 +694,9 @@ func (g *Game) updateWorld(dt float32, allowInput bool) {
 	}
 	if g.pickCool > 0 {
 		g.pickCool -= dt
+	}
+	if g.throwCool > 0 {
+		g.throwCool -= dt
 	}
 	if g.breakCool > 0 {
 		g.breakCool -= dt

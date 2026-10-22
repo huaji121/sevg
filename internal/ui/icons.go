@@ -22,6 +22,7 @@ var flatItemIcons = map[core.ItemID]string{
 	core.ItemStonePickaxe: "stone_pickaxe",
 	core.ItemIronSword:    "iron_sword",
 	core.ItemIronPickaxe:  "iron_pickaxe",
+	core.ItemSnowball:     "snowball",
 }
 
 func buildItemIcons(atlas []byte) map[core.ItemID]*image.RGBA {

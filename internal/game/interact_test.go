@@ -196,6 +196,60 @@ func TestPlacePassThroughBlockInsidePlayer(t *testing.T) {
 	}
 }
 
+func TestThrowSnowballConsumesItem(t *testing.T) {
+	g := newTestGame(t)
+	g.mode = ModeSurvival
+	g.inv = core.Inventory{}
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{Item: core.ItemSnowball, Count: 3}
+	g.player.Yaw = 0
+	g.player.Pitch = 0
+	g.throwProjectile(core.ItemSnowball)
+	if len(g.mobs.Projectiles) != 1 {
+		t.Fatalf("projectiles = %d, want 1", len(g.mobs.Projectiles))
+	}
+	if got := g.inv.Slots[0].Count; got != 2 {
+		t.Fatalf("snowball count = %d, want 2", got)
+	}
+	// The cooldown prevents an instant second throw.
+	g.throwProjectile(core.ItemSnowball)
+	if len(g.mobs.Projectiles) != 1 {
+		t.Fatal("cooldown did not block the second throw")
+	}
+}
+
+func TestCreativeThrowDoesNotConsume(t *testing.T) {
+	g := newTestGame(t)
+	g.mode = ModeCreative
+	g.player.Creative = true
+	g.inv = core.Inventory{}
+	g.inv.Selected = 0
+	g.inv.Slots[0] = core.Stack{Item: core.ItemSnowball, Count: 3}
+	g.throwProjectile(core.ItemSnowball)
+	if got := g.inv.Slots[0].Count; got != 3 {
+		t.Fatalf("creative throw consumed item: %d", got)
+	}
+}
+
+func TestSnowballRecipe(t *testing.T) {
+	found := false
+	for _, r := range recipes {
+		if r.Output.Item != core.ItemSnowball {
+			continue
+		}
+		found = true
+		if r.Output.Count != 4 {
+			t.Fatalf("snowball recipe output = %d, want 4", r.Output.Count)
+		}
+		if !recipeFits2x2(r) {
+			t.Fatal("snowball recipe does not fit the 2x2 grid")
+		}
+	}
+	if !found {
+		t.Fatal("no snowball recipe")
+	}
+}
+
 func TestCreativePickBlockCopiesBlock(t *testing.T) {
 	g := newTestGame(t)
 	g.mode = ModeCreative

@@ -142,13 +142,17 @@ func (d *ItemDrop) Transparent() bool {
 }
 
 type Manager struct {
-	Mobs         []*Mob
-	Items        []*ItemDrop
-	Falling      []*FallingBlock
-	PickupEvents int
-	rng          *rand.Rand
-	nextID       int
-	spawnTimer   float32
+	Mobs        []*Mob
+	Items       []*ItemDrop
+	Falling     []*FallingBlock
+	Projectiles []*Projectile
+	// ProjectileImpacts collects the world positions where projectiles hit,
+	// so the renderer can spawn impact particles.
+	ProjectileImpacts []mathx.Vec3
+	PickupEvents      int
+	rng               *rand.Rand
+	nextID            int
+	spawnTimer        float32
 }
 
 func NewManager(seed int64) *Manager {
@@ -286,6 +290,7 @@ func (m *Manager) Update(dt float32, w *world.World, playerPos mathx.Vec3, inv *
 	}
 
 	m.UpdateFalling(w, dt)
+	m.UpdateProjectiles(w, dt)
 
 	// Collect pickups and expire old drops.
 	for _, d := range m.Items {

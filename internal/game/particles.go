@@ -111,6 +111,41 @@ func (g *Game) spawnEatParticles(item core.ItemID, count int) {
 	}
 }
 
+// spawnHitParticles bursts fragments of a tile at an impact point.
+func (g *Game) spawnHitParticles(pos mathx.Vec3, tile uint8, count int) {
+	if g.world == nil || count <= 0 {
+		return
+	}
+	x := int(math.Floor(float64(pos.X)))
+	y := int(math.Floor(float64(pos.Y)))
+	z := int(math.Floor(float64(pos.Z)))
+	sky := float32(g.world.SkyLightAt(x, y, z)) / 15
+	blk := float32(g.world.BlockLightAt(x, y, z)) / 15
+	for i := 0; i < count; i++ {
+		vel := mathx.V3((rand.Float32()-0.5)*3, rand.Float32()*2.2, (rand.Float32()-0.5)*3)
+		g.addParticle(breakParticle{
+			pos:   pos,
+			vel:   vel,
+			life:  0.3 + rand.Float32()*0.4,
+			size:  0.05 + rand.Float32()*0.05,
+			tile:  tile,
+			sky:   sky,
+			light: blk,
+		})
+	}
+}
+
+// flushProjectileImpacts turns recorded projectile hits into snow particles.
+func (g *Game) flushProjectileImpacts() {
+	if g.mobs == nil || len(g.mobs.ProjectileImpacts) == 0 {
+		return
+	}
+	for _, pos := range g.mobs.ProjectileImpacts {
+		g.spawnHitParticles(pos, core.TileSnow, 8)
+	}
+	g.mobs.ProjectileImpacts = g.mobs.ProjectileImpacts[:0]
+}
+
 func (g *Game) updateParticles(dt float32) {
 	if len(g.particles) == 0 {
 		return

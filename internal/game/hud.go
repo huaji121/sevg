@@ -595,6 +595,11 @@ func (g *Game) buildEntityMeshes() (world.MeshData, world.MeshData, world.MeshDa
 				}
 			}
 		}
+		for _, p := range g.mobs.Projectiles {
+			half := float32(0.12)
+			c := p.Body.Pos
+			appendBlockBox(&opaque, c.Sub(mathx.V3(half, half, half)), c.Add(mathx.V3(half, half, half)), core.Snow)
+		}
 	}
 	g.applySmoothLightRange(&opaque, 0)
 	g.applySmoothLightRange(&transparent, 0)

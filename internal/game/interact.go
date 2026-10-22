@@ -50,6 +50,7 @@ var recipes = []recipe{
 	shaped(core.Stack{Item: core.ItemIronSword, Count: 1}, []string{"I", "I", "S"}, map[rune]core.ItemID{'I': core.ItemIronIngot, 'S': core.ItemStick}),
 	shaped(core.Stack{Item: core.ItemStonePickaxe, Count: 1}, []string{"CCC", " S ", " S "}, map[rune]core.ItemID{'C': core.ItemCobble, 'S': core.ItemStick}),
 	shaped(core.Stack{Item: core.ItemIronPickaxe, Count: 1}, []string{"III", " S ", " S "}, map[rune]core.ItemID{'I': core.ItemIronIngot, 'S': core.ItemStick}),
+	shaped(core.Stack{Item: core.ItemSnowball, Count: 4}, []string{"S"}, map[rune]core.ItemID{'S': core.ItemSnow}),
 }
 
 func (g *Game) handleActions(dt float32) {
@@ -96,6 +97,11 @@ func (g *Game) handleActions(dt float32) {
 	if g.mouseRight && blockHit.Hit && !mobFirst && blockHit.Block == core.Chest && g.placeCool <= 0 {
 		g.cancelUse()
 		g.openChest(blockHit.Pos)
+		return
+	}
+	// Throwable items are launched immediately (rate limited by a cooldown).
+	if g.mouseRight && !st.Empty() && st.Item.Def().Throwable {
+		g.throwProjectile(st.Item)
 		return
 	}
 	// Food is eaten over its use duration rather than instantly.
@@ -174,6 +180,28 @@ func (g *Game) finishEating(item core.ItemID) {
 	g.placeCool = 0.35
 	g.notify(i18n.T("toast.ate", i18n.ItemName(item)), 1.2)
 	g.cancelUse()
+}
+
+// projectileSpeed is how fast thrown items leave the hand (blocks per second).
+const projectileSpeed = float32(24)
+
+// throwProjectile launches the held throwable item, consuming it in survival.
+func (g *Game) throwProjectile(item core.ItemID) {
+	if g.throwCool > 0 || g.mobs == nil || g.player == nil {
+		return
+	}
+	g.throwCool = 0.3
+	g.cancelUse()
+	dir := g.player.LookDir()
+	if dir.LengthSq() < 1e-5 {
+		dir = mathx.V3(0, 0, -1)
+	}
+	pos := g.player.Eye().Add(dir.Mul(0.45)).Add(mathx.V3(0, -0.08, 0))
+	g.mobs.SpawnProjectile(item, pos, dir.Mul(projectileSpeed))
+	if g.mode != ModeCreative {
+		g.inv.TakeSelected(1)
+	}
+	g.triggerSwing()
 }
 
 func (g *Game) mineBlock(dt float32, hit world.RayHit) {
