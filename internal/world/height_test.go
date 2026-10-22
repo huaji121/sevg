@@ -20,7 +20,7 @@ func TestHighMountainsInTallWorld(t *testing.T) {
 			}
 			if b == BiomeHighMountains {
 				high++
-				if h < 145 {
+				if h < SeaLevel+97 {
 					t.Fatalf("high mountain too low: %d", h)
 				}
 			}

@@ -50,14 +50,14 @@ func TestMineBlockProducesDrop(t *testing.T) {
 
 func TestPlaceBlockConsumesItem(t *testing.T) {
 	g := newTestGame(t)
-	g.world.SetBlock(8, 70, 8, core.Stone)
-	g.player.Body.Pos = mathx.Vec3{X: 12.5, Y: 72, Z: 12.5}
+	g.world.SetBlock(8, 100, 8, core.Stone)
+	g.player.Body.Pos = mathx.Vec3{X: 12.5, Y: 102, Z: 12.5}
 	g.inv = core.Inventory{}
 	g.inv.Selected = 0
 	g.inv.Slots[0] = core.Stack{Item: core.ItemPlanks, Count: 4}
-	hit := world.RayHit{Hit: true, Block: core.Stone, Pos: [3]int{8, 70, 8}, Normal: mathx.Vec3{Y: 1}}
+	hit := world.RayHit{Hit: true, Block: core.Stone, Pos: [3]int{8, 100, 8}, Normal: mathx.Vec3{Y: 1}}
 	g.useItem(hit)
-	if b := g.world.GetBlock(8, 71, 8); b != core.Planks {
+	if b := g.world.GetBlock(8, 101, 8); b != core.Planks {
 		t.Fatalf("block not placed: %v", b)
 	}
 	if got := g.inv.Count(core.ItemPlanks); got != 3 {
@@ -178,17 +178,17 @@ func TestMiningProgressResetsWhenBlockChanges(t *testing.T) {
 }
 func TestPlacePassThroughBlockInsidePlayer(t *testing.T) {
 	g := newTestGame(t)
-	g.player.Body.Pos = mathx.Vec3{X: 12.5, Y: 72, Z: 12.5}
+	g.player.Body.Pos = mathx.Vec3{X: 12.5, Y: 102, Z: 12.5}
 	g.inv = core.Inventory{}
 	g.inv.Selected = 0
 	g.inv.Slots[0] = core.Stack{Item: core.ItemTorch, Count: 4}
-	g.world.SetBlock(12, 71, 12, core.Stone)
-	hit := world.RayHit{Hit: true, Block: core.Stone, Pos: [3]int{11, 72, 12}, Normal: mathx.Vec3{X: 1}}
-	if !g.player.IntersectsBlock(12, 72, 12) {
+	g.world.SetBlock(12, 101, 12, core.Stone)
+	hit := world.RayHit{Hit: true, Block: core.Stone, Pos: [3]int{11, 102, 12}, Normal: mathx.Vec3{X: 1}}
+	if !g.player.IntersectsBlock(12, 102, 12) {
 		t.Fatal("test target is not inside the player")
 	}
 	g.useItem(hit)
-	if b := g.world.GetBlock(12, 72, 12); b != core.Torch {
+	if b := g.world.GetBlock(12, 102, 12); b != core.Torch {
 		t.Fatalf("pass-through block was not placed inside player: %v", b)
 	}
 	if got := g.inv.Count(core.ItemTorch); got != 3 {
@@ -251,13 +251,13 @@ func TestEatingBlockedWhenFull(t *testing.T) {
 
 func TestSolidBlockStillRequiresSpace(t *testing.T) {
 	g := newTestGame(t)
-	g.player.Body.Pos = mathx.Vec3{X: 12.5, Y: 72, Z: 12.5}
+	g.player.Body.Pos = mathx.Vec3{X: 12.5, Y: 102, Z: 12.5}
 	g.inv = core.Inventory{}
 	g.inv.Selected = 0
 	g.inv.Slots[0] = core.Stack{Item: core.ItemPlanks, Count: 4}
-	hit := world.RayHit{Hit: true, Block: core.Dirt, Pos: [3]int{11, 72, 12}, Normal: mathx.Vec3{X: 1}}
+	hit := world.RayHit{Hit: true, Block: core.Dirt, Pos: [3]int{11, 102, 12}, Normal: mathx.Vec3{X: 1}}
 	g.useItem(hit)
-	if b := g.world.GetBlock(12, 72, 12); b != core.Air {
+	if b := g.world.GetBlock(12, 102, 12); b != core.Air {
 		t.Fatalf("solid block was placed inside player: %v", b)
 	}
 	if got := g.inv.Count(core.ItemPlanks); got != 4 {

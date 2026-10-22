@@ -216,32 +216,32 @@ func TestWaterFlowsAndRetracts(t *testing.T) {
 	w.EnsureChunk(ChunkPos{0, 0})
 	for x := 6; x <= 18; x++ {
 		for z := 6; z <= 10; z++ {
-			w.SetBlock(x, 69, z, core.Stone)
-			for y := 70; y <= 73; y++ {
+			w.SetBlock(x, 99, z, core.Stone)
+			for y := 100; y <= 103; y++ {
 				w.SetBlock(x, y, z, core.Air)
 			}
 		}
 	}
-	w.SetBlock(8, 70, 8, core.Water)
+	w.SetBlock(8, 100, 8, core.Water)
 	for i := 0; i < 40; i++ {
 		w.TickFluids()
 	}
-	if got := w.GetBlock(9, 70, 8); got != core.Water || w.WaterLevelAt(9, 70, 8) != 1 {
-		t.Fatalf("first flow cell = %v level %d", got, w.WaterLevelAt(9, 70, 8))
+	if got := w.GetBlock(9, 100, 8); got != core.Water || w.WaterLevelAt(9, 100, 8) != 1 {
+		t.Fatalf("first flow cell = %v level %d", got, w.WaterLevelAt(9, 100, 8))
 	}
-	if got := w.WaterLevelAt(15, 70, 8); got != 7 {
+	if got := w.WaterLevelAt(15, 100, 8); got != 7 {
 		t.Fatalf("last flow level = %d, want 7", got)
 	}
-	if got := w.GetBlock(16, 70, 8); got != core.Air {
+	if got := w.GetBlock(16, 100, 8); got != core.Air {
 		t.Fatalf("water exceeded max range: %v", got)
 	}
 
-	w.SetBlock(8, 70, 8, core.Air)
+	w.SetBlock(8, 100, 8, core.Air)
 	for i := 0; i < 60; i++ {
 		w.TickFluids()
 	}
 	for x := 9; x <= 15; x++ {
-		if got := w.GetBlock(x, 70, 8); got != core.Air {
+		if got := w.GetBlock(x, 100, 8); got != core.Air {
 			t.Fatalf("flow did not retract at %d: %v", x, got)
 		}
 	}

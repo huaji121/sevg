@@ -15,7 +15,7 @@ func flatWorld(t *testing.T, radius int) *world.World {
 	w.EnsureChunk(world.ChunkPos{0, 0})
 	for x := -radius; x <= radius; x++ {
 		for z := -radius; z <= radius; z++ {
-			w.SetBlock(x, 64, z, core.Stone)
+			w.SetBlock(x, 100, z, core.Stone)
 		}
 	}
 	return w
@@ -23,7 +23,7 @@ func flatWorld(t *testing.T, radius int) *world.World {
 
 func TestCrouchLowersEyeAndSlowsMovement(t *testing.T) {
 	w := flatWorld(t, 3)
-	p := New(mathx.Vec3{X: 0.5, Y: 65, Z: 0.5})
+	p := New(mathx.Vec3{X: 0.5, Y: 101, Z: 0.5})
 	p.Update(0.016, w, Input{})
 	standEye := p.Eye().Y
 	p.Update(0.016, w, Input{Crouch: true})
@@ -48,13 +48,13 @@ func TestCrouchLowersEyeAndSlowsMovement(t *testing.T) {
 func TestCrouchStopsAtBlockEdge(t *testing.T) {
 	w := world.New(2)
 	w.EnsureChunk(world.ChunkPos{0, 0})
-	w.SetBlock(0, 64, 0, core.Stone)
-	p := New(mathx.Vec3{X: 0.5, Y: 65, Z: 0.5})
+	w.SetBlock(0, 100, 0, core.Stone)
+	p := New(mathx.Vec3{X: 0.5, Y: 101, Z: 0.5})
 	p.Yaw = 1.5707964 // +X
 	for i := 0; i < 120; i++ {
 		p.Update(0.016, w, Input{Forward: 1, Crouch: true})
 	}
-	if p.Body.Pos.Y < 64.9 {
+	if p.Body.Pos.Y < 100.9 {
 		t.Fatalf("crouching player fell off the edge: y=%f x=%f", p.Body.Pos.Y, p.Body.Pos.X)
 	}
 	if p.Body.Pos.X <= 1.0 || p.Body.Pos.X > 1.31 {
@@ -66,7 +66,7 @@ func TestCrouchStopsAtBlockEdge(t *testing.T) {
 	for i := 0; i < 60; i++ {
 		p.Update(0.016, w, Input{Strafe: 1, Crouch: true})
 	}
-	if p.Body.Pos.Z <= z0+0.15 || p.Body.Pos.Y < 64.9 {
+	if p.Body.Pos.Z <= z0+0.15 || p.Body.Pos.Y < 100.9 {
 		t.Fatalf("stuck or fell while moving along edge: z=%f y=%f", p.Body.Pos.Z, p.Body.Pos.Y)
 	}
 
@@ -75,13 +75,13 @@ func TestCrouchStopsAtBlockEdge(t *testing.T) {
 	for i := 0; i < 60; i++ {
 		p.Update(0.016, w, Input{Forward: -1, Crouch: true})
 	}
-	if p.Body.Pos.X >= x0-0.1 || p.Body.Pos.Y < 64.9 {
+	if p.Body.Pos.X >= x0-0.1 || p.Body.Pos.Y < 100.9 {
 		t.Fatalf("stuck or fell while retreating: x=%f y=%f", p.Body.Pos.X, p.Body.Pos.Y)
 	}
 }
 func TestJumpClearsOnGroundImmediately(t *testing.T) {
 	w := flatWorld(t, 3)
-	p := New(mathx.Vec3{X: 0.5, Y: 65, Z: 0.5})
+	p := New(mathx.Vec3{X: 0.5, Y: 101, Z: 0.5})
 	p.Update(0.016, w, Input{})
 	p.Update(0.016, w, Input{Jump: true})
 	if p.Body.OnGround || p.Body.Vel.Y <= 0 {
@@ -108,7 +108,7 @@ func TestEatRestoresFoodAndSaturation(t *testing.T) {
 
 func TestSprintRequiresFood(t *testing.T) {
 	w := flatWorld(t, 3)
-	p := New(mathx.Vec3{X: 0.5, Y: 65, Z: 0.5})
+	p := New(mathx.Vec3{X: 0.5, Y: 101, Z: 0.5})
 	p.Food = 6
 	p.Update(0.05, w, Input{Forward: 1, Sprint: true})
 	if p.Sprinting {
@@ -123,7 +123,7 @@ func TestSprintRequiresFood(t *testing.T) {
 
 func TestExhaustionDrainsFood(t *testing.T) {
 	w := flatWorld(t, 3)
-	p := New(mathx.Vec3{X: 0.5, Y: 65, Z: 0.5})
+	p := New(mathx.Vec3{X: 0.5, Y: 101, Z: 0.5})
 	p.Saturation = 0
 	p.AddExhaustion(4)
 	p.Update(0.016, w, Input{})
@@ -134,7 +134,7 @@ func TestExhaustionDrainsFood(t *testing.T) {
 
 func TestFoodRegeneratesHealth(t *testing.T) {
 	w := flatWorld(t, 3)
-	p := New(mathx.Vec3{X: 0.5, Y: 65, Z: 0.5})
+	p := New(mathx.Vec3{X: 0.5, Y: 101, Z: 0.5})
 	p.Health = 10
 	p.Saturation = 0
 	for i := 0; i < 300; i++ { // 15 seconds
@@ -150,7 +150,7 @@ func TestFoodRegeneratesHealth(t *testing.T) {
 
 func TestStarvingPlayerTakesDamage(t *testing.T) {
 	w := flatWorld(t, 3)
-	p := New(mathx.Vec3{X: 0.5, Y: 65, Z: 0.5})
+	p := New(mathx.Vec3{X: 0.5, Y: 101, Z: 0.5})
 	p.Food = 0
 	p.Saturation = 0
 	for i := 0; i < 100; i++ { // 5 seconds
@@ -163,7 +163,7 @@ func TestStarvingPlayerTakesDamage(t *testing.T) {
 
 func TestCreativeHungerStaysFull(t *testing.T) {
 	w := flatWorld(t, 3)
-	p := New(mathx.Vec3{X: 0.5, Y: 65, Z: 0.5})
+	p := New(mathx.Vec3{X: 0.5, Y: 101, Z: 0.5})
 	p.Creative = true
 	p.Food = 3
 	p.Saturation = 0

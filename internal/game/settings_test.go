@@ -55,8 +55,8 @@ func TestDynamicLightToggle(t *testing.T) {
 	g := newTestGame(t)
 	g.opts.SmokeFrames = 1
 	g.opts.DynamicLight = true
-	g.world.SetDynamicLight(8, 70, 8, 14)
-	if g.world.BlockLightAt(8, 70, 8) == 0 {
+	g.world.SetDynamicLight(8, 100, 8, 14)
+	if g.world.BlockLightAt(8, 100, 8) == 0 {
 		t.Fatal("dynamic light was not applied")
 	}
 	g.applyVideoChange(6, 0)
@@ -64,7 +64,7 @@ func TestDynamicLightToggle(t *testing.T) {
 		t.Fatal("dynamic light option did not turn off")
 	}
 	g.updateHeldLight(0.1)
-	if got := g.world.BlockLightAt(8, 70, 8); got != 0 {
+	if got := g.world.BlockLightAt(8, 100, 8); got != 0 {
 		t.Fatalf("dynamic light remains after disabling: %d", got)
 	}
 }

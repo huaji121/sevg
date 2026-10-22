@@ -9,7 +9,7 @@ import (
 const (
 	ChunkSize   = 16
 	ChunkHeight = 256
-	SeaLevel    = 48
+	SeaLevel    = 70
 	ChunkArea   = ChunkSize * ChunkSize * ChunkHeight
 )
 
@@ -116,7 +116,9 @@ func (g *Generator) HeightAt(wx, wz int) (int, Biome) {
 	detail := g.detail.Fbm2(x*0.021, z*0.021, 4, 2.0, 0.5)
 	ridge := g.ridge.Ridged2(x*0.0055+100, z*0.0055-70, 4)
 	mountainMask := smoothstep(0.02, 0.55, continent)
-	h := 48.0 + continent*19.0 + detail*5.5 + mountainMask*ridge*32.0
+	// The base height tracks SeaLevel so raising sea level lifts the whole
+	// terrain (deeper underground) instead of flooding the world.
+	h := float64(SeaLevel) + continent*19.0 + detail*5.5 + mountainMask*ridge*32.0
 
 	// Alpine ranges rise from the highest continental areas. The ridged noise
 	// creates sharp connecting peaks instead of rounded hills.
@@ -130,9 +132,9 @@ func (g *Generator) HeightAt(wx, wz int) (int, Biome) {
 
 	biome := BiomePlains
 	switch {
-	case h >= 145:
+	case h >= float64(SeaLevel+97):
 		biome = BiomeHighMountains
-	case h > 78:
+	case h > float64(SeaLevel+30):
 		biome = BiomeMountains
 	case temp > 0.30 && moist < -0.05:
 		biome = BiomeDesert
@@ -141,7 +143,7 @@ func (g *Generator) HeightAt(wx, wz int) (int, Biome) {
 	case moist > 0.12:
 		biome = BiomeForest
 	}
-	if h < SeaLevel-1 {
+	if h < float64(SeaLevel-1) {
 		biome = BiomeOcean
 	}
 	return int(math.Round(h)), biome
@@ -152,23 +154,23 @@ func (g *Generator) surfaceBlock(biome Biome, h int) core.BlockID {
 	case BiomeDesert:
 		return core.Sand
 	case BiomeSnow:
-		if h > 110 {
+		if h > SeaLevel+62 {
 			return core.Snow
 		}
 		return core.SnowyGrass
 	case BiomeHighMountains:
-		if h > 185 {
+		if h > SeaLevel+137 {
 			return core.Snow
 		}
-		if h > 150 {
+		if h > SeaLevel+102 {
 			return core.Stone
 		}
 		return core.Grass
 	case BiomeMountains:
-		if h > 125 {
+		if h > SeaLevel+77 {
 			return core.Snow
 		}
-		if h > 100 {
+		if h > SeaLevel+52 {
 			return core.Stone
 		}
 		return core.Grass
@@ -235,9 +237,9 @@ func (g *Generator) GenerateChunk(cp ChunkPos) []core.BlockID {
 					blocks[i] = core.Air
 					continue
 				}
-				if y < 72 {
+				if y < SeaLevel+24 {
 					r := g.ore.Unit3(wx, y, wz)
-					if y < 48 && r < 0.010 {
+					if y < SeaLevel && r < 0.010 {
 						blocks[i] = core.IronOre
 					} else if r < 0.025 {
 						blocks[i] = core.CoalOre

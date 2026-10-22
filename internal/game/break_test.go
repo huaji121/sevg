@@ -9,8 +9,8 @@ import (
 
 func TestBreakOverlayGeometry(t *testing.T) {
 	g := newTestGame(t)
-	g.world.SetBlock(8, 70, 8, core.Stone)
-	g.breakPos = [3]int{8, 70, 8}
+	g.world.SetBlock(8, 100, 8, core.Stone)
+	g.breakPos = [3]int{8, 100, 8}
 	g.targetValid = true
 	g.breakActive = true
 	g.breakProgress = 0.45

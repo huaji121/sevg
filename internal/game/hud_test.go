@@ -43,7 +43,7 @@ func TestPlantDropGeometry(t *testing.T) {
 
 func TestGlassDropUsesTransparentMesh(t *testing.T) {
 	g := newTestGame(t)
-	g.mobs.Drop(core.ItemGlass, 1, mathx.Vec3{X: 0.5, Y: 64.2, Z: 0.5}, mathx.Vec3{})
+	g.mobs.Drop(core.ItemGlass, 1, mathx.Vec3{X: 0.5, Y: 100.2, Z: 0.5}, mathx.Vec3{})
 	opaque, transparent, _ := g.buildEntityMeshes()
 	if len(transparent.Vertices) != 24 || len(transparent.Indices) != 36 {
 		t.Fatalf("glass drop transparent mesh: %d/%d", len(transparent.Vertices), len(transparent.Indices))
