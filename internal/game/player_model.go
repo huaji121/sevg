@@ -23,6 +23,20 @@ type skinFaces [6][4]float32
 
 const skinSize = float32(64)
 
+// Minecraft player model proportions. The 32 model pixels (legs 12, torso 12,
+// head 8) map to the 1.8-block collision height so proportions and scale match
+// the vanilla model.
+const playerUnit = float32(1.8 / 32.0)
+
+const (
+	playerLegHeight   = 12 * playerUnit
+	playerTorsoHeight = 12 * playerUnit
+	playerHeadSize    = 8 * playerUnit
+	playerTorsoWidth  = 8 * playerUnit
+	playerLimbWidth   = 4 * playerUnit
+	playerLimbDepth   = 4 * playerUnit
+)
+
 func skinFace(x0, y0, x1, y1 float32) [4]float32 {
 	return [4]float32{x0 / skinSize, y0 / skinSize, x1 / skinSize, y1 / skinSize}
 }
@@ -128,12 +142,12 @@ func (g *Game) appendPlayerHeldBlock(opaque, transparent *world.MeshData, swing 
 	default:
 		return
 	}
-	center := mathx.V3(0.48, 0.56, -0.16)
+	center := mathx.V3(0.40, 0.60, -0.18)
 	const half = float32(0.13)
 	var part world.MeshData
 	appendBlockBox(&part, center.Sub(mathx.V3(half, half, half)), center.Add(mathx.V3(half, half, half)), def.Block)
 	p := g.player
-	pivot := mathx.V3(0.36, 1.25, 0)
+	pivot := mathx.V3(playerTorsoWidth/2+playerLimbWidth/2, playerLegHeight+playerTorsoHeight, 0)
 	base := uint32(len(dst.Vertices))
 	for _, v := range part.Vertices {
 		q := mathx.Vec3{X: v.X, Y: v.Y, Z: v.Z}.Sub(pivot)
@@ -151,8 +165,15 @@ func (g *Game) appendPlayerHeldBlock(opaque, transparent *world.MeshData, swing 
 // appendPlayerRightArm builds the same right arm geometry used by the
 // third-person player model, in player-local coordinates.
 func appendPlayerRightArm(dst *world.MeshData, walkSwing, actionSwing float32) {
-	arm := -walkSwing - actionSwing
-	appendPlayerSkinBox(dst, mathx.V3(0.27, 0.62, -0.10), mathx.V3(0.45, 1.26, 0.10), mathx.V3(0.36, 1.25, 0), arm, skinArmRight)
+	// A positive angle rotates the hanging arm toward -Z, so the action swing
+	// must be added to reach forward instead of behind the player.
+	arm := -walkSwing + actionSwing
+	inner := playerTorsoWidth / 2
+	pivot := mathx.V3(inner+playerLimbWidth/2, playerLegHeight+playerTorsoHeight, 0)
+	appendPlayerSkinBox(dst,
+		mathx.V3(inner, playerLegHeight, -playerLimbDepth/2),
+		mathx.V3(inner+playerLimbWidth, playerLegHeight+playerTorsoHeight, playerLimbDepth/2),
+		pivot, arm, skinArmRight)
 }
 
 // appendPlayerModel builds a Steve-like blocky player model at the player's
@@ -175,21 +196,39 @@ func (g *Game) appendPlayerModel(dst, icons, transparent *world.MeshData) {
 
 	var model world.MeshData
 	// Torso.
-	appendPlayerSkinBox(&model, mathx.V3(-0.25, 0.65, -0.15), mathx.V3(0.25, 1.30, 0.15), mathx.V3(0, 0.65, 0), 0, skinTorso)
+	legTop := playerLegHeight
+	torsoTop := legTop + playerTorsoHeight
+	halfW := playerTorsoWidth / 2
+	halfD := playerLimbDepth / 2
+	appendPlayerSkinBox(&model,
+		mathx.V3(-halfW, legTop, -halfD), mathx.V3(halfW, torsoTop, halfD),
+		mathx.V3(0, legTop, 0), 0, skinTorso)
 
 	// Head, hair and face all follow head pitch around the neck.
-	neck := mathx.V3(0, 1.30, 0)
+	neck := mathx.V3(0, torsoTop, 0)
 	pitch := p.Pitch
-	appendPlayerSkinBox(&model, mathx.V3(-0.25, 1.30, -0.25), mathx.V3(0.25, 1.80, 0.25), neck, pitch, skinHead)
+	headHalf := playerHeadSize / 2
+	appendPlayerSkinBox(&model,
+		mathx.V3(-headHalf, torsoTop, -headHalf), mathx.V3(headHalf, torsoTop+playerHeadSize, headHalf),
+		neck, pitch, skinHead)
 	// Eyes.
 
 	// Arms. They hang from the shoulders and swing opposite to the legs.
 	appendPlayerRightArm(&model, armSwing, g.swingAngle())
-	appendPlayerSkinBox(&model, mathx.V3(-0.45, 0.62, -0.10), mathx.V3(-0.27, 1.26, 0.10), mathx.V3(-0.36, 1.25, 0), armSwing, skinArmLeft)
+	inner := halfW
+	appendPlayerSkinBox(&model,
+		mathx.V3(-inner-playerLimbWidth, legTop, -playerLimbDepth/2), mathx.V3(-inner, torsoTop, playerLimbDepth/2),
+		mathx.V3(-inner-playerLimbWidth/2, torsoTop, 0), armSwing, skinArmLeft)
 
-	// Legs with darker shoes.
-	appendPlayerSkinBox(&model, mathx.V3(0.01, 0.0, -0.12), mathx.V3(0.24, 0.66, 0.12), mathx.V3(0.125, 0.65, 0), legSwing, skinLegRight)
-	appendPlayerSkinBox(&model, mathx.V3(-0.24, 0.0, -0.12), mathx.V3(-0.01, 0.66, 0.12), mathx.V3(-0.125, 0.65, 0), -legSwing, skinLegLeft)
+	// Legs with darker shoes. Each leg is 4 px wide (playerLimbWidth), so the
+	// two legs together span the 8 px torso width.
+	legHalf := playerLimbWidth / 2
+	appendPlayerSkinBox(&model,
+		mathx.V3(0, 0, -playerLimbDepth/2), mathx.V3(legHalf*2, legTop, playerLimbDepth/2),
+		mathx.V3(legHalf, legTop, 0), legSwing, skinLegRight)
+	appendPlayerSkinBox(&model,
+		mathx.V3(-legHalf*2, 0, -playerLimbDepth/2), mathx.V3(0, legTop, playerLimbDepth/2),
+		mathx.V3(-legHalf, legTop, 0), -legSwing, skinLegLeft)
 
 	// Rotate the whole model to the player's yaw and move it to the feet.
 	base := uint32(len(dst.Vertices))
@@ -203,8 +242,8 @@ func (g *Game) appendPlayerModel(dst, icons, transparent *world.MeshData) {
 	for _, idx := range model.Indices {
 		dst.Indices = append(dst.Indices, base+idx)
 	}
-	g.appendPlayerHeldIconCard(icons, armSwing+g.swingAngle())
-	g.appendPlayerHeldBlock(dst, transparent, armSwing+g.swingAngle())
+	g.appendPlayerHeldIconCard(icons, armSwing-g.swingAngle())
+	g.appendPlayerHeldBlock(dst, transparent, armSwing-g.swingAngle())
 	g.applySmoothLightRange(dst, int(base))
 	g.applySmoothLightRange(icons, int(iconBase))
 }
@@ -232,7 +271,7 @@ func (g *Game) appendPlayerHeldIconCard(dst *world.MeshData, swing float32) {
 	var card world.MeshData
 	appendIconCard(&card, center, cardRight, cardUp, normal, 0.42, 0.42, 0.012, glyph, g.canv.IconSides[st.Item])
 	p := g.player
-	pivot := mathx.V3(0.36, 1.25, 0)
+	pivot := mathx.V3(playerTorsoWidth/2+playerLimbWidth/2, playerLegHeight+playerTorsoHeight, 0)
 	base := uint32(len(dst.Vertices))
 	for _, v := range card.Vertices {
 		q := mathx.Vec3{X: v.X, Y: v.Y, Z: v.Z}.Sub(pivot)

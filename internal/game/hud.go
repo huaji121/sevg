@@ -705,8 +705,8 @@ func (g *Game) appendFirstPersonHand(dst *world.MeshData, eye, right, up, fwd ma
 	appendPlayerRightArm(&arm, armSwing, g.swingAngle())
 	const (
 		armScale  = float32(0.45)
-		shoulderX = float32(0.36)
-		shoulderY = float32(1.25)
+		shoulderX = playerTorsoWidth/2 + playerLimbWidth/2
+		shoulderY = playerLegHeight + playerTorsoHeight
 		offR      = float32(0.32)
 		offU      = float32(-0.22)
 		offF      = float32(0.30)
